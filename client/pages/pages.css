@@ -1,0 +1,29 @@
+/* user-profile  */
+@import url(./user-profile/user-profile.css);
+
+/* dashboard  */
+@import url(./Dashboard/dashboard.css);
+@import url(./Dashboard/analytics.css);
+
+/* employees  */
+@import url(./Employees/employees.css);
+@import url(./Employees/permisson.css);
+
+/* business  */
+@import url(./Business/business.css);
+@import url(./Business/analytics.css);
+
+/* todo  */
+@import url(./Tasks/tasks.css);
+@import url(./Tasks/analytics.css);
+
+/* messenger  */
+@import url(./Messenger/messenger.css);
+@import url(./Messenger/analytics.css);
+
+/* vacations  */
+@import url(./Vacations/vacations.css);
+@import url(./Vacations/analytics.css);
+
+/* infoportal  */
+@import url(./InfoPortal/infoportal.css);

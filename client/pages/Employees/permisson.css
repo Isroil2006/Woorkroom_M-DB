@@ -1,0 +1,435 @@
+/* ═══════════════════════════════════════════════════════════════
+   permissions.css
+   ═══════════════════════════════════════════════════════════════ */
+
+@keyframes permOverlayIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+@keyframes permModalIn {
+    from {
+        opacity: 0;
+        transform: scale(0.93) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+@keyframes badgePop {
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+    70% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* ── Overlay ── */
+.perm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 29, 46, 0.5);
+    backdrop-filter: blur(7px);
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: permOverlayIn 0.18s ease;
+}
+
+/* ── Modal ── */
+.perm-modal {
+    background: #fff;
+    border-radius: 22px;
+    width: 100%;
+    max-width: 700px;
+    max-height: 95%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 28px 72px rgba(0, 0, 0, 0.18);
+    animation: permModalIn 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+    overflow: hidden;
+    font-family: inherit;
+}
+
+/* ── Header ── */
+.perm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 26px 16px;
+    background: linear-gradient(135deg, #5b6ef5, #7c3aed);
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+}
+.perm-header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(-45deg, transparent, transparent 18px, rgba(255, 255, 255, 0.03) 18px, rgba(255, 255, 255, 0.03) 19px);
+    pointer-events: none;
+}
+.perm-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    z-index: 1;
+}
+.perm-header-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.perm-header-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.2px;
+}
+.perm-header-sub {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 2px;
+}
+.perm-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    transition: all 0.15s;
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+}
+.perm-close:hover {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+}
+
+/* ── Body ── */
+.perm-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 22px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background: #f8f9ff;
+}
+.perm-body::-webkit-scrollbar {
+    width: 4px;
+}
+.perm-body::-webkit-scrollbar-thumb {
+    background: #dde1f3;
+    border-radius: 2px;
+}
+
+/* ── Section ── */
+.perm-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.perm-section-label {
+    font-size: 11px;
+    font-weight: 800;
+    color: #8892a4;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 2px;
+}
+
+/* ── Items ── */
+.perm-items {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.perm-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 11px 13px;
+    border-radius: 12px;
+    border: 1.5px solid #e8eaf5;
+    background: #fff;
+    transition: all 0.18s;
+    user-select: none;
+}
+.perm-item--on {
+    border-color: #e8eaf5;
+}
+.perm-item--off {
+    border-color: #fecaca;
+    background: #fff8f8;
+}
+.perm-item--off:hover {
+    border-color: #fca5a5;
+}
+
+.perm-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+}
+.perm-item-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1d2e;
+    line-height: 1.3;
+}
+.perm-item-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    width: fit-content;
+    transition: all 0.18s;
+}
+.badge--on {
+    background: #dcfce7;
+    color: #16a34a;
+}
+.badge--off {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* ── Right side ── */
+.perm-item-right {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════
+   ── Blocked count badge ──
+   ══════════════════════════════════════════════════════ */
+.perm-sub-count {
+    /* Always in DOM — invisible when empty */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 800;
+    font-family: inherit;
+    /* Default: transparent / invisible */
+    background: transparent;
+    color: transparent;
+    transition:
+        background 0.2s,
+        color 0.2s;
+    pointer-events: none;
+    flex-shrink: 0;
+}
+
+/* Active — qizil badge, animatsiya bilan */
+.perm-sub-count--active {
+    background: #fee2e2;
+    color: #dc2626;
+    border: 1.5px solid #fca5a5;
+    animation: badgePop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Chevron ── */
+.perm-chevron-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1.5px solid #e2e6f5;
+    background: #f4f5fd;
+    color: #8892c8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.16s;
+    padding: 0;
+}
+.perm-chevron-btn:hover {
+    background: #eaecfb;
+    border-color: #b8bef0;
+    color: #5b6ef5;
+}
+.perm-chevron-icon {
+    transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.perm-chevron-btn--open .perm-chevron-icon {
+    transform: rotate(90deg);
+}
+
+/* ── Toggle ── */
+.perm-toggle {
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: #e2e8f0;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.22s;
+    flex-shrink: 0;
+}
+.perm-toggle--on {
+    background: #5b6ef5;
+}
+.perm-toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.perm-toggle--on .perm-toggle-thumb {
+    transform: translateX(18px);
+}
+
+/* ── Sub-panel ── */
+.perm-item-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+.perm-sub-panel {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition:
+        max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.22s ease,
+        margin-top 0.22s ease;
+    margin-top: 0;
+}
+.perm-sub-panel--open {
+    max-height: 500px;
+    opacity: 1;
+    margin-top: 4px;
+}
+.perm-sub-items {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding-left: 14px;
+    border-left: 2px solid #dde2f8;
+    margin-left: 12px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+.perm-item--sub {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #fcfcff;
+}
+.perm-item--sub .perm-item-label {
+    font-size: 12.5px;
+    color: #2d3150;
+}
+
+/* ── Footer ── */
+.perm-footer {
+    display: flex;
+    gap: 10px;
+    padding: 14px 26px 18px;
+    border-top: 1.5px solid #e8eaf5;
+    background: #fff;
+    flex-shrink: 0;
+}
+.perm-btn-cancel {
+    flex: 1;
+    background: #f0f2f8;
+    color: #5a6279;
+    border: none;
+    border-radius: 10px;
+    padding: 11px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+}
+.perm-btn-cancel:hover {
+    background: #e2e6f3;
+}
+.perm-btn-save {
+    flex: 1;
+    background: #5b6ef5;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 11px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(91, 110, 245, 0.28);
+}
+.perm-btn-save:hover {
+    background: #4a5de4;
+    transform: translateY(-1px);
+}
+
+/* ── Employees card button ── */
+.emp-perm-btn {
+    width: 100%;
+    padding: 10px 14px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: #5b6ef5;
+    font-weight: 600;
+    transition: background 0.13s;
+    border-radius: 0;
+}
+.emp-perm-btn:hover {
+    background: #eef0fd;
+}

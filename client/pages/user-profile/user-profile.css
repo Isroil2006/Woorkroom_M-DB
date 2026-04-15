@@ -1,0 +1,466 @@
+/* ──────────────────────────────────────────────────────────
+   USER PROFILE  —  redesigned styles
+   Uses project color palette:
+     primary blue:  var(--primary-blue)
+     white:         var(--white)
+     text-main:     var(--text-main)
+     text-gray:     var(--text-gray)
+   ────────────────────────────────────────────────────────── */
+
+/* Root wrapper */
+.up-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    background-color: #F0F2F8;
+    padding: 28px 32px;border-radius: 12px;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.up-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.up-header h2 {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.up-icon-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    border: none;
+    background: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-main);
+    transition: transform 0.2s ease;
+}
+.up-icon-btn:hover { transform: scale(1.07); }
+
+/* ── Body layout ─────────────────────────────────────────── */
+.up-body {
+    display: flex;
+    gap: 24px;
+    height: 100%;
+}
+
+/* ── Generic card ────────────────────────────────────────── */
+.up-card {
+    background: var(--white);
+    border-radius: 24px;
+    padding: 28px;
+    flex: 1;
+}
+
+/* ── Aside (left) ────────────────────────────────────────── */
+.up-aside {
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Avatar card */
+.up-avatar-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.up-avatar-wrap {
+    position: relative;
+    margin-bottom: 8px;
+}
+
+.up-avatar-img {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #e6edf5;
+}
+
+.up-avatar-edit-btn {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: none;
+    background: var(--primary-blue);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+.up-avatar-edit-btn:hover { transform: scale(1.1); }
+
+.up-avatar-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 0;
+    text-align: center;
+}
+.up-avatar-pos {
+    font-size: 13px;
+    color: var(--text-gray);
+    margin: 0;
+    text-align: center;
+    min-height: 18px;
+}
+
+/* Completion bar */
+.up-completion {
+    width: 100%;
+    margin-top: 12px;
+}
+.up-completion-top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-gray);
+    margin-bottom: 6px;
+}
+.up-completion-pct {
+    font-weight: 700;
+    color: var(--primary-blue);
+}
+.up-completion-bar {
+    width: 100%;
+    height: 6px;
+    background: #e6edf5;
+    border-radius: 99px;
+    overflow: hidden;
+}
+.up-completion-fill {
+    height: 100%;
+    background: var(--primary-blue);
+    border-radius: 99px;
+    transition: width 0.5s ease;
+}
+
+/* Chips card */
+.up-chips-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 8px 0;
+}
+
+.up-info-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    border-bottom: 1px solid #f0f2f5;
+}
+.up-info-chip:last-child { border-bottom: none; }
+
+.up-chip-label {
+    font-size: 13px;
+    color: var(--text-gray);
+    font-weight: 500;
+}
+.up-chip-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+.up-empty {
+    font-size: 13px;
+    font-weight: 400;
+    color: #c0c5d0;
+}
+
+/* ── Main (right) ────────────────────────────────────────── */
+.up-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Form card */
+.up-form-card {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.up-form-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 38.4px;
+}
+.up-form-card-header h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.up-edit-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    border: 1.5px solid var(--primary-blue);
+    background: transparent;
+    color: var(--primary-blue);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+.up-edit-btn:hover {
+    background: var(--primary-blue);
+    color: #fff;
+}
+
+/* Form grid — 2 columns */
+.up-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.up-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.up-form-group label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-gray);
+    letter-spacing: 0.02em;
+}
+
+.up-input {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1.5px solid #e6edf5;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-main);
+    background: var(--white);
+    transition: border-color 0.2s ease;
+    box-sizing: border-box;
+}
+.up-input:not(:disabled):focus {
+    outline: none;
+    border-color: var(--primary-blue);
+}
+.up-input:disabled {
+    background: #f7f9fc;
+    color: #9aa0b4;
+    cursor: not-allowed;
+    border-color: #eef0f5;
+}
+.up-select { appearance: none; cursor: pointer; }
+.up-select:not(:disabled) { cursor: pointer; }
+
+/* Form footer */
+.up-form-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.up-save-btn {
+    padding: 12px 28px;
+    border-radius: 12px;
+    border: none;
+    background: var(--primary-blue);
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.25s ease, transform 0.15s ease;
+}
+.up-save-btn:hover { transform: translateY(-1px); }
+.up-save-btn.up-saved { background: #0ac947; }
+
+.up-cancel-btn {
+    padding: 12px 24px;
+    border-radius: 12px;
+    border: 1.5px solid #e6edf5;
+    background: transparent;
+    color: var(--text-gray);
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+.up-cancel-btn:hover { background: #f7f9fc; }
+
+.hidden { display: none !important; }
+
+/* ── Settings page ───────────────────────────────────────── */
+.up-settings-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding-top: 40px;
+    gap: 24px;
+}
+
+.up-settings-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.up-settings-header h2 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.up-back-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: none;
+    background: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+.up-back-btn:hover { transform: translateX(-3px); }
+
+.up-settings-body {
+    display: flex;
+    gap: 24px;
+    height: 100%;
+}
+
+.up-snav {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--white);
+    border-radius: 24px;
+    padding: 20px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.up-snav-btn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 16px;
+    border-radius: 14px;
+    border: none;
+    background: transparent;
+    color: var(--text-gray);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+    position: relative;
+    text-align: left;
+}
+.up-snav-btn .setting-icon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+}
+.up-snav-btn.active {
+    background: #e6edf5;
+    color: var(--primary-blue);
+}
+.up-snav-btn.active::after {
+    content: "";
+    position: absolute;
+    right: -6px;
+    top: 10%;
+    height: 80%;
+    width: 4px;
+    background: var(--primary-blue);
+    border-radius: 99px;
+}
+.up-snav-btn:hover:not(.active) { background: #f5f7fa; }
+
+.up-scontent {
+    flex: 1;
+    background: var(--white);
+    border-radius: 24px;
+    padding: 32px;
+}
+
+.up-setting-section h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+/* ── Loading View ───────────────────────────────────────── */
+.up-body.loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.up-body-loader {
+    width: 100%;
+    height: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--white);
+    border-radius: 24px;
+    gap: 16px;
+}
+
+.up-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #e6edf5;
+    border-top: 4px solid var(--primary-blue);
+    border-radius: 50%;
+    animation: up-spin 0.8s linear infinite;
+}
+
+@keyframes up-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Skeleton Styles */
+.up-skeleton {
+    background: linear-gradient(90deg, #f0f2f5 25%, #e6edf5 50%, #f0f2f5 75%);
+    background-size: 200% 100%;
+    animation: up-skeleton-loading 1.5s infinite;
+    border-radius: 8px;
+}
+
+@keyframes up-skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.up-skeleton-avatar { width: 88px; height: 88px; border-radius: 50%; }
+.up-skeleton-text { height: 16px; width: 140px; }
+.up-skeleton-title { height: 24px; width: 180px; }
+.up-skeleton-input { height: 42px; width: 100%; border-radius: 12px; }
