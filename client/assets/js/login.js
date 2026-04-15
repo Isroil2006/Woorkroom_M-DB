@@ -1,3 +1,4 @@
+import { API_URL } from "./api.js";
 import { signInForm, signUpForm } from "../../pages/login/auth.js";
 
 const wrapper = document.querySelector(".auth-wrapper");
@@ -112,7 +113,7 @@ function attachEvents() {
         password,
       };
 
-      fetch("http://localhost:5000/api/users/register", {
+      fetch(`${API_URL}/api/users/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bodyData),
@@ -144,7 +145,7 @@ function attachEvents() {
         return;
       }
 
-      fetch("http://localhost:5000/api/users/login", {
+      fetch(`${API_URL}/api/users/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

@@ -1,3 +1,4 @@
+import { API_URL } from "../../assets/js/api.js";
 import { profileTranslations } from "./translations.js";
 
 const userProfileBtn = document.querySelector(".user-profile-btn");
@@ -79,7 +80,7 @@ export async function userProfileRender() {
   let user = loggedInInfo;
   try {
     const uId = loggedInInfo.userId || loggedInInfo._id;
-    const res = await fetch(`http://localhost:5000/api/users/${uId}`);
+    const res = await fetch(`${API_URL}/api/users/${uId}`);
     if (res.ok) {
       user = await res.json();
     }
@@ -92,7 +93,7 @@ export async function userProfileRender() {
   try {
     const uId = user.userId || user._id;
     const res = await fetch(
-      `http://localhost:5000/api/user-photos/${uId}?type=image`,
+      `${API_URL}/api/user-photos/${uId}?type=image`,
     );
     if (res.ok) {
       const file = await res.json();
@@ -290,7 +291,7 @@ export async function userProfileRender() {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${uId}`, {
+      const res = await fetch(`${API_URL}/api/users/${uId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -333,7 +334,7 @@ export async function userProfileRender() {
       const uId = user.userId || user._id;
 
       try {
-        const res = await fetch("http://localhost:5000/api/user-photos/upload", {
+        const res = await fetch(`${API_URL}/api/user-photos/upload`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

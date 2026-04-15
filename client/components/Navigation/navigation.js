@@ -1,3 +1,4 @@
+import { API_URL } from "../../assets/js/api.js";
 import {
   DashboardPage,
   initDashboardLogic,
@@ -417,7 +418,7 @@ const updateNavAvatar = async () => {
   if (!cu) return;
   try {
     const uId = cu.userId || cu._id;
-    const res = await fetch(`http://localhost:5000/api/user-photos/${uId}?type=image`);
+    const res = await fetch(`${API_URL}/api/user-photos/${uId}?type=image`);
     if (res.ok) {
       const file = await res.json();
       if (file && file.fileData) {

@@ -1,4 +1,5 @@
 // employees.js
+import { API_URL } from "../../assets/js/api.js";
 import {
   openPermissionsModal,
   getPermissions,
@@ -143,7 +144,7 @@ export function initEmployeesPage() {
   async function renderEmployees() {
     let users = [];
     try {
-      const res = await fetch("http://localhost:5000/api/users");
+      const res = await fetch(`${API_URL}/api/users`);
       if (res.ok) users = await res.json();
     } catch (e) {
       console.error(e);
@@ -243,7 +244,7 @@ export function initEmployeesPage() {
       const img = document.getElementById(`avatar-${u.userId || u._id}`);
       if (img) img.classList.add("image-loading");
 
-      fetch(`http://localhost:5000/api/user-photos/${u.userId || u._id}`)
+      fetch(`${API_URL}/api/user-photos/${u.userId || u._id}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((f) => {
           if (f && f.fileData && img) {
@@ -389,7 +390,7 @@ export function initEmployeesPage() {
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/user-photos/${u.userId || u._id}`,
+        `${API_URL}/api/user-photos/${u.userId || u._id}`,
       );
       if (res.ok) {
         const file = await res.json();
@@ -444,8 +445,8 @@ export function initEmployeesPage() {
     const method = editIndex !== null ? "PUT" : "POST";
     const url =
       editIndex !== null
-        ? `http://localhost:5000/api/users/${uId}`
-        : "http://localhost:5000/api/users/register";
+        ? `${API_URL}/api/users/${uId}`
+        : `${API_URL}/api/users/register`;
 
     try {
       const btnOriginalText = saveBtn.innerText;
@@ -464,7 +465,7 @@ export function initEmployeesPage() {
           currentImage &&
           currentImage !== "./assets/images/User-avatar.png"
         ) {
-          await fetch("http://localhost:5000/api/user-photos/upload", {
+          await fetch(`${API_URL}/api/user-photos/upload`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -556,7 +557,7 @@ export function initEmployeesPage() {
     const uId = userToDelete.userId || userToDelete._id;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${uId}`, {
+      const res = await fetch(`${API_URL}/api/users/${uId}`, {
         method: "DELETE",
       });
       if (res.ok) {

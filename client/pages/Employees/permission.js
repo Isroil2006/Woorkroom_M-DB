@@ -1,5 +1,6 @@
 //  permission.js
-const API_URL = "http://localhost:5000/api/permissions";
+import { API_URL } from "../../assets/js/api.js";
+const PERM_API = `${API_URL}/api/permissions`;
 
 const DEFAULT_PERMISSIONS = {
     nav_dashboard: true,
@@ -42,7 +43,7 @@ export const getPermissions = async (userId) => {
     }
 
     try {
-        const res = await fetch(`${API_URL}/${userId}`);
+        const res = await fetch(`${PERM_API}/${userId}`);
         if (res.ok) {
             const data = await res.json();
             const perms = data && data.perms ? { ...DEFAULT_PERMISSIONS, ...data.perms } : { ...DEFAULT_PERMISSIONS };
@@ -62,7 +63,7 @@ export const getPermissions = async (userId) => {
 export const savePermissions = async (userId, perms) => {
     if (!userId) return;
     try {
-        const res = await fetch(`${API_URL}/${userId}`, {
+        const res = await fetch(`${PERM_API}/${userId}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ perms }),

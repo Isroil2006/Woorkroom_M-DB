@@ -1,3 +1,4 @@
+import { API_URL as BASE_URL } from "../../assets/js/api.js";
 import { createTaskAnalyticsBtn, initTaskAnalytics } from "./analytics.js";
 import { translations } from "./trasnslations.js";
 import { applyPermissions } from "../Employees/permission.js";
@@ -6,7 +7,7 @@ let currentLang = localStorage.getItem("language") || "uz";
 const t = (key) => translations[currentLang]?.[key] ?? key;
 
 // ─── DATA HELPERS (API) ──────────────────────────────────────────
-const API_URL = "http://localhost:5000/api/tasks";
+const API_URL = `${BASE_URL}/api/tasks`;
 
 const fetchProjects = async () => {
   try {
@@ -30,7 +31,7 @@ const fetchTasks = async (projectId) => {
 
 const fetchUsers = async () => {
   try {
-    const res = await fetch(`http://localhost:5000/api/users`);
+    const res = await fetch(`${BASE_URL}/api/users`);
     return await res.json();
   } catch (err) {
     return [];
