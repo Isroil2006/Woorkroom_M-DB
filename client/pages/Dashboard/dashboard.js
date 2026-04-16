@@ -86,16 +86,16 @@ const renderDetailView = (container, testId) => {
                         <button class="btn back-to-dash">${t("back_dash")}</button>
                         <div class="custom-select" id="dash-language-selector">
                             <div class="selected">
-                                <img src="../assets/images/uzb-flag.png" alt="" />
+                                <img src="/assets/images/uzb-flag.png" alt="" />
                                 <span>UZ</span>
                                 <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="6 9 12 15 18 9"></polyline>
                                 </svg>
                             </div>
                             <ul class="options" style="display: none;">
-                                <li data-value="uz"><img src="../assets/images/uzb-flag.png" alt="" /> UZ</li>
-                                <li data-value="en"><img src="../assets/images/usa-flag.png" alt="" /> EN</li>
-                                <li data-value="ru"><img src="../assets/images/rus-flag.png" alt="" /> RU</li>
+                                <li data-value="uz"><img src="/assets/images/uzb-flag.png" alt="" /> UZ</li>
+                                <li data-value="en"><img src="/assets/images/usa-flag.png" alt="" /> EN</li>
+                                <li data-value="ru"><img src="/assets/images/rus-flag.png" alt="" /> RU</li>
                             </ul>
                         </div>
                     </div>
@@ -273,7 +273,7 @@ const renderQuestionList = (container, testId) => {
             <div class="q-item-top">
                 <div class="q-item-info">
                     <span class="q-label">Q. ${index + 1}</span>
-                    <button class="del-q-btn" data-idx="${index}"><img src="./pages/Dashboard/images/trash.svg" width="18"></button>
+                    <button class="del-q-btn" data-idx="${index}"><img src="/pages/Dashboard/images/trash.svg" width="18"></button>
                 </div>
                 <div class="q-item-meta">
                     <span>${t("type")}: ${q.type}</span>
@@ -327,7 +327,7 @@ const openQuestionEditor = (container, testId, qIndex = null) => {
         editView.innerHTML = `
             <div class="editor-header">
                 <button class="btn-back-q">
-                    <img src="./pages/Dashboard/images/back-img.svg" alt="" />
+                    <img src="/pages/Dashboard/images/back-img.svg" alt="" />
                     ${t("question")} ${qIndex !== null ? qIndex + 1 : test.questions.length + 1}
                 </button>
             </div>
@@ -497,7 +497,7 @@ const renderLeaderboardUI = () => {
     leaderboardDiv.innerHTML = `
         <h3 class="lider-title">
             ${t("lider_board_title")}
-            <img src="./pages/Dashboard/images/leaderboard-img.svg" alt="">
+            <img src="/pages/Dashboard/images/leaderboard-img.svg" alt="">
         </h3>
         <div class="lider-list">
             ${sortedUsers

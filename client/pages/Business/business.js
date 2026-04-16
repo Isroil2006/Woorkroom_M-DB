@@ -433,7 +433,7 @@ const renderDocsMini = (me) => {
                   return `
             <div class="biz-doc-mini-row">
               <div style="display:flex;align-items:center;gap:10px;flex:1">
-                <div class="biz-doc-mini-icon"><img src="../../pages/Business/images/folder icon.svg" alt=""></div>
+                <div class="biz-doc-mini-icon"><img src="/pages/Business/images/folder icon.svg" alt=""></div>
                 <div>
                   <p class="biz-user-name">${p.desc || t("documents")}</p>
                   <p class="biz-user-phone">${fromToLabel} ${p.recipientName || "—"} · ${p.date || "—"}</p>

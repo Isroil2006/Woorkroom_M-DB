@@ -89,6 +89,18 @@ const NAV_PERM_MAP = {
   Infoportal: "nav_infoportal",
 };
 
+const ROUTES = {
+  "/": "Tests",
+  "/tests": "Tests",
+  "/payments": "Payments",
+  "/tasks": "Tasks",
+  "/vacations": "Vacations",
+  "/employees": "Employees",
+  "/messenger": "Messenger",
+  "/calendar": "Infoportal",
+  "/profile": "user-profile",
+};
+
 const filterNavByPermissions = async () => {
   const cu = JSON.parse(localStorage.getItem("currentUser") || "null");
   if (!cu) return;
@@ -98,7 +110,7 @@ const filterNavByPermissions = async () => {
 // ─── NAV HTML ─────────────────────────────────────────────────────
 navigationWrapper.innerHTML = `
     <div class="nav-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-        <a href="/"><img src="/assets/images/logo-blue.svg" alt="" /></a>
+        <a href="/tasks" id="nav-logo-link"><img src="/assets/images/logo-blue.svg" alt="" /></a>
         
         <div class="custom-select" id="nav-language-selector">
             <div class="selected">
@@ -298,6 +310,22 @@ initNavLanguage();
 // ─── RENDER PAGE ──────────────────────────────────────────────────
 const contentArea = document.querySelector(".content");
 
+// 404 Page Template
+const NotFoundPage = `
+    <div class="error-container">
+        <h1 class="error-code">404</h1>
+        <h2 class="error-title">Sahifa topilmadi</h2>
+        <p class="error-message">Siz qidirayotgan sahifa mavjud emas yoki boshqa manzilga ko'chirilgan.</p>
+        <button class="go-home-btn" id="error-go-home">Asosiy sahifaga qaytish</button>
+    </div>
+`;
+
+// Helper to attach event for 404 button
+const attachNotFoundEvents = () => {
+    const btn = document.getElementById("error-go-home");
+    if (btn) btn.onclick = () => navigateTo("/tasks");
+};
+
 const renderPage = (pageName) => {
   if (pageName === "Tests") {
     contentArea.innerHTML = DashboardPage();
@@ -322,9 +350,19 @@ const renderPage = (pageName) => {
     initInfoPortalLogic();
   } else if (pageName === "user-profile") {
     userProfileRender();
+  } else {
+    contentArea.innerHTML = NotFoundPage;
+    attachNotFoundEvents();
+    return;
   }
 
   localStorage.setItem("currentPage", pageName);
+
+  // Update Active Link in Sidebar
+  document.querySelectorAll(".nav-menu li").forEach((link) => {
+    const pageID = link.getAttribute("data-page");
+    link.classList.toggle("active", pageID === pageName);
+  });
 
   // ── Page render bo'lgandan keyin permissions qo'llash ──
   const cu = JSON.parse(localStorage.getItem("currentUser") || "null");
@@ -333,46 +371,63 @@ const renderPage = (pageName) => {
   }
 };
 
+const navigateTo = (path, pushState = true) => {
+  const pageName = ROUTES[path] || "NotFound";
+  
+  if (pushState) {
+    window.history.pushState({ path, pageName }, pageName, path);
+  }
+  
+  renderPage(pageName);
+};
+
+window.addEventListener("popstate", (e) => {
+  const path = window.location.pathname;
+  navigateTo(path, false);
+});
+
 // ─── BOSHLANG'ICH YUKLASH ─────────────────────────────────────────
 
 // Nav itemlarni permissions bo'yicha filterlash (DOM tayyor bo'lgandan keyin)
 filterNavByPermissions();
 
-// Boshlang'ich sahifani yuklash
-renderPage(savedPage);
+// Boshlang'ich sahifani URL orqali yuklash
+const initialPath = window.location.pathname;
+navigateTo(initialPath, false);
 
 // ─── NAV CLICK EVENTS ─────────────────────────────────────────────
 const navLinks = document.querySelectorAll(".nav-menu li");
 
-navLinks.forEach((link) => {
-  const pageID = link.getAttribute("data-page");
-  link.classList.toggle("active", pageID === savedPage);
-});
+const PATH_MAP = {
+  Tests: "/tests",
+  Payments: "/payments",
+  Tasks: "/tasks",
+  Vacations: "/vacations",
+  Employees: "/employees",
+  Messenger: "/messenger",
+  Infoportal: "/calendar",
+};
 
 navLinks.forEach((link) => {
   link.addEventListener("click", async (e) => {
     e.preventDefault();
 
+    const pageID = link.getAttribute("data-page");
+    const targetPath = PATH_MAP[pageID] || "/";
+
     // Bloklangan sahifaga o'tishga urinish — oldini olish
     const cu = JSON.parse(localStorage.getItem("currentUser") || "null");
     if (cu) {
-      const pageID = link.getAttribute("data-page");
       const permKey = NAV_PERM_MAP[pageID];
       if (permKey) {
         const perms = await getPermissions(cu.userId || cu._id);
         if (perms[permKey] === false) {
-          // Nav item display:none bo'lsa bu ishlamaydi, lekin
-          // keyboard / URL orqali urinish bo'lsa shu yerda to'sib qo'yamiz
           return;
         }
       }
     }
 
-    navLinks.forEach((l) => l.classList.remove("active"));
-    link.classList.add("active");
-
-    const pageID = link.getAttribute("data-page");
-    renderPage(pageID);
+    navigateTo(targetPath);
   });
 });
 
@@ -398,8 +453,7 @@ if (profileContainer) {
   });
 
   document.getElementById("go-to-profile").onclick = () => {
-    renderPage("user-profile");
-    navLinks.forEach((l) => l.classList.remove("active"));
+    navigateTo("/profile");
     dropdown.style.display = "none";
     chevron.style.transform = "rotate(0deg)";
   };
@@ -409,6 +463,15 @@ if (profileContainer) {
     localStorage.removeItem("currentUser");
     localStorage.removeItem("currentPage");
     window.location.href = "login.html";
+  };
+}
+
+// ─── LOGO CLICK EVENT ─────────────────────────────────────────────
+const logoLink = document.getElementById("nav-logo-link");
+if (logoLink) {
+  logoLink.onclick = (e) => {
+    e.preventDefault();
+    navigateTo("/tasks");
   };
 }
 

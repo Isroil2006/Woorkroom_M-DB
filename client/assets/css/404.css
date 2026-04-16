@@ -1,0 +1,65 @@
+:root {
+    --primary-blue: #3f8cff;
+    --text-main: #0f172a;
+    --text-gray: #64748b;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #f8fafc;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.error-container {
+    text-align: center;
+    padding: 40px;
+    max-width: 500px;
+}
+
+.error-code {
+    font-size: 151px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--primary-blue), #7c3aed);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+    line-height: 1;
+}
+
+.error-title {
+    color: var(--text-main);
+    font-size: 32px;
+    margin: 20px 0 10px;
+    font-weight: 800;
+}
+
+.error-message {
+    color: var(--text-gray);
+    font-size: 18px;
+    margin-bottom: 30px;
+    line-height: 1.6;
+}
+
+.go-home-btn {
+    display: inline-block;
+    background: var(--primary-blue);
+    color: white;
+    padding: 14px 32px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 700;
+    box-shadow: 0 10px 20px rgba(63, 140, 255, 0.2);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    cursor: pointer;
+}
+
+.go-home-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 30px rgba(63, 140, 255, 0.3);
+}
