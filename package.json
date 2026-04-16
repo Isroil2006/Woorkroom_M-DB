@@ -4,6 +4,6 @@
   "private": true,
   "scripts": {
     "install-all": "npm install && cd client && npm install && cd ../server && npm install",
-    "build": "cd client && npm install && npm run build"
+    "build": "cd client && npm install && npm run build && cd .. && mkdir -p public && cp -r client/dist/* public/"
   }
 }
