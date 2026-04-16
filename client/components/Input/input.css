@@ -1,0 +1,18 @@
+.input {
+    width: 100%;
+    padding: 10px 45px 10px 20px;
+    border-radius: 14px;
+    border: 1px solid var(--input-border);
+    background-color: var(--white);
+    color: var(--text-dark);
+    outline: none;
+    font-weight: 400;
+    font-size: 14px;
+    box-shadow: 0px 1px 2px 0px #b8c8e039;
+    transition: all 0.3s ease;
+}
+
+.input:focus {
+    border: 1px solid var(--primary-blue);
+    outline: 5px solid #e8f2ff;
+}

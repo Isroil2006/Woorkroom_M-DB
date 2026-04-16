@@ -1,0 +1,10 @@
+:root {
+    --primary-blue: #3f8cff;
+    --white: #ffffff;
+    --bg-color: #dfe3e8;
+    --text-gray: #7d8592;
+    --text-main: #1e293b;
+    --input-border: #d8e0f0;
+    --transition-slow: 0.8s ease;
+    --transition-fast: 0.3s ease;
+}

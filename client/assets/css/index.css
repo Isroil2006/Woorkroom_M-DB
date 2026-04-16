@@ -1,0 +1,84 @@
+@import url("global.css");
+@import url("variables.css");
+@import url("../../components/component.css");
+@import url("../../pages/pages.css");
+
+.custom-select {
+    position: relative;
+    width: max-content;
+    font-family: sans-serif;
+    cursor: pointer;
+}
+
+.selected {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    background-color: #F0F2F8;
+    border-radius: 14px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 20px;
+    border: none;
+    transition: 0.3s ease;
+    gap: 10px;
+}
+
+.selected img {
+    height: 20px;
+    object-fit: cover;
+}
+
+.selected .chevron-icon {
+    width: 14px;
+    height: 14px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--text-gray);
+}
+
+.options {
+    position: absolute;
+    top: calc(100% + 5px);
+    right: 0;
+    min-width: 120px;
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    list-style: none;
+    padding: 8px;
+    margin: 0;
+    display: none;
+    z-index: 1000;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.options li {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 6px;
+}
+
+.options li:hover {
+    background: #f0f0f0;
+}
+
+.options img {
+    width: 20px;
+    height: 20px;
+    object-fit: cover;
+}
+
+/* ─── Permission-based visibility ─── */
+[data-perm]:not(.perm-allowed) {
+    display: none !important;
+}
