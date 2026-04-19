@@ -16,6 +16,7 @@ export const setToken = (token) => sessionStorage.setItem("token", token);
 
 export const clearAuth = () => {
   sessionStorage.removeItem("token");
+  localStorage.removeItem("currentUser");
   cachedUser = null;
 };
 
