@@ -1,9 +1,10 @@
 import { createPayAnalyticsBtn, initPayAnalytics } from "./analytics.js";
 import { translations } from "./translations.js";
+import { getCurrentUser, getAuthHeaders } from "../../assets/js/api.js";
 
 const getUsers = () => JSON.parse(localStorage.getItem("users")) || [];
 const saveUsers = (u) => localStorage.setItem("users", JSON.stringify(u));
-const getCurrent = () => JSON.parse(localStorage.getItem("currentUser"));
+const getCurrent = () => getCurrentUser();
 
 let currentLang = localStorage.getItem("language") || "uz";
 const t = (key) => translations[currentLang]?.[key] ?? key;
@@ -16,7 +17,8 @@ const syncMe = () => {
     const cu = getCurrent();
     if (!cu) return cu;
     const fresh = getUsers().find((u) => u.username === cu.username);
-    if (fresh) localStorage.setItem("currentUser", JSON.stringify(fresh));
+    // Note: We don't save to localStorage anymore as per JWT requirements, 
+    // we rely on the in-memory cache or server re-fetch.
     return fresh || cu;
 };
 
@@ -796,8 +798,11 @@ const applyPendingPayment = (me) => {
         p.recipientName = recipUser;
         p.recipientMethodIdx = selRecipMethodIdx;
     }
+    // Update the local storage of users (the mocked backend for payments)
     saveUsers(us);
-    localStorage.setItem("currentUser", JSON.stringify(us.find((u) => u.username === me.username)));
+    
+    // We don't update localStorage for 'currentUser' anymore.
+    // Instead, we just refresh the local 'me' reference from the cache.
     pendingPayment = null;
 };
 
@@ -1037,34 +1042,6 @@ export const initBusinessLogic = () => {
 
         let hasError = false;
         // Karta raqami 16ta raqam bo'lishi kerak
-        if (raw.length !== 16) { $("cm-number").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-number").style.borderColor = ""; }
-        // Ism 3ta harfdan kam bo'lmasligi kerak
-        if (holder.length < 3) { $("cm-holder").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-holder").style.borderColor = ""; }
-        // Amal qilish muddati MM/YY formatida, ya'ni "/" bilan birga 5ta belgi (4ta raqam)
-        if (expiry.length !== 5) { $("cm-expiry").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-expiry").style.borderColor = ""; }
-
-        if (hasError) return;
-
-        const us = getUsers();
-        const m = us.find((u) => u.username === me.username);
-        if (!m.paymentMethods) m.paymentMethods = [];
-        m.paymentMethods.push({
-            type: "card",
-            number: raw.replace(/(.{4})/g, "$1 ").trim(),
-            displayNumber: raw.slice(0, 4) + " **** **** " + raw.slice(-4),
-            holder: holder,
-            expiry: expiry,
-            balance: parseFloat($("cm-balance").value) || 0,
-        });
-        saveUsers(us);
-        me = syncMe();
-        $("card-modal").style.display = "none";
-        renderAccounts(me);
-        refreshStats(me);
-    });
-
-    initPayAnalytics(currentLang);
-};
         if (raw.length !== 16) { $("cm-number").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-number").style.borderColor = ""; }
         // Ism 3ta harfdan kam bo'lmasligi kerak
         if (holder.length < 3) { $("cm-holder").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-holder").style.borderColor = ""; }
