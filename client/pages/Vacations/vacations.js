@@ -1,5 +1,6 @@
 import { createAnalyticsButton, initAnalytics } from "./analiytics.js";
 
+import { API_URL, getCurrentUser, getAuthHeaders } from "../../assets/js/api.js";
 import { vacTranslations } from "./translations.js";
 import { SAMPLE_TOURS } from "./card-default-data.js";
 import { applyPermissions } from "../Employees/permission.js";
@@ -1007,9 +1008,8 @@ const processTourPayment = () => {
 
     try {
         const users = JSON.parse(localStorage.getItem("users")) || [];
-        const cuStr = localStorage.getItem("currentUser");
-        if (!cuStr) return;
-        const cu = JSON.parse(cuStr);
+        const cu = getCurrentUser();
+        if (!cu) return;
 
         const myUser = users.find(u => u.username === cu.username);
         if (!myUser) return;
@@ -1071,7 +1071,9 @@ const processTourPayment = () => {
 
         // Save back
         localStorage.setItem("users", JSON.stringify(users));
-        localStorage.setItem("currentUser", JSON.stringify(myUser));
+        
+        // We don't save to localStorage anymore as per JWT requirements.
+        // The current user state is managed in the API cache.
 
         bookStep = 2; // Success step
         updateBookModalUI();
@@ -1255,7 +1257,7 @@ const refreshGrid = () => {
     g.innerHTML = renderCards();
     attachGridOnlyEvents();
 
-    const cu = JSON.parse(localStorage.getItem("currentUser") || "null");
+    const cu = getCurrentUser();
     if (cu) applyPermissions(cu.userId || cu._id);
 };
 const attachGridOnlyEvents = () => {
@@ -1591,6 +1593,7 @@ const autosave = () => saveUiState();
 
 // ─── INIT ─────────────────────────────────────
 export const initVacationsLogic = () => {
+    const cu = getCurrentUser();
     vacLang = localStorage.getItem("language") || "uz";
     // Restore UI state from before refresh
     const restored = loadUiState();
@@ -1667,5 +1670,4 @@ const openDeleteModal = (tourId, onConfirm) => {
             document.removeEventListener("keydown", esc);
         }
     });
-};
 };
