@@ -119,13 +119,20 @@ function attachEvents() {
         body: JSON.stringify(bodyData),
       })
         .then(async (res) => {
-          const data = await res.json();
-          if (res.status === 400 && data.message === "Bu email band!") {
-            showError("reg-email", "Bu email band!");
-          } else if (res.status !== 201) {
-            alert(data.message || "Xatolik yuz berdi");
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const data = await res.json();
+            if (res.status === 400 && data.message === "Bu email band!") {
+              showError("reg-email", "Bu email band!");
+            } else if (!res.ok) {
+              alert(data.message || "Xatolik yuz berdi");
+            } else {
+              renderAuth("signin");
+            }
           } else {
-            renderAuth("signin");
+            const text = await res.text();
+            console.error("Server error (not JSON):", text);
+            alert("Serverda xatolik yuz berdi. Iltimos keyinroq qayta urinib ko'ring.");
           }
         })
         .catch((err) => console.error("Register xatosi:", err));
@@ -151,15 +158,22 @@ function attachEvents() {
         body: JSON.stringify({ email, password }),
       })
         .then(async (res) => {
-          const data = await res.json();
-          if (res.status === 401) {
-            showError("email", "Email yoki parol xato");
-            showError("password", "Email yoki parol xato");
-          } else if (res.status === 200) {
-            setToken(data.token);
-            window.location.href = "index.html";
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const data = await res.json();
+            if (res.status === 401) {
+              showError("email", "Email yoki parol xato");
+              showError("password", "Email yoki parol xato");
+            } else if (res.status === 200) {
+              setToken(data.token);
+              window.location.href = "index.html";
+            } else {
+              alert(data.message || "Xatolik yuz berdi");
+            }
           } else {
-            alert(data.message || "Xatolik yuz berdi");
+            const text = await res.text();
+            console.error("Server error (not JSON):", text);
+            alert("Tizimga kirishda xatolik yuz berdi. Iltimos keyinroq qayta urinib ko'ring.");
           }
         })
         .catch((err) => console.error("Login xatosi:", err));

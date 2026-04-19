@@ -1,6 +1,9 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 
+// JWT Secret fallback (in production should be set in environment)
+const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_for_dev_only";
+
 // Register
 exports.register = async (req, res) => {
   try {
@@ -34,11 +37,17 @@ exports.register = async (req, res) => {
     });
 
     await newUser.save();
-    res.status(201).json(newUser);
+    
+    // Return user without password
+    const userObj = newUser.toObject();
+    delete userObj.password;
+    
+    res.status(201).json(userObj);
   } catch (error) {
+    console.error("Register error:", error);
     res
       .status(500)
-      .json({ message: "Xatolik yuz berdi", error: error.message });
+      .json({ message: "Ro'yxatdan o'tishda xatolik yuz berdi", error: error.message });
   }
 };
 
@@ -57,7 +66,7 @@ exports.login = async (req, res) => {
       // JWT token yaratish
       const token = jwt.sign(
         { id: user._id, userId: user.userId, email: user.email },
-        process.env.JWT_SECRET,
+        JWT_SECRET,
         { expiresIn: "24h" }
       );
 
@@ -70,9 +79,10 @@ exports.login = async (req, res) => {
       res.status(401).json({ message: "Email yoki parol noto'g'ri" });
     }
   } catch (error) {
+    console.error("Login error:", error);
     res
       .status(500)
-      .json({ message: "Xatolik yuz berdi", error: error.message });
+      .json({ message: "Tizimga kirishda xatolik yuz berdi", error: error.message });
   }
 };
 

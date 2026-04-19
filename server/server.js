@@ -5,8 +5,14 @@ const app = require("./app");
 // MongoDB Connection
 mongoose
   .connect(process.env.MONGODB_URI)
-  .then(() => console.log("MongoDB ga muvaffaqiyatli ulandi"))
-  .catch((err) => console.error("MongoDB ga ulanishda xatolik:", err));
+  .then(() => {
+    console.log("MongoDB ga muvaffaqiyatli ulandi");
+    console.log("Database Name:", mongoose.connection.name);
+  })
+  .catch((err) => {
+    console.error("MongoDB ga ulanishda xatolik!");
+    console.error("Error Message:", err.message);
+  });
 
 // Start Server
 const PORT = process.env.PORT || 5000;
