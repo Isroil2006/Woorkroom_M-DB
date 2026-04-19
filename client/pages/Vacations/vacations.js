@@ -1668,3 +1668,4 @@ const openDeleteModal = (tourId, onConfirm) => {
         }
     });
 };
+};

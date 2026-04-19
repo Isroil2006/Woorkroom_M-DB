@@ -1,4 +1,4 @@
-import { API_URL } from "./api.js";
+import { API_URL, setToken } from "./api.js";
 import { signInForm, signUpForm } from "../../pages/login/auth.js";
 
 const wrapper = document.querySelector(".auth-wrapper");
@@ -156,8 +156,7 @@ function attachEvents() {
             showError("email", "Email yoki parol xato");
             showError("password", "Email yoki parol xato");
           } else if (res.status === 200) {
-            localStorage.setItem("isLoggedIn", "true");
-            localStorage.setItem("currentUser", JSON.stringify(data));
+            setToken(data.token);
             window.location.href = "index.html";
           } else {
             alert(data.message || "Xatolik yuz berdi");

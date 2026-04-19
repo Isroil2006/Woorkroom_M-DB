@@ -1,5 +1,5 @@
 // employees.js
-import { API_URL } from "../../assets/js/api.js";
+import { API_URL, getCurrentUser, getAuthHeaders } from "../../assets/js/api.js";
 import {
   openPermissionsModal,
   getPermissions,
@@ -144,7 +144,9 @@ export function initEmployeesPage() {
   async function renderEmployees() {
     let users = [];
     try {
-      const res = await fetch(`${API_URL}/api/users`);
+      const res = await fetch(`${API_URL}/api/users`, {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) users = await res.json();
     } catch (e) {
       console.error(e);
@@ -152,7 +154,7 @@ export function initEmployeesPage() {
     window.usersData = users; // Cache for edit
 
     // JORIY userning permissionini tekshiramiz (bir marta fetch qilinadi)
-    const cu = JSON.parse(localStorage.getItem("currentUser") || "null");
+    const cu = getCurrentUser();
     const myPerms = cu ? await getPermissions(cu.userId || cu._id) : null;
 
     list.innerHTML = "";
@@ -244,7 +246,9 @@ export function initEmployeesPage() {
       const img = document.getElementById(`avatar-${u.userId || u._id}`);
       if (img) img.classList.add("image-loading");
 
-      fetch(`${API_URL}/api/user-photos/${u.userId || u._id}`)
+      fetch(`${API_URL}/api/user-photos/${u.userId || u._id}`, {
+        headers: getAuthHeaders(),
+      })
         .then((r) => (r.ok ? r.json() : null))
         .then((f) => {
           if (f && f.fileData && img) {
@@ -390,7 +394,9 @@ export function initEmployeesPage() {
 
     try {
       const res = await fetch(
-        `${API_URL}/api/user-photos/${u.userId || u._id}`,
+        `${API_URL}/api/user-photos/${u.userId || u._id}`, {
+          headers: getAuthHeaders(),
+        }
       );
       if (res.ok) {
         const file = await res.json();
@@ -455,7 +461,7 @@ export function initEmployeesPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data),
       });
 
@@ -467,7 +473,7 @@ export function initEmployeesPage() {
         ) {
           await fetch(`${API_URL}/api/user-photos/upload`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: getAuthHeaders(),
             body: JSON.stringify({
               userId: uId,
               fileType: "image",
@@ -477,15 +483,7 @@ export function initEmployeesPage() {
         }
         modal.style.display = "none";
 
-        const responseData = await res.json();
-        const currentUser = JSON.parse(localStorage.getItem("currentUser"));
-        if (
-          currentUser &&
-          editIndex !== null &&
-          users[editIndex].email === currentUser.email
-        ) {
-          localStorage.setItem("currentUser", JSON.stringify(responseData));
-        }
+        await res.json();
 
         await renderEmployees();
       } else {
@@ -559,12 +557,14 @@ export function initEmployeesPage() {
     try {
       const res = await fetch(`${API_URL}/api/users/${uId}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
       });
       if (res.ok) {
         deleteModal.style.display = "none";
-        const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+        const currentUser = getCurrentUser();
         if (currentUser && userToDelete.email === currentUser.email) {
-          localStorage.removeItem("currentUser");
+          const { clearAuth } = await import("../../assets/js/api.js");
+          clearAuth();
           window.location.href = "login.html";
           return;
         }

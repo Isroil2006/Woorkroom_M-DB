@@ -1,4 +1,4 @@
-import { API_URL as BASE_URL } from "../../assets/js/api.js";
+import { API_URL as BASE_URL, getCurrentUser, getAuthHeaders } from "../../assets/js/api.js";
 import { createTaskAnalyticsBtn, initTaskAnalytics } from "./analytics.js";
 import { translations } from "./trasnslations.js";
 import { applyPermissions } from "../Employees/permission.js";
@@ -11,7 +11,9 @@ const API_URL = `${BASE_URL}/api/tasks`;
 
 const fetchProjects = async () => {
   try {
-    const res = await fetch(`${API_URL}/projects`);
+    const res = await fetch(`${API_URL}/projects`, {
+      headers: getAuthHeaders(),
+    });
     return await res.json();
   } catch (err) {
     console.error("Fetch projects error:", err);
@@ -21,7 +23,9 @@ const fetchProjects = async () => {
 
 const fetchTasks = async (projectId) => {
   try {
-    const res = await fetch(`${API_URL}/?projectId=${projectId}`);
+    const res = await fetch(`${API_URL}/?projectId=${projectId}`, {
+      headers: getAuthHeaders(),
+    });
     return await res.json();
   } catch (err) {
     console.error("Fetch tasks error:", err);
@@ -31,14 +35,16 @@ const fetchTasks = async (projectId) => {
 
 const fetchUsers = async () => {
   try {
-    const res = await fetch(`${BASE_URL}/api/users`);
+    const res = await fetch(`${BASE_URL}/api/users`, {
+      headers: getAuthHeaders(),
+    });
     return await res.json();
   } catch (err) {
     return [];
   }
 };
 
-const getCurrent = () => JSON.parse(localStorage.getItem("currentUser"));
+const getCurrent = () => getCurrentUser();
 
 // ─── PERMISSION & STATUS HELPERS ────────────────────────────
 const isOwner = (task) => {
@@ -801,13 +807,13 @@ const initDragDrop = () => {
         if (ids.length > 0 && ids.includes(cuId)) {
           await fetch(`${API_URL}/${taskId}/user-status`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ userId: cuId, status: newCol }),
           });
         } else {
           await fetch(`${API_URL}/${taskId}`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ status: newCol }),
           });
         }
@@ -854,7 +860,7 @@ const toggleDone = async (tid) => {
     const newStatus = task.status === "done" ? "todo" : "done";
     await fetch(`${API_URL}/${tid}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ status: newStatus }),
     });
   } else if (ids.includes(cuId)) {
@@ -863,7 +869,7 @@ const toggleDone = async (tid) => {
     const next = cur === "done" ? "todo" : "done";
     await fetch(`${API_URL}/${tid}/user-status`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ userId: cuId, status: next }),
     });
   }
@@ -881,7 +887,7 @@ const showNoProjectModal = () => {
 
 const deleteTask = (tid) => {
   showDeleteConfirm(t("confirm_delete_task"), async () => {
-    await fetch(`${API_URL}/${tid}`, { method: "DELETE" });
+    await fetch(`${API_URL}/${tid}`, { method: "DELETE", headers: getAuthHeaders() });
     renderView();
   });
 };
@@ -957,13 +963,13 @@ const saveTask = async () => {
   if (editingTaskId) {
     await fetch(`${API_URL}/${editingTaskId}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
   } else {
     await fetch(`${API_URL}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
   }
@@ -1184,6 +1190,7 @@ export const initTodoLogic = async () => {
     showDeleteConfirm(t("confirm_delete_project"), async () => {
       await fetch(`${API_URL}/projects/${currentProjectId}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
       });
       currentProjectId = null;
       renderProjectTabs();
@@ -1210,7 +1217,7 @@ export const initTodoLogic = async () => {
     const cu = getCurrent();
     const res = await fetch(`${API_URL}/projects`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ name, createdBy: cu?._id || cu?.userId }),
     });
 

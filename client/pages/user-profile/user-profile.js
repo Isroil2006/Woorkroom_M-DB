@@ -1,4 +1,4 @@
-import { API_URL } from "../../assets/js/api.js";
+import { API_URL, getCurrentUser, getAuthHeaders, setCurrentUser } from "../../assets/js/api.js";
 import { profileTranslations } from "./translations.js";
 
 const userProfileBtn = document.querySelector(".user-profile-btn");
@@ -36,7 +36,7 @@ function infoChip(label, value) {
 // ───── Main render ────────────────────────────────────────
 export async function userProfileRender() {
   const content = document.querySelector(".content");
-  const loggedInInfo = JSON.parse(localStorage.getItem("currentUser"));
+  const loggedInInfo = getCurrentUser();
   if (!loggedInInfo) return;
 
   // 1️⃣ Show Loading State immediately
@@ -80,7 +80,9 @@ export async function userProfileRender() {
   let user = loggedInInfo;
   try {
     const uId = loggedInInfo.userId || loggedInInfo._id;
-    const res = await fetch(`${API_URL}/api/users/${uId}`);
+    const res = await fetch(`${API_URL}/api/users/${uId}`, {
+      headers: getAuthHeaders(),
+    });
     if (res.ok) {
       user = await res.json();
     }
@@ -92,9 +94,9 @@ export async function userProfileRender() {
   let userAvatar = user.avatar || "/assets/images/User-avatar.png";
   try {
     const uId = user.userId || user._id;
-    const res = await fetch(
-      `${API_URL}/api/user-photos/${uId}?type=image`,
-    );
+    const res = await fetch(`${API_URL}/api/user-photos/${uId}?type=image`, {
+      headers: getAuthHeaders(),
+    });
     if (res.ok) {
       const file = await res.json();
       if (file && file.fileData) userAvatar = file.fileData;
@@ -293,13 +295,13 @@ export async function userProfileRender() {
     try {
       const res = await fetch(`${API_URL}/api/users/${uId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data),
       });
 
       if (res.ok) {
         const updatedUser = await res.json();
-        localStorage.setItem("currentUser", JSON.stringify(updatedUser));
+        setCurrentUser(updatedUser);
 
         saveBtn.textContent = t("saved");
         saveBtn.classList.add("up-saved");
@@ -336,7 +338,7 @@ export async function userProfileRender() {
       try {
         const res = await fetch(`${API_URL}/api/user-photos/upload`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             userId: uId,
             fileType: "image",
@@ -346,11 +348,11 @@ export async function userProfileRender() {
 
         if (res.ok) {
           document.querySelector(".up-avatar-img").src = base64;
-          
-          // Update localStorage and Sidebar
+
+          // Update cache and Sidebar
           const updatedUser = { ...user, avatar: base64 };
-          localStorage.setItem("currentUser", JSON.stringify(updatedUser));
-          
+          setCurrentUser(updatedUser);
+
           const sideAvatar = document.querySelector(".nav-user-avatar");
           if (sideAvatar) sideAvatar.src = base64;
         } else {
@@ -366,9 +368,3 @@ export async function userProfileRender() {
 }
 
 // ── Nav button logic removed (handled by navigation.js) ──
-function renderCurrentPage() {
-  const page = localStorage.getItem("currentPage");
-  if (page === "user-profile") userProfileRender();
-}
-
-renderCurrentPage();

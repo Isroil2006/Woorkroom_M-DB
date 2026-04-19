@@ -1065,3 +1065,31 @@ export const initBusinessLogic = () => {
 
     initPayAnalytics(currentLang);
 };
+        if (raw.length !== 16) { $("cm-number").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-number").style.borderColor = ""; }
+        // Ism 3ta harfdan kam bo'lmasligi kerak
+        if (holder.length < 3) { $("cm-holder").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-holder").style.borderColor = ""; }
+        // Amal qilish muddati MM/YY formatida, ya'ni "/" bilan birga 5ta belgi (4ta raqam)
+        if (expiry.length !== 5) { $("cm-expiry").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-expiry").style.borderColor = ""; }
+
+        if (hasError) return;
+
+        const us = getUsers();
+        const m = us.find((u) => u.username === me.username);
+        if (!m.paymentMethods) m.paymentMethods = [];
+        m.paymentMethods.push({
+            type: "card",
+            number: raw.replace(/(.{4})/g, "$1 ").trim(),
+            displayNumber: raw.slice(0, 4) + " **** **** " + raw.slice(-4),
+            holder: holder,
+            expiry: expiry,
+            balance: parseFloat($("cm-balance").value) || 0,
+        });
+        saveUsers(us);
+        me = syncMe();
+        $("card-modal").style.display = "none";
+        renderAccounts(me);
+        refreshStats(me);
+    });
+
+    initPayAnalytics(currentLang);
+};

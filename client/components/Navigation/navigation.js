@@ -1,4 +1,4 @@
-import { API_URL } from "../../assets/js/api.js";
+import { API_URL, getCurrentUser, fetchCurrentUser, clearAuth, getAuthHeaders, setCurrentUser } from "../../assets/js/api.js";
 import {
   DashboardPage,
   initDashboardLogic,
@@ -32,11 +32,10 @@ import { userProfileRender } from "../../pages/user-profile/user-profile.js";
 
 const navigationWrapper = document.querySelector(".navigation-wrapper");
 const currentLang = localStorage.getItem("language") || "uz";
-const savedPage = localStorage.getItem("currentPage") || "Tests";
-const cu = JSON.parse(localStorage.getItem("currentUser") || "null");
-const userAvatar = cu?.avatar || "/assets/images/User-avatar.png";
-const userName =
-  cu?.username || (currentLang === "uz" ? "Foydalanuvchi" : "User");
+
+// Placeholder values — will be updated after fetchCurrentUser
+let userAvatar = "/assets/images/User-avatar.png";
+let userName = currentLang === "uz" ? "Foydalanuvchi" : "User";
 
 export const translations = {
   uz: {
@@ -102,10 +101,14 @@ const ROUTES = {
 };
 
 const filterNavByPermissions = async () => {
-  const cu = JSON.parse(localStorage.getItem("currentUser") || "null");
+  const cu = getCurrentUser();
   if (!cu) return;
   await applyPermissions(cu.userId || cu._id);
 };
+
+// ─── Determine initial page from URL ──────────────────────────────
+const initialPath = window.location.pathname;
+const initialPage = ROUTES[initialPath] || "Tasks";
 
 // ─── NAV HTML ─────────────────────────────────────────────────────
 navigationWrapper.innerHTML = `
@@ -138,7 +141,7 @@ navigationWrapper.innerHTML = `
     </div>
 
     <ul class="nav-menu">
-        <li data-page="Tests" data-perm="nav_dashboard" class="${savedPage === "Tests" ? "active" : ""}">
+        <li data-page="Tests" data-perm="nav_dashboard" class="${initialPage === "Tests" ? "active" : ""}">
             <a href="#tests">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -149,7 +152,7 @@ navigationWrapper.innerHTML = `
             </a>
         </li>
 
-        <li data-page="Payments" class="${savedPage === "Payments" ? "active" : ""}">
+        <li data-page="Payments" class="${initialPage === "Payments" ? "active" : ""}">
             <a href="#business">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -160,7 +163,7 @@ navigationWrapper.innerHTML = `
             </a>
         </li>
 
-        <li data-page="Tasks" data-perm="nav_tasks" class="${savedPage === "Tasks" ? "active" : ""}">
+        <li data-page="Tasks" data-perm="nav_tasks" class="${initialPage === "Tasks" ? "active" : ""}">
             <a href="#calendar">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -171,7 +174,7 @@ navigationWrapper.innerHTML = `
             </a>
         </li>
 
-        <li data-page="Vacations" data-perm="nav_vacations" class="${savedPage === "Vacations" ? "active" : ""}">
+        <li data-page="Vacations" data-perm="nav_vacations" class="${initialPage === "Vacations" ? "active" : ""}">
             <a href="#vacations">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -182,7 +185,7 @@ navigationWrapper.innerHTML = `
             </a>
         </li>
 
-        <li data-page="Employees" data-perm="nav_employees" class="${savedPage === "Employees" ? "active" : ""}">
+        <li data-page="Employees" data-perm="nav_employees" class="${initialPage === "Employees" ? "active" : ""}">
             <a href="#employees">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -193,7 +196,7 @@ navigationWrapper.innerHTML = `
             </a>
         </li>
 
-        <li data-page="Messenger" data-perm="nav_messenger" class="${savedPage === "Messenger" ? "active" : ""}">
+        <li data-page="Messenger" data-perm="nav_messenger" class="${initialPage === "Messenger" ? "active" : ""}">
             <a href="#messenger">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -204,7 +207,7 @@ navigationWrapper.innerHTML = `
             </a>
         </li>
 
-        <li data-page="Infoportal" data-perm="nav_infoportal" class="${savedPage === "Infoportal" ? "active" : ""}">
+        <li data-page="Infoportal" data-perm="nav_infoportal" class="${initialPage === "Infoportal" ? "active" : ""}">
             <a href="#infoportal">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -244,7 +247,7 @@ navigationWrapper.innerHTML = `
 
         <div class="user-profile-btn sidebar-profile">
             <img src="${userAvatar}" class="nav-user-avatar" alt="Avatar" />
-            <span>${userName}</span>
+            <span class="nav-user-name">${userName}</span>
             <svg class="chevron-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="18 15 12 9 6 15"></polyline>
             </svg>
@@ -322,8 +325,8 @@ const NotFoundPage = `
 
 // Helper to attach event for 404 button
 const attachNotFoundEvents = () => {
-    const btn = document.getElementById("error-go-home");
-    if (btn) btn.onclick = () => navigateTo("/tasks");
+  const btn = document.getElementById("error-go-home");
+  if (btn) btn.onclick = () => navigateTo("/tasks");
 };
 
 const renderPage = (pageName) => {
@@ -356,8 +359,6 @@ const renderPage = (pageName) => {
     return;
   }
 
-  localStorage.setItem("currentPage", pageName);
-
   // Update Active Link in Sidebar
   document.querySelectorAll(".nav-menu li").forEach((link) => {
     const pageID = link.getAttribute("data-page");
@@ -365,7 +366,7 @@ const renderPage = (pageName) => {
   });
 
   // ── Page render bo'lgandan keyin permissions qo'llash ──
-  const cu = JSON.parse(localStorage.getItem("currentUser") || "null");
+  const cu = getCurrentUser();
   if (cu) {
     applyPermissions(cu.userId || cu._id);
   }
@@ -373,11 +374,11 @@ const renderPage = (pageName) => {
 
 const navigateTo = (path, pushState = true) => {
   const pageName = ROUTES[path] || "NotFound";
-  
+
   if (pushState) {
     window.history.pushState({ path, pageName }, pageName, path);
   }
-  
+
   renderPage(pageName);
 };
 
@@ -386,14 +387,45 @@ window.addEventListener("popstate", (e) => {
   navigateTo(path, false);
 });
 
-// ─── BOSHLANG'ICH YUKLASH ─────────────────────────────────────────
+// ─── BOSHLANG'ICH YUKLASH (ASYNC) ────────────────────────────────
 
-// Nav itemlarni permissions bo'yicha filterlash (DOM tayyor bo'lgandan keyin)
-filterNavByPermissions();
+const initNavigation = async () => {
+  // 1. Server'dan current user olish
+  const cu = await fetchCurrentUser();
 
-// Boshlang'ich sahifani URL orqali yuklash
-const initialPath = window.location.pathname;
-navigateTo(initialPath, false);
+  if (cu) {
+    // 2. Sidebar'dagi user ismini va avatarni yangilash
+    const nameEl = document.querySelector(".nav-user-name");
+    if (nameEl) nameEl.textContent = cu.username || userName;
+
+    // 3. Avatar serverdan olish
+    try {
+      const uId = cu.userId || cu._id;
+      const res = await fetch(`${API_URL}/api/user-photos/${uId}?type=image`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const file = await res.json();
+        if (file && file.fileData) {
+          const sideAvatar = document.querySelector(".nav-user-avatar");
+          if (sideAvatar) sideAvatar.src = file.fileData;
+          // Update cached user with avatar
+          setCurrentUser({ ...cu, avatar: file.fileData });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch nav avatar:", err);
+    }
+
+    // 4. Permissions qo'llash
+    await applyPermissions(cu.userId || cu._id);
+  }
+
+  // 5. Sahifani URL orqali yuklash
+  navigateTo(initialPath, false);
+};
+
+initNavigation();
 
 // ─── NAV CLICK EVENTS ─────────────────────────────────────────────
 const navLinks = document.querySelectorAll(".nav-menu li");
@@ -416,7 +448,7 @@ navLinks.forEach((link) => {
     const targetPath = PATH_MAP[pageID] || "/";
 
     // Bloklangan sahifaga o'tishga urinish — oldini olish
-    const cu = JSON.parse(localStorage.getItem("currentUser") || "null");
+    const cu = getCurrentUser();
     if (cu) {
       const permKey = NAV_PERM_MAP[pageID];
       if (permKey) {
@@ -459,9 +491,7 @@ if (profileContainer) {
   };
 
   document.getElementById("sidebar-logout").onclick = () => {
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("currentUser");
-    localStorage.removeItem("currentPage");
+    clearAuth();
     window.location.href = "login.html";
   };
 }
@@ -474,28 +504,3 @@ if (logoLink) {
     navigateTo("/tasks");
   };
 }
-
-// ─── FETCH LATEST AVATAR FROM SERVER ──────────────────────────────
-const updateNavAvatar = async () => {
-  const cu = JSON.parse(localStorage.getItem("currentUser") || "null");
-  if (!cu) return;
-  try {
-    const uId = cu.userId || cu._id;
-    const res = await fetch(`${API_URL}/api/user-photos/${uId}?type=image`);
-    if (res.ok) {
-      const file = await res.json();
-      if (file && file.fileData) {
-        const sideAvatar = document.querySelector(".nav-user-avatar");
-        if (sideAvatar) sideAvatar.src = file.fileData;
-        
-        // Also update localStorage to keep it in sync
-        const updatedUser = { ...cu, avatar: file.fileData };
-        localStorage.setItem("currentUser", JSON.stringify(updatedUser));
-      }
-    }
-  } catch (err) {
-    console.error("Failed to fetch nav avatar:", err);
-  }
-};
-
-updateNavAvatar();
