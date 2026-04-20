@@ -1,9 +1,9 @@
 import { API_URL, getCurrentUser, getAuthHeaders, setCurrentUser } from "../../assets/js/api.js";
 import { profileTranslations } from "./translations.js";
+import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
+ 
+const t = createTranslationHelper(profileTranslations);
 
-const userProfileBtn = document.querySelector(".user-profile-btn");
-let currentLang = localStorage.getItem("language") || "uz";
-const t = (key) => profileTranslations[currentLang]?.[key] || key;
 
 // ───── Helpers ────────────────────────────────────────────
 function calcCompletion(user) {

@@ -26,6 +26,7 @@ export const translations = {
         save: "Saqlash",
         edit: "Tahrirlash",
         delete: "O'chirish",
+        show: "Ko'rsatish",
     },
     en: {
         employees: "Employees",
@@ -54,6 +55,7 @@ export const translations = {
         save: "Save",
         edit: "Edit",
         delete: "Delete",
+        show: "Show",
     },
     ru: {
         employees: "Сотрудники",
@@ -82,5 +84,6 @@ export const translations = {
         save: "Сохранить",
         edit: "Редактировать",
         delete: "Удалить",
+        show: "Показать",
     },
 };

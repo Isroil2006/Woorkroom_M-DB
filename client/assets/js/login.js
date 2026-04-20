@@ -166,7 +166,7 @@ function attachEvents() {
               showError("password", "Email yoki parol xato");
             } else if (res.status === 200) {
               setToken(data.token);
-              window.location.href = "index.html";
+              window.location.href = "/";
             } else {
               alert(data.message || "Xatolik yuz berdi");
             }

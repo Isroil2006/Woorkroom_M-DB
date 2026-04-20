@@ -7,14 +7,32 @@ import {
 } from "./permission.js";
 import { translations } from "../Employees/translations.js";
 
-let currentLang = localStorage.getItem("language") || "uz";
-const t = (key) => translations[currentLang][key] || key;
+import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
 
-export const EmployeesPage = `
+const t = createTranslationHelper(translations);
+
+export const EmployeesPage = () => `
     <div class="employees-page">
         <div class="employees-header">
             <h2 id="employee-count-title">${t("employees")} (0)</h2>
-            <button class="btn add-employee-btn">${t("add_employees")}</button>
+            <div class="employees-header-right">
+                <div class="rows-per-page-container" id="rows-per-page-container">
+                    <button class="rows-selector-btn" id="rows-selector-btn">
+                        <span>${t("show")}: <span id="current-rows-val">10</span></span>
+                        <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    <div class="rows-dropdown" id="rows-dropdown">
+                        <div class="rows-option active" data-val="10">10</div>
+                        <div class="rows-option" data-val="15">15</div>
+                        <div class="rows-option" data-val="20">20</div>
+                        <div class="rows-option" data-val="25">25</div>
+                        <div class="rows-option" data-val="30">30</div>
+                    </div>
+                </div>
+                <button class="btn add-employee-btn">${t("add_employees")}</button>
+            </div>
         </div>
         <div id="employees-list"></div>
         <div class="pagination" id="pagination"></div>
@@ -123,7 +141,7 @@ export function initEmployeesPage() {
   const confirmDeleteBtn = document.getElementById("confirmDelete");
   const cancelDeleteBtn = document.getElementById("cancelDelete");
 
-  const ITEMS_PER_PAGE = 4;
+  let ITEMS_PER_PAGE = 10;
   let currentPageNum = 1;
   let editIndex = null;
   let indexToDelete = null;
@@ -176,10 +194,11 @@ export function initEmployeesPage() {
 
       let permBtnHtml = "";
       if (myPerms && myPerms["emp_perm_btn"] !== false) {
+        const lang = getCurrentLang();
         const label =
-          currentLang === "ru"
+          lang === "ru"
             ? "Ограничения"
-            : currentLang === "en"
+            : lang === "en"
               ? "Permissions"
               : "Cheklovlar";
         permBtnHtml = `
@@ -285,7 +304,42 @@ export function initEmployeesPage() {
   function renderPagination(total) {
     pagination.innerHTML = "";
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE) || 1;
-    for (let i = 1; i <= totalPages; i++) {
+    if (totalPages <= 1) return;
+
+    // Previous button
+    const prevBtn = document.createElement("button");
+    prevBtn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>`;
+    prevBtn.disabled = currentPageNum === 1;
+    prevBtn.onclick = () => {
+      if (currentPageNum > 1) {
+        currentPageNum--;
+        renderEmployees();
+      }
+    };
+    pagination.appendChild(prevBtn);
+
+    // Page buttons logic: max 3 numbers
+    let startPage, endPage;
+    if (totalPages <= 3) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      if (currentPageNum === 1) {
+        startPage = 1;
+        endPage = 3;
+      } else if (currentPageNum === totalPages) {
+        startPage = totalPages - 2;
+        endPage = totalPages;
+      } else {
+        startPage = currentPageNum - 1;
+        endPage = currentPageNum + 1;
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
       const btn = document.createElement("button");
       btn.innerText = i;
       if (i === currentPageNum) btn.classList.add("active");
@@ -295,6 +349,21 @@ export function initEmployeesPage() {
       };
       pagination.appendChild(btn);
     }
+
+    // Next button
+    const nextBtn = document.createElement("button");
+    nextBtn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>`;
+    nextBtn.disabled = currentPageNum === totalPages;
+    nextBtn.onclick = () => {
+      if (currentPageNum < totalPages) {
+        currentPageNum++;
+        renderEmployees();
+      }
+    };
+    pagination.appendChild(nextBtn);
   }
 
   function attachEvents() {
@@ -310,7 +379,7 @@ export function initEmployeesPage() {
         openPermissionsModal(
           btn.dataset.userid,
           btn.dataset.username,
-          currentLang,
+          getCurrentLang(),
         );
       };
     });
@@ -580,9 +649,48 @@ export function initEmployeesPage() {
     }
   };
 
+  // ── Rows Per Page Dropdown Logic ──
+  const rowsSelectorBtn = document.getElementById("rows-selector-btn");
+  const rowsDropdown = document.getElementById("rows-dropdown");
+  const currentRowsVal = document.getElementById("current-rows-val");
+  const rowsOptions = document.querySelectorAll(".rows-option");
+
+  rowsSelectorBtn.onclick = (e) => {
+    e.stopPropagation();
+    const isOpen = rowsDropdown.style.display === "flex";
+    rowsDropdown.style.display = isOpen ? "none" : "flex";
+    const chevron = rowsSelectorBtn.querySelector(".chevron");
+    if (chevron) chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
+  };
+
+  rowsOptions.forEach((opt) => {
+    opt.onclick = () => {
+      const val = parseInt(opt.dataset.val);
+      ITEMS_PER_PAGE = val;
+      currentRowsVal.innerText = val;
+      
+      rowsOptions.forEach(o => o.classList.remove("active"));
+      opt.classList.add("active");
+      
+      rowsDropdown.style.display = "none";
+      const chevron = rowsSelectorBtn.querySelector(".chevron");
+      if (chevron) chevron.style.transform = "rotate(0deg)";
+      
+      currentPageNum = 1; // Reset to page 1
+      renderEmployees();
+    };
+  });
+
   window.onclick = (e) => {
     if (e.target === modal) modal.style.display = "none";
     if (e.target === deleteModal) deleteModal.style.display = "none";
+    
+    // Close rows dropdown if clicked outside
+    if (!rowsSelectorBtn.contains(e.target) && !rowsDropdown.contains(e.target)) {
+      rowsDropdown.style.display = "none";
+      const chevron = rowsSelectorBtn.querySelector(".chevron");
+      if (chevron) chevron.style.transform = "rotate(0deg)";
+    }
   };
 
   renderEmployees();

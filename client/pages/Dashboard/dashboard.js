@@ -1,5 +1,6 @@
 import { createDashAnalyticsBtn, initDashAnalytics } from "./analytics.js";
 import { translations } from "../Dashboard/translations.js";
+import { getCurrentLang, createTranslationHelper, LANGUAGE_CHANGED_EVENT } from "../../assets/js/i18n.js";
 
 let allTests = JSON.parse(localStorage.getItem("myTests")) || [];
 let currentView = localStorage.getItem("currentView") || "dashboard";
@@ -13,8 +14,7 @@ const saveToLocal = () => {
   localStorage.setItem("currentTab", currentTab);
 };
 
-let currentLang = localStorage.getItem("language") || "uz";
-const t = (key) => translations[currentLang][key] || key;
+const t = createTranslationHelper(translations);
 
 // 1. DASHBOARD VA ASOSIY STRUKTURA
 export const DashboardPage = () => {
@@ -173,7 +173,8 @@ const renderDetailView = (container, testId) => {
 
   items.forEach((item) => {
     item.addEventListener("click", () => {
-      localStorage.setItem("language", item.dataset.value);
+      const lang = item.dataset.value;
+      import("../../assets/js/i18n.js").then(i18n => i18n.setLanguage(lang));
 
       const calPanel = document.getElementById("cal-events-panel");
       const calEventsDate = document.getElementById("cal-events-date");
@@ -184,7 +185,7 @@ const renderDetailView = (container, testId) => {
         localStorage.setItem("cal_selected_date", calEventsDate.textContent);
       }
 
-      window.location.reload();
+      // window.location.reload(); // Removed for refresh-less switching
     });
   });
 

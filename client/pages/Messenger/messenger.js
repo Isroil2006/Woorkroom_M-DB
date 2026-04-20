@@ -1,5 +1,8 @@
 import { createMsgAnalyticsBtn, initMsgAnalytics } from "./analytics.js";
 import { translations } from "./translations.js";
+import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
+ 
+const t = createTranslationHelper(translations);
 
 const EMOJIS = [
   "😀",
@@ -136,7 +139,6 @@ const avatarHtmlFromUser = (user, size = 34) =>
 export const MassangerPage = `<div class="messenger-wrap" id="messenger-root"></div>`;
 
 // ─── STATE ────────────────────────────────────
-let currentLang = "uz";
 let currentUser = null;
 let activeContact = null;
 let searchQuery = "";
@@ -154,6 +156,7 @@ const $ = (id) => document.getElementById(id);
 const renderRoot = () => {
   const root = $("messenger-root");
   if (!root) return;
+  const currentLang = getCurrentLang();
   const tr = translations[currentLang];
   root.innerHTML = `
         <h1 class="messenger-title">${tr.title}</h1>
@@ -436,6 +439,7 @@ const renderNoChat = () => {
 // ═══════════════════════════════════════════════
 const renderMessages = () => {
   if (!activeContact || !currentUser) return "";
+  const currentLang = getCurrentLang();
   const tr = translations[currentLang];
   const msgs = getMessages(currentUser.username, activeContact.username);
   if (msgs.length === 0)
@@ -462,6 +466,7 @@ const renderMessages = () => {
     lastFrom = null;
 
   msgs.forEach((msg) => {
+    const currentLang = getCurrentLang();
     const dateStr = formatDateSep(msg.at, currentLang);
     if (dateStr !== lastDate) {
       html += `<div class="msg-date-sep"><span>${dateStr}</span></div>`;

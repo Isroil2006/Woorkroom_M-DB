@@ -1,4 +1,5 @@
 import { SAMPLE_TOURS } from "../Vacations/card-default-data.js";
+import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
 
 const getUsers = () => JSON.parse(localStorage.getItem("users")) || [];
 const getCurrent = () => JSON.parse(localStorage.getItem("currentUser"));
@@ -53,7 +54,6 @@ const eventIcons = {
   [EVENT_TYPES.TASK_DUE]: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-list-icon lucide-clipboard-list"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>`,
 };
 
-let currentLang = localStorage.getItem("language") || "uz";
 
 const translations = {
   uz: {
@@ -199,8 +199,7 @@ const translations = {
   },
 };
 
-const t = (key) =>
-  translations[currentLang]?.[key] ?? translations.uz[key] ?? key;
+const t = createTranslationHelper(translations);
 
 const parseDate = (dateStr) => {
   if (!dateStr) return null;
@@ -233,7 +232,7 @@ const dateToString = (date) => {
 
 const collectAllEvents = () => {
   const events = [];
-  const currentLangLocal = localStorage.getItem("language") || "uz";
+  const currentLangLocal = getCurrentLang();
   const tLocal = (key) =>
     translations[currentLangLocal]?.[key] ?? translations.uz[key] ?? key;
   const currentUser = getCurrent();
@@ -418,7 +417,7 @@ const getPrioritizedEvents = (events, maxCount = 5) => {
   return result;
 };
 
-export const InfoPortalPage = `
+export const InfoPortalPage = () => `
 <div class="cal-container">
     <div class="cal-header">
         <div class="cal-header-left">
@@ -721,7 +720,7 @@ const renderDayView = () => {
 };
 
 const showEventDetails = (dateStr) => {
-  currentLang = localStorage.getItem("language") || "uz";
+  const currentLang = getCurrentLang();
   invalidateCache();
   const events = getEventsForDate(dateStr);
   const panel = document.getElementById("cal-events-panel");
@@ -772,7 +771,6 @@ const showEventDetails = (dateStr) => {
 };
 
 export const initInfoPortalLogic = () => {
-  currentLang = localStorage.getItem("language") || "uz";
   renderCalendar();
 
   const savedDate = localStorage.getItem("cal_selected_date");
@@ -784,7 +782,6 @@ export const initInfoPortalLogic = () => {
   }
 
   const handleLanguageChange = () => {
-    currentLang = localStorage.getItem("language") || "uz";
     invalidateCache();
     renderCalendar();
     if (selectedDate) {
@@ -792,13 +789,7 @@ export const initInfoPortalLogic = () => {
     }
   };
 
-  window.addEventListener("storage", (e) => {
-    if (e.key === "language") {
-      handleLanguageChange();
-    }
-  });
-
-  document.addEventListener("languageChanged", handleLanguageChange);
+  document.addEventListener(LANGUAGE_CHANGED_EVENT, handleLanguageChange);
 
   const viewBtn = document.getElementById("cal-view-btn");
   const viewMenu = document.getElementById("cal-view-menu");

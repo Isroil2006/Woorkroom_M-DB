@@ -29,13 +29,14 @@ import {
   getPermissions,
 } from "../../pages/Employees/permission.js";
 import { userProfileRender } from "../../pages/user-profile/user-profile.js";
+import { getCurrentLang, setLanguage, LANGUAGE_CHANGED_EVENT } from "../../assets/js/i18n.js";
 
 const navigationWrapper = document.querySelector(".navigation-wrapper");
-const currentLang = localStorage.getItem("language") || "uz";
+const contentArea = document.querySelector(".content");
 
 // Placeholder values — will be updated after fetchCurrentUser
 let userAvatar = "/assets/images/User-avatar.png";
-let userName = currentLang === "uz" ? "Foydalanuvchi" : "User";
+let userName = getCurrentLang() === "uz" ? "Foydalanuvchi" : "User";
 
 export const translations = {
   uz: {
@@ -76,7 +77,10 @@ export const translations = {
   },
 };
 
-const t = (key) => translations[currentLang][key] || key;
+const t = (key) => {
+  const lang = getCurrentLang();
+  return translations[lang][key] || key;
+};
 
 const NAV_PERM_MAP = {
   Tests: "nav_dashboard",
@@ -89,10 +93,12 @@ const NAV_PERM_MAP = {
 };
 
 const ROUTES = {
-  "/": "Tests",
+  "/": "Tasks",
   "/tests": "Tests",
   "/payments": "Payments",
   "/tasks": "Tasks",
+  "/index.html": "Tasks",
+  "/index": "Tasks",
   "/vacations": "Vacations",
   "/employees": "Employees",
   "/messenger": "Messenger",
@@ -100,25 +106,33 @@ const ROUTES = {
   "/profile": "user-profile",
 };
 
-const filterNavByPermissions = async () => {
-  const cu = getCurrentUser();
-  if (!cu) return;
-  await applyPermissions(cu.userId || cu._id);
+const PATH_MAP = {
+  Tests: "/tests",
+  Payments: "/payments",
+  Tasks: "/tasks",
+  Vacations: "/vacations",
+  Employees: "/employees",
+  Messenger: "/messenger",
+  Infoportal: "/calendar",
 };
 
-// ─── Determine initial page from URL ──────────────────────────────
-const initialPath = window.location.pathname;
-const initialPage = ROUTES[initialPath] || "Tasks";
-
 // ─── NAV HTML ─────────────────────────────────────────────────────
-navigationWrapper.innerHTML = `
+const renderNavigation = () => {
+    const lang = getCurrentLang();
+    const currentPageName = ROUTES[window.location.pathname] || "Tasks";
+    const cu = getCurrentUser();
+    
+    const displayAvatar = cu?.avatar || userAvatar;
+    const displayName = cu?.username || (lang === "uz" ? "Foydalanuvchi" : "User");
+
+    navigationWrapper.innerHTML = `
     <div class="nav-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
         <a href="/tasks" id="nav-logo-link"><img src="/assets/images/logo-blue.svg" alt="" /></a>
         
         <div class="custom-select" id="nav-language-selector">
             <div class="selected">
-                <img src="/assets/images/uzb-flag.png" alt="" />
-                <span>UZ</span>
+                <img src="/assets/images/${lang === 'uz' ? 'uzb-flag.png' : lang === 'en' ? 'usa-flag.png' : 'rus-flag.png'}" alt="" />
+                <span>${lang.toUpperCase()}</span>
                 <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
@@ -141,31 +155,7 @@ navigationWrapper.innerHTML = `
     </div>
 
     <ul class="nav-menu">
-        <!-- 💡 Legacy bo'limlar (Backend bitganda ochiladi)
-        <li data-page="Tests" data-perm="nav_dashboard" class="${initialPage === "Tests" ? "active" : ""}">
-            <a href="#tests">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path fill-rule="evenodd" clip-rule="evenodd"
-                        d="M6 3C4.34315 3 3 4.34315 3 6V8C3 9.65685 4.34315 11 6 11H8C9.65685 11 11 9.65685 11 8V6C11 4.34315 9.65685 3 8 3H6ZM16 3C14.3431 3 13 4.34315 13 6V8C13 9.65685 14.3431 11 16 11H18C19.6569 11 21 9.65685 21 8V6C21 4.34315 19.6569 3 18 3H16ZM3 16C3 14.3431 4.34315 13 6 13H8C9.65685 13 11 14.3431 11 16V18C11 19.6569 9.65685 21 8 21H6C4.34315 21 3 19.6569 3 18V16ZM16 13C14.3431 13 13 14.3431 13 16V18C13 19.6569 14.3431 21 16 21H18C19.6569 21 21 19.6569 21 18V16C21 14.3431 19.6569 13 18 13H16Z"
-                        fill="currentColor"/>
-                </svg>
-                <span>${t("nav_tests")}</span>
-            </a>
-        </li>
-
-        <li data-page="Payments" class="${initialPage === "Payments" ? "active" : ""}">
-            <a href="#business">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path fill-rule="evenodd" clip-rule="evenodd"
-                        d="M13.0423 2.63625C12.4024 2.2456 11.5978 2.2456 10.9579 2.63625L4.84895 6.36588C3.5594 7.15317 3.57497 9.03115 4.8774 9.79696L11.0093 13.4024C11.6364 13.7712 12.4143 13.7703 13.0406 13.4001L19.1339 9.79908C20.4329 9.03137 20.4463 7.15655 19.1585 6.37028L13.0423 2.63625ZM19.6032 11.4709C20.0833 11.198 20.6938 11.3661 20.9666 11.8462C21.22 12.2921 21.0932 12.8503 20.6894 13.1463L20.5913 13.2097L13.9967 16.9572C13.167 17.4329 12.1543 17.4657 11.2965 17.0535L11.1151 16.9584L4.59833 13.207C4.11968 12.9314 3.95503 12.3201 4.23056 11.8414C4.48641 11.397 5.03184 11.2232 5.49169 11.4213L5.59612 11.4736L12.1095 15.2231C12.3498 15.3601 12.6429 15.377 12.8983 15.2725L13.0053 15.2202L19.6032 11.4709ZM19.5062 15.1307C19.9864 14.8579 20.5968 15.0259 20.8697 15.5061C21.1231 15.952 20.9963 16.5102 20.5924 16.8061L20.4943 16.8696L13.8998 20.617C13.07 21.0928 12.0573 21.1255 11.1995 20.7133L11.0182 20.6182L4.50137 16.8668C4.02273 16.5913 3.85807 15.9799 4.1336 15.5013C4.38945 15.0568 4.93489 14.8831 5.39473 15.0811L5.49916 15.1335L12.1095 15.2231C12.3498 15.3601 12.6429 15.377 12.8983 15.2725L13.0053 15.2202L19.6032 11.4709ZM19.5062 15.1307C19.9864 14.8579 20.5968 15.0259 20.8697 15.5061C21.1231 15.952 20.9963 16.5102 20.5924 16.8061L20.4943 16.8696L13.8998 20.617C13.07 21.0928 12.0573 21.1255 11.1995 20.7133L11.0182 20.6182L4.50137 16.8668C4.02273 16.5913 3.85807 15.9799 4.1336 15.5013C4.38945 15.0568 4.93489 14.8831 5.39473 15.0811L5.49916 15.1335L12.0126 18.8829C12.2528 19.02 12.5459 19.0369 12.8014 18.9323L12.9083 18.8801L19.5062 15.1307Z"
-                        fill="currentColor"/>
-                </svg>
-                <span>${t("nav_business")}</span>
-            </a>
-        </li>
-        -->
-
-        <li data-page="Tasks" data-perm="nav_tasks" class="${initialPage === "Tasks" ? "active" : ""}">
+        <li data-page="Tasks" data-perm="nav_tasks" class="${currentPageName === "Tasks" ? "active" : ""}">
             <a href="#calendar">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -176,7 +166,8 @@ navigationWrapper.innerHTML = `
             </a>
         </li>
 
-        <li data-page="Vacations" data-perm="nav_vacations" class="${initialPage === "Vacations" ? "active" : ""}">
+        <!--
+        <li data-page="Vacations" data-perm="nav_vacations" class="${currentPageName === "Vacations" ? "active" : ""}">
             <a href="#vacations">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -186,8 +177,9 @@ navigationWrapper.innerHTML = `
                 <span>${t("nav_vacations")}</span>
             </a>
         </li>
+        -->
 
-        <li data-page="Employees" data-perm="nav_employees" class="${initialPage === "Employees" ? "active" : ""}">
+        <li data-page="Employees" data-perm="nav_employees" class="${currentPageName === "Employees" ? "active" : ""}">
             <a href="#employees">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -197,38 +189,7 @@ navigationWrapper.innerHTML = `
                 <span>${t("nav_employees")}</span>
             </a>
         </li>
-
-        <!-- 💡 Legacy bo'limlar 
-        <li data-page="Messenger" data-perm="nav_messenger" class="${initialPage === "Messenger" ? "active" : ""}">
-            <a href="#messenger">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path fill-rule="evenodd" clip-rule="evenodd"
-                        d="M22.1131 17.1417C23.2813 15.0135 23.2963 12.4606 22.153 10.3196C21.0098 8.17856 18.8557 6.72546 16.3968 6.43648C15.313 3.96537 12.925 2.27316 10.1786 2.03006C7.43221 1.78695 4.77042 3.03217 3.24746 5.27253C1.72449 7.5129 1.58606 10.387 2.88697 12.7565L2.30716 14.7344C2.17615 15.181 2.30391 15.6617 2.64093 15.9902C2.97795 16.3187 3.47124 16.4433 3.92957 16.3157L5.95948 15.7506C6.7809 16.179 7.67719 16.4543 8.60228 16.5622C9.42916 18.4471 11.03 19.9072 13.0148 20.5867C14.9995 21.2661 17.1857 21.1025 19.0407 20.1357L21.0705 20.7008C21.5288 20.8284 22.0221 20.7038 22.3591 20.3754C22.6961 20.047 22.824 19.5663 22.693 19.1197L22.1131 17.1417ZM20.6612 16.675C20.5556 16.848 20.5279 17.0558 20.5847 17.2494L21.1581 19.205L19.1512 18.6463C18.9526 18.591 18.7394 18.618 18.5619 18.7209C17.1753 19.5217 15.5165 19.7454 13.9588 19.3419C12.4012 18.9383 11.0754 17.9413 10.28 16.5753C12.3569 16.3658 14.2498 15.3212 15.5024 13.6933C16.7549 12.0655 17.2534 10.002 16.8777 8.00059C18.7362 8.42838 20.2748 9.69239 21.0218 11.405C21.7687 13.1175 21.6348 15.0742 20.6612 16.675Z"
-                        fill="currentColor"/>
-                </svg>
-                <span>${t("nav_messenger")}</span>
-            </a>
-        </li>
-
-        <li data-page="Infoportal" data-perm="nav_infoportal" class="${initialPage === "Infoportal" ? "active" : ""}">
-            <a href="#infoportal">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path fill-rule="evenodd" clip-rule="evenodd"
-                        d="M22.7133 9.96615C22.427 9.56926 21.9681 9.33394 21.4793 9.33333H20.2529L20.2392 8.26013C20.2252 7.16563 19.3339 6.28571 18.2394 6.28571H12.4751C12.258 6.28571 12.0468 6.21507 11.8734 6.08444L9.6407 4.40254C9.2939 4.1413 8.8715 4 8.43731 4H4C2.89543 4 2 4.89543 2 6L2 18C2 19.1046 2.89543 20 4 20H18.5968C19.458 20 20.2224 19.4488 20.4944 18.6318L22.9223 11.339C23.0763 10.8743 22.9986 10.3637 22.7133 9.96615ZM8.25749 5.52381C8.47416 5.52381 8.68496 5.59418 8.85818 5.72432L11.2278 7.50474C11.4915 7.70195 11.8115 7.80883 12.1405 7.80952H17.7318C18.2841 7.80952 18.7318 8.25724 18.7318 8.80952V9.33333H6.35086C5.69595 9.33274 5.11436 9.75267 4.90782 10.3753L3.52108 14.543V6.52381C3.52108 5.97153 3.96879 5.52381 4.52108 5.52381H8.25749Z"
-                        fill="currentColor"/>
-                </svg>
-                <span>${t("nav_infoportal")}</span>
-            </a>
-        </li>
-        -->
     </ul>
-
-    <!--
-    <div class="support">
-        <img src="/components/Navigation/images/support.svg" alt="" />
-        <button class="btn">${t("nav_support")}</button>
-    </div>
-    -->
 
     <div class="profile-menu-container">
         <div class="profile-dropdown" style="display: none;">
@@ -250,74 +211,122 @@ navigationWrapper.innerHTML = `
         </div>
 
         <div class="user-profile-btn sidebar-profile">
-            <img src="${userAvatar}" class="nav-user-avatar" alt="Avatar" />
-            <span class="nav-user-name">${userName}</span>
+            <img src="${displayAvatar}" class="nav-user-avatar" alt="Avatar" />
+            <span class="nav-user-name">${displayName}</span>
             <svg class="chevron-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="18 15 12 9 6 15"></polyline>
             </svg>
         </div>
     </div>
-`;
+    `;
 
-// ─── LANGUAGE SELECTOR LOGIC ──────────────────────────────────────
-const initNavLanguage = () => {
-  const select = document.getElementById("nav-language-selector");
-  if (!select) return;
-
-  const selected = select.querySelector(".selected");
-  const options = select.querySelector(".options");
-  const items = select.querySelectorAll(".options li");
-
-  // 1️⃣ Set current language UI
-  items.forEach((item) => {
-    if (item.dataset.value === currentLang) {
-      const img = item.querySelector("img").src;
-      const text = item.textContent.trim();
-      selected.innerHTML = `<img src="${img}"> <span>${text}</span>`;
-    }
-  });
-
-  // 2️⃣ Toggle dropdown
-  selected.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const isOpen = options.style.display === "block";
-    options.style.display = isOpen ? "none" : "block";
-    const chevron = selected.querySelector(".chevron-icon");
-    if (chevron)
-      chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
-  });
-
-  // 3️⃣ Select language
-  items.forEach((item) => {
-    item.addEventListener("click", () => {
-      const lang = item.dataset.value;
-      localStorage.setItem("language", lang);
-
-      // Save calendar date if needed
-      const calEventsDate = document.getElementById("cal-events-date");
-      if (calEventsDate?.textContent) {
-        localStorage.setItem("cal_selected_date", calEventsDate.textContent);
-      }
-      window.location.reload();
-    });
-  });
-
-  // 4️⃣ Close on outside click
-  document.addEventListener("click", (e) => {
-    if (!select.contains(e.target)) {
-      options.style.display = "none";
-      const chevron = selected.querySelector(".chevron-icon");
-      if (chevron) chevron.style.transform = "rotate(0deg)";
-    }
-  });
+    // Re-attach all events
+    initNavLanguage();
+    attachNavClickEvents();
+    attachProfileEvents();
+    attachLogoEvent();
 };
 
-initNavLanguage();
+const initNavLanguage = () => {
+    const select = document.getElementById("nav-language-selector");
+    if (!select) return;
 
-// ─── RENDER PAGE ──────────────────────────────────────────────────
-const contentArea = document.querySelector(".content");
+    const selected = select.querySelector(".selected");
+    const options = select.querySelector(".options");
+    const items = select.querySelectorAll(".options li");
 
-// 404 Page Template
+    selected.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isOpen = options.style.display === "block";
+        options.style.display = isOpen ? "none" : "block";
+        const chevron = selected.querySelector(".chevron-icon");
+        if (chevron) chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
+    });
+
+    items.forEach((item) => {
+        item.addEventListener("click", () => {
+            const lang = item.dataset.value;
+            setLanguage(lang);
+            
+            const calEventsDate = document.getElementById("cal-events-date");
+            if (calEventsDate?.textContent) {
+                localStorage.setItem("cal_selected_date", calEventsDate.textContent);
+            }
+        });
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!select.contains(e.target)) {
+            options.style.display = "none";
+            const chevron = selected.querySelector(".chevron-icon");
+            if (chevron) chevron.style.transform = "rotate(0deg)";
+        }
+    });
+};
+
+const attachNavClickEvents = () => {
+    const navLinks = document.querySelectorAll(".nav-menu li");
+    navLinks.forEach((link) => {
+        link.addEventListener("click", async (e) => {
+            e.preventDefault();
+            const pageID = link.getAttribute("data-page");
+            const targetPath = PATH_MAP[pageID] || "/";
+            const cu = getCurrentUser();
+            if (cu) {
+                const permKey = NAV_PERM_MAP[pageID];
+                if (permKey) {
+                    const perms = await getPermissions(cu.userId || cu._id);
+                    if (perms[permKey] === false) return;
+                }
+            }
+            navigateTo(targetPath);
+        });
+    });
+};
+
+const attachProfileEvents = () => {
+    const profileContainer = document.querySelector(".profile-menu-container");
+    if (!profileContainer) return;
+    const profileBtn = profileContainer.querySelector(".sidebar-profile");
+    const dropdown = profileContainer.querySelector(".profile-dropdown");
+    const chevron = profileContainer.querySelector(".chevron-icon");
+
+    profileBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isOpen = dropdown.style.display === "flex";
+        dropdown.style.display = isOpen ? "none" : "flex";
+        chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
+    });
+
+    document.getElementById("go-to-profile").onclick = () => {
+        dropdown.style.display = "none";
+        chevron.style.transform = "rotate(0deg)";
+        navigateTo("/profile");
+    };
+
+    document.getElementById("sidebar-logout").onclick = () => {
+        clearAuth();
+        window.location.href = "login.html";
+    };
+
+    document.addEventListener("click", (e) => {
+        if (!profileContainer.contains(e.target)) {
+            dropdown.style.display = "none";
+            chevron.style.transform = "rotate(0deg)";
+        }
+    });
+};
+
+const attachLogoEvent = () => {
+    const logoLink = document.getElementById("nav-logo-link");
+    if (logoLink) {
+        logoLink.onclick = (e) => {
+            e.preventDefault();
+            navigateTo("/tasks");
+        };
+    }
+};
+
 const NotFoundPage = `
     <div class="error-container">
         <h1 class="error-code">404</h1>
@@ -327,49 +336,36 @@ const NotFoundPage = `
     </div>
 `;
 
-// Helper to attach event for 404 button
-const attachNotFoundEvents = () => {
-  const btn = document.getElementById("error-go-home");
-  if (btn) btn.onclick = () => navigateTo("/tasks");
-};
-
 const renderPage = (pageName) => {
   if (pageName === "Tests") {
     contentArea.innerHTML = DashboardPage();
     initDashboardLogic();
   } else if (pageName === "Payments") {
-    contentArea.innerHTML = BusinessPage;
+    contentArea.innerHTML = BusinessPage();
     initBusinessLogic();
   } else if (pageName === "Tasks") {
-    contentArea.innerHTML = TodoPage;
+    contentArea.innerHTML = TodoPage();
     initTodoLogic();
   } else if (pageName === "Vacations") {
-    contentArea.innerHTML = VacationsPage;
-    initVacationsLogic();
+    contentArea.innerHTML = '<div class="vac-wrap"></div>';
   } else if (pageName === "Employees") {
-    contentArea.innerHTML = EmployeesPage;
+    contentArea.innerHTML = EmployeesPage();
     initEmployeesPage();
   } else if (pageName === "Messenger") {
-    contentArea.innerHTML = MassangerPage;
+    contentArea.innerHTML = MassangerPage();
     initMessengerLogic();
   } else if (pageName === "Infoportal") {
-    contentArea.innerHTML = InfoPortalPage;
+    contentArea.innerHTML = InfoPortalPage();
     initInfoPortalLogic();
   } else if (pageName === "user-profile") {
     userProfileRender();
   } else {
     contentArea.innerHTML = NotFoundPage;
-    attachNotFoundEvents();
+    const btn = document.getElementById("error-go-home");
+    if (btn) btn.onclick = () => navigateTo("/tasks");
     return;
   }
 
-  // Update Active Link in Sidebar
-  document.querySelectorAll(".nav-menu li").forEach((link) => {
-    const pageID = link.getAttribute("data-page");
-    link.classList.toggle("active", pageID === pageName);
-  });
-
-  // ── Page render bo'lgandan keyin permissions qo'llash ──
   const cu = getCurrentUser();
   if (cu) {
     applyPermissions(cu.userId || cu._id);
@@ -378,12 +374,16 @@ const renderPage = (pageName) => {
 
 const navigateTo = (path, pushState = true) => {
   const pageName = ROUTES[path] || "NotFound";
-
   if (pushState) {
     window.history.pushState({ path, pageName }, pageName, path);
   }
-
   renderPage(pageName);
+  
+  // Update active links
+  document.querySelectorAll(".nav-menu li").forEach((link) => {
+    const pageID = link.getAttribute("data-page");
+    link.classList.toggle("active", pageID === pageName);
+  });
 };
 
 window.addEventListener("popstate", (e) => {
@@ -391,18 +391,14 @@ window.addEventListener("popstate", (e) => {
   navigateTo(path, false);
 });
 
-// ─── BOSHLANG'ICH YUKLASH (ASYNC) ────────────────────────────────
-
 const initNavigation = async () => {
-  // 1. Server'dan current user olish
   const cu = await fetchCurrentUser();
+  
+  // 1. Initial render of navigation structure (required for applyPermissions to find elements)
+  renderNavigation();
 
   if (cu) {
-    // 2. Sidebar'dagi user ismini va avatarni yangilash
-    const nameEl = document.querySelector(".nav-user-name");
-    if (nameEl) nameEl.textContent = cu.username || userName;
-
-    // 3. Avatar serverdan olish
+    // 2. Fetch profile picture separately if not in user object
     try {
       const uId = cu.userId || cu._id;
       const res = await fetch(`${API_URL}/api/user-photos/${uId}?type=image`, {
@@ -411,100 +407,30 @@ const initNavigation = async () => {
       if (res.ok) {
         const file = await res.json();
         if (file && file.fileData) {
-          const sideAvatar = document.querySelector(".nav-user-avatar");
-          if (sideAvatar) sideAvatar.src = file.fileData;
-          // Update cached user with avatar
           setCurrentUser({ ...cu, avatar: file.fileData });
+          // Re-render to show new avatar
+          renderNavigation();
         }
       }
     } catch (err) {
       console.error("Failed to fetch nav avatar:", err);
     }
-
-    // 4. Permissions qo'llash
+    
+    // 3. Apply permissions to the now-rendered navigation items
     await applyPermissions(cu.userId || cu._id);
   }
 
-  // 5. Sahifani URL orqali yuklash
-  navigateTo(initialPath, false);
+  // 4. Initial page load
+  navigateTo(window.location.pathname, false);
 };
+
+const handleLanguageChange = () => {
+    renderNavigation();
+    const currentPath = window.location.pathname;
+    const pageName = ROUTES[currentPath] || "NotFound";
+    renderPage(pageName);
+};
+
+document.addEventListener(LANGUAGE_CHANGED_EVENT, handleLanguageChange);
 
 initNavigation();
-
-// ─── NAV CLICK EVENTS ─────────────────────────────────────────────
-const navLinks = document.querySelectorAll(".nav-menu li");
-
-const PATH_MAP = {
-  Tests: "/tests",
-  Payments: "/payments",
-  Tasks: "/tasks",
-  Vacations: "/vacations",
-  Employees: "/employees",
-  Messenger: "/messenger",
-  Infoportal: "/calendar",
-};
-
-navLinks.forEach((link) => {
-  link.addEventListener("click", async (e) => {
-    e.preventDefault();
-
-    const pageID = link.getAttribute("data-page");
-    const targetPath = PATH_MAP[pageID] || "/";
-
-    // Bloklangan sahifaga o'tishga urinish — oldini olish
-    const cu = getCurrentUser();
-    if (cu) {
-      const permKey = NAV_PERM_MAP[pageID];
-      if (permKey) {
-        const perms = await getPermissions(cu.userId || cu._id);
-        if (perms[permKey] === false) {
-          return;
-        }
-      }
-    }
-
-    navigateTo(targetPath);
-  });
-});
-
-// ─── PROFILE DROPDOWN LOGIC ───────────────────────────────────────
-const profileContainer = document.querySelector(".profile-menu-container");
-if (profileContainer) {
-  const profileBtn = profileContainer.querySelector(".sidebar-profile");
-  const dropdown = profileContainer.querySelector(".profile-dropdown");
-  const chevron = profileContainer.querySelector(".chevron-icon");
-
-  profileBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const isOpen = dropdown.style.display === "flex";
-    dropdown.style.display = isOpen ? "none" : "flex";
-    chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
-  });
-
-  document.addEventListener("click", (e) => {
-    if (!profileContainer.contains(e.target)) {
-      dropdown.style.display = "none";
-      chevron.style.transform = "rotate(0deg)";
-    }
-  });
-
-  document.getElementById("go-to-profile").onclick = () => {
-    navigateTo("/profile");
-    dropdown.style.display = "none";
-    chevron.style.transform = "rotate(0deg)";
-  };
-
-  document.getElementById("sidebar-logout").onclick = () => {
-    clearAuth();
-    window.location.href = "login.html";
-  };
-}
-
-// ─── LOGO CLICK EVENT ─────────────────────────────────────────────
-const logoLink = document.getElementById("nav-logo-link");
-if (logoLink) {
-  logoLink.onclick = (e) => {
-    e.preventDefault();
-    navigateTo("/tasks");
-  };
-}

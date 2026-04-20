@@ -1,17 +1,13 @@
 import { createPayAnalyticsBtn, initPayAnalytics } from "./analytics.js";
 import { translations } from "./translations.js";
 import { getCurrentUser, getAuthHeaders } from "../../assets/js/api.js";
+import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
 
 const getUsers = () => JSON.parse(localStorage.getItem("users")) || [];
 const saveUsers = (u) => localStorage.setItem("users", JSON.stringify(u));
 const getCurrent = () => getCurrentUser();
 
-let currentLang = localStorage.getItem("language") || "uz";
-const t = (key) => translations[currentLang]?.[key] ?? key;
-
-export const setBusinessLang = (lang) => {
-    currentLang = lang;
-};
+const t = createTranslationHelper(translations);
 
 const syncMe = () => {
     const cu = getCurrent();
@@ -47,7 +43,7 @@ const avatarHTML = (user, size = 34) => {
     return `<div class="biz-avatar" style="background:${avatarColor(name)};width:${size}px;height:${size}px;font-size:${Math.round(size * 0.35)}px">${initials(name)}</div>`;
 };
 
-export const BusinessPage = `
+export const BusinessPage = () => `
 <div class="biz-container">
 <div class="biz-root">
 

@@ -2,9 +2,9 @@ import { API_URL as BASE_URL, getCurrentUser, getAuthHeaders } from "../../asset
 import { createTaskAnalyticsBtn, initTaskAnalytics } from "./analytics.js";
 import { translations } from "./trasnslations.js";
 import { applyPermissions } from "../Employees/permission.js";
+import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
 
-let currentLang = localStorage.getItem("language") || "uz";
-const t = (key) => translations[currentLang]?.[key] ?? key;
+const t = createTranslationHelper(translations);
 
 // ─── DATA HELPERS (API) ──────────────────────────────────────────
 const API_URL = `${BASE_URL}/api/tasks`;
@@ -163,7 +163,7 @@ const dueDateHtml = (dateStr) => {
 };
 
 // ─── PAGE HTML ────────────────────────────────────────────────
-export const TodoPage = `
+export const TodoPage = () => `
 <div class="todo-wrap">
   <div class="todo-header">
     <div class="todo-header-left" style="display:flex; align-items:center;">
@@ -1110,12 +1110,12 @@ const translateUI = () => {
 
 // ─── INIT ─────────────────────────────────────────────────────
 export const initTodoLogic = async () => {
-  currentLang = localStorage.getItem("language") || "uz";
+  const lang = getCurrentLang();
   translateUI();
 
   const hr = document.querySelector(".todo-header-right");
   if (hr) {
-    const btn = createTaskAnalyticsBtn(currentLang);
+    const btn = createTaskAnalyticsBtn(lang);
     if (!hr.querySelector(".todo-analytics-btn")) {
       hr.insertAdjacentHTML("afterbegin", btn);
     }
@@ -1270,5 +1270,5 @@ export const initTodoLogic = async () => {
     () => ($("todo-del-modal").style.display = "none"),
   );
 
-  initTaskAnalytics(currentLang);
+  initTaskAnalytics(lang);
 };

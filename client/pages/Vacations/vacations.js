@@ -1,9 +1,11 @@
 import { createAnalyticsButton, initAnalytics } from "./analiytics.js";
-
 import { API_URL, getCurrentUser, getAuthHeaders } from "../../assets/js/api.js";
 import { vacTranslations } from "./translations.js";
 import { SAMPLE_TOURS } from "./card-default-data.js";
 import { applyPermissions } from "../Employees/permission.js";
+import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
+
+const t = createTranslationHelper(vacTranslations);
 
 // ─── DATA ─────────────────────────────────────
 const getToursKey = () => "vac_tours_v2";
@@ -27,7 +29,6 @@ const ml = (field, lang) => {
 export const VacationsPage = `<div class="vac-wrap" id="vac-root"></div>`;
 
 // ─── STATE ────────────────────────────────────
-let vacLang = "uz";
 let vacSearch = "";
 let vacFilter = "all";
 let detailTourId = null;
@@ -59,7 +60,7 @@ const esc = (s) =>
 const renderRoot = () => {
     const root = $v("vac-root");
     if (!root) return;
-    vacLang = localStorage.getItem("language") || "uz";
+    const vacLang = getCurrentLang();
     const tr = vacTranslations[vacLang] || vacTranslations.uz;
 
     if (detailTourId) {
@@ -72,7 +73,7 @@ const renderRoot = () => {
         <div class="vac-header">
             <h1 class="vac-title">${tr.title}</h1>
             <div class="vac-header-btns">
-                ${createAnalyticsButton(vacLang)}
+                ${createAnalyticsButton(getCurrentLang())}
                 <button data-perm="vac_add_tour" class="vac-add-btn" id="vac-add-btn">
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
                     ${tr.add_btn}
@@ -117,6 +118,7 @@ const filterIcon = (f) => {
 
 // ─── CARDS ────────────────────────────────────
 const renderCards = () => {
+    const vacLang = getCurrentLang();
     const tr = vacTranslations[vacLang] || vacTranslations.uz;
     let tours = getTours();
     if (vacSearch) tours = tours.filter((t) => ml(t.name, vacLang).toLowerCase().includes(vacSearch.toLowerCase()) || ml(t.country, vacLang).toLowerCase().includes(vacSearch.toLowerCase()) || ml(t.city, vacLang).toLowerCase().includes(vacSearch.toLowerCase()));
@@ -144,6 +146,7 @@ const starsHtml = (r) => {
 };
 
 const renderCard = (t) => {
+    const vacLang = getCurrentLang();
     const tr = vacTranslations[vacLang] || vacTranslations.uz;
     const img = t.coverImage || (t.images && t.images[0]) || "https://images.unsplash.com/photo-1488085061387-422e29b40080?w=600&q=80";
     const name = ml(t.name, vacLang);
@@ -192,6 +195,7 @@ const renderCard = (t) => {
 
 // ─── DETAIL ──
 const renderDetailInline = () => {
+    const vacLang = getCurrentLang();
     const tr = vacTranslations[vacLang] || vacTranslations.uz;
     const t = getTours().find((x) => x.id === detailTourId);
     if (!t) return "";
@@ -338,7 +342,7 @@ const renderDetailInline = () => {
 
 // ─── BOOKING MODAL ────────────────────────────
 const getBookModalHTML = () => {
-    vacLang = localStorage.getItem("language") || "uz";
+    const vacLang = getCurrentLang();
     const tr = vacTranslations[vacLang] || vacTranslations.uz;
     const t = getTours().find(x => x.id === detailTourId);
     if (!t) return "";
@@ -439,6 +443,7 @@ const getBookModalHTML = () => {
 
 // ─── ADD / EDIT MODAL ─────────────────────────
 const renderAddModal = () => {
+    const vacLang = getCurrentLang();
     const tr = vacTranslations[vacLang] || vacTranslations.uz;
     let t = null;
     if (editTourId) t = getTours().find((x) => x.id === editTourId);
@@ -1594,7 +1599,7 @@ const autosave = () => saveUiState();
 // ─── INIT ─────────────────────────────────────
 export const initVacationsLogic = () => {
     const cu = getCurrentUser();
-    vacLang = localStorage.getItem("language") || "uz";
+    const vacLang = getCurrentLang();
     // Restore UI state from before refresh
     const restored = loadUiState();
     if (!restored) {
