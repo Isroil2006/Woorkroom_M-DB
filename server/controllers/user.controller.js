@@ -1,7 +1,7 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 
-// JWT Secret fallback (in production should be set in environment)
+// JWT Secret fallback
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_for_dev_only";
 
 // Register
@@ -37,17 +37,20 @@ exports.register = async (req, res) => {
     });
 
     await newUser.save();
-    
+
     // Return user without password
     const userObj = newUser.toObject();
     delete userObj.password;
-    
+
     res.status(201).json(userObj);
   } catch (error) {
     console.error("Register error:", error);
     res
       .status(500)
-      .json({ message: "Ro'yxatdan o'tishda xatolik yuz berdi", error: error.message });
+      .json({
+        message: "Ro'yxatdan o'tishda xatolik yuz berdi",
+        error: error.message,
+      });
   }
 };
 
@@ -67,7 +70,7 @@ exports.login = async (req, res) => {
       const token = jwt.sign(
         { id: user._id, userId: user.userId, email: user.email },
         JWT_SECRET,
-        { expiresIn: "24h" }
+        { expiresIn: "24h" },
       );
 
       // User ma'lumotlarini password'siz qaytarish
@@ -82,7 +85,10 @@ exports.login = async (req, res) => {
     console.error("Login error:", error);
     res
       .status(500)
-      .json({ message: "Tizimga kirishda xatolik yuz berdi", error: error.message });
+      .json({
+        message: "Tizimga kirishda xatolik yuz berdi",
+        error: error.message,
+      });
   }
 };
 
