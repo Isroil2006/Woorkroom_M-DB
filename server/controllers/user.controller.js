@@ -1,8 +1,8 @@
 const User = require("../models/User");
+const Permission = require("../models/Permission");
 const jwt = require("jsonwebtoken");
 
-// JWT Secret fallback
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_for_dev_only";
+// ... boshqa kodlar
 
 // Register
 exports.register = async (req, res) => {
@@ -38,6 +38,17 @@ exports.register = async (req, res) => {
 
     await newUser.save();
 
+    // YANGI: Foydalanuvchi uchun default 'true' ruxsatnomalar yaratish
+    const defaultPerms = new Permission({
+      userId: newUser.userId || newUser._id.toString(),
+      perms: {
+        tasks: true,
+        employees: true,
+        settings: true // Yangi userlar uchun hamma narsa boshida ochiq bo'ladi
+      }
+    });
+    await defaultPerms.save();
+
     // Return user without password
     const userObj = newUser.toObject();
     delete userObj.password;
@@ -53,6 +64,7 @@ exports.register = async (req, res) => {
       });
   }
 };
+
 
 // Login
 exports.login = async (req, res) => {
