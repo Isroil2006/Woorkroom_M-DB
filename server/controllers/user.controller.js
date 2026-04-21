@@ -2,7 +2,8 @@ const User = require("../models/User");
 const Permission = require("../models/Permission");
 const jwt = require("jsonwebtoken");
 
-// ... boshqa kodlar
+// JWT Secret fallback
+const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_for_dev_only";
 
 // Register
 exports.register = async (req, res) => {
