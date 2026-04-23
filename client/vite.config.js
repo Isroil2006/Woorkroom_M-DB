@@ -5,9 +5,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        login: resolve(__dirname, 'login.html'),
-        notfound: resolve(__dirname, '404.html'),
+        main: resolve(__dirname, "index.html"),
+        login: resolve(__dirname, "login.html"),
       },
     },
   },
