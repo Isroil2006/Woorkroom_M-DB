@@ -6,27 +6,23 @@ export const API_URL =
       ? ""
       : "http://localhost:5000";
 
-// ─── Token Management ───────────────────────────────────────────
-export const getToken = () => sessionStorage.getItem("token");
-
-export const setToken = (token) => sessionStorage.setItem("token", token);
-
-export const clearAuth = () => {
-  sessionStorage.removeItem("token");
+// ─── Token Management (Endi kuki bilan ishlaymiz) ──────────────────
+export const clearAuth = async () => {
+  try {
+    await fetch(`${API_URL}/api/users/logout`, { method: "POST", credentials: "include" });
+  } catch (err) {
+    console.error("Logout error:", err);
+  }
   localStorage.removeItem("currentUser");
   cachedUser = null;
 };
 
-export const isAuthenticated = () => !!getToken();
+// Autentifikatsiyani tekshirish uchun user ma'lumoti bormi-yo'qligiga qaraymiz
+export const isAuthenticated = () => !!cachedUser;
 
 // ─── Auth Headers ───────────────────────────────────────────────
 export const getAuthHeaders = () => {
-  const token = getToken();
-  const headers = { "Content-Type": "application/json" };
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  return headers;
+  return { "Content-Type": "application/json" };
 };
 
 // ─── Current User Cache ─────────────────────────────────────────
@@ -41,19 +37,17 @@ export const setCurrentUser = (user) => {
 };
 
 export const fetchCurrentUser = async () => {
-  const token = getToken();
-  if (!token) return null;
-
   try {
     const res = await fetch(`${API_URL}/api/users/me`, {
+      method: "GET",
       headers: getAuthHeaders(),
+      credentials: "include", // Kukini yuborish uchun shart
     });
     if (res.ok) {
       cachedUser = await res.json();
       return cachedUser;
     } else if (res.status === 401) {
-      // Token yaroqsiz — tozalaymiz
-      clearAuth();
+      cachedUser = null;
       return null;
     }
   } catch (err) {
@@ -61,3 +55,4 @@ export const fetchCurrentUser = async () => {
   }
   return null;
 };
+

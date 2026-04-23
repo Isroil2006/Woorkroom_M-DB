@@ -1,4 +1,4 @@
-const File = require("../models/File");
+const UserPhoto = require("../models/UserPhoto");
 
 // Upload a file (avatar or video)
 exports.uploadFile = async (req, res) => {
@@ -13,10 +13,11 @@ exports.uploadFile = async (req, res) => {
 
     // Check if file already exists for this user (e.g. replacing avatar)
     // Optionally, if we only want one image per user, we can replace it.
-    let existingFile = await File.findOne({
+    let existingFile = await UserPhoto.findOne({
       userId,
       fileType: fileType || "image",
     });
+
 
     if (existingFile) {
       existingFile.fileData = fileData;
@@ -24,7 +25,8 @@ exports.uploadFile = async (req, res) => {
       return res.status(200).json(existingFile);
     }
 
-    const newFile = new File({
+    const newFile = new UserPhoto({
+
       userId,
       fileType: fileType || "image",
       fileData,
@@ -45,7 +47,8 @@ exports.getFileByUserId = async (req, res) => {
     const { userId } = req.params;
     const type = req.query.type || "image";
 
-    const file = await File.findOne({ userId, fileType: type });
+    const file = await UserPhoto.findOne({ userId, fileType: type });
+
     if (!file) {
       return res
         .status(200)
@@ -66,7 +69,8 @@ exports.deleteFileByUserId = async (req, res) => {
     const { userId } = req.params;
     const type = req.query.type || "image";
 
-    await File.findOneAndDelete({ userId, fileType: type });
+    await UserPhoto.findOneAndDelete({ userId, fileType: type });
+
     res.status(200).json({ message: "Fayl o'chirildi" });
   } catch (error) {
     res

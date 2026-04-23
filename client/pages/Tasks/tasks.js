@@ -13,7 +13,9 @@ const fetchProjects = async () => {
   try {
     const res = await fetch(`${API_URL}/projects`, {
       headers: getAuthHeaders(),
+      credentials: "include",
     });
+
     return await res.json();
   } catch (err) {
     console.error("Fetch projects error:", err);
@@ -25,7 +27,9 @@ const fetchTasks = async (projectId) => {
   try {
     const res = await fetch(`${API_URL}/?projectId=${projectId}`, {
       headers: getAuthHeaders(),
+      credentials: "include",
     });
+
     return await res.json();
   } catch (err) {
     console.error("Fetch tasks error:", err);
@@ -37,7 +41,9 @@ const fetchUsers = async () => {
   try {
     const res = await fetch(`${BASE_URL}/api/users`, {
       headers: getAuthHeaders(),
+      credentials: "include",
     });
+
     return await res.json();
   } catch (err) {
     return [];
@@ -808,14 +814,18 @@ const initDragDrop = () => {
           await fetch(`${API_URL}/${taskId}/user-status`, {
             method: "PUT",
             headers: getAuthHeaders(),
+            credentials: "include",
             body: JSON.stringify({ userId: cuId, status: newCol }),
           });
+
         } else {
           await fetch(`${API_URL}/${taskId}`, {
             method: "PUT",
             headers: getAuthHeaders(),
+            credentials: "include",
             body: JSON.stringify({ status: newCol }),
           });
+
         }
         renderView();
       } catch (err) {
@@ -861,8 +871,10 @@ const toggleDone = async (tid) => {
     await fetch(`${API_URL}/${tid}`, {
       method: "PUT",
       headers: getAuthHeaders(),
+      credentials: "include",
       body: JSON.stringify({ status: newStatus }),
     });
+
   } else if (ids.includes(cuId)) {
     // User specific toggle
     const cur = task.userStatus?.[cuId] || task.status || "todo";
@@ -870,8 +882,10 @@ const toggleDone = async (tid) => {
     await fetch(`${API_URL}/${tid}/user-status`, {
       method: "PUT",
       headers: getAuthHeaders(),
+      credentials: "include",
       body: JSON.stringify({ userId: cuId, status: next }),
     });
+
   }
   renderView();
 };
@@ -887,7 +901,8 @@ const showNoProjectModal = () => {
 
 const deleteTask = (tid) => {
   showDeleteConfirm(t("confirm_delete_task"), async () => {
-    await fetch(`${API_URL}/${tid}`, { method: "DELETE", headers: getAuthHeaders() });
+    await fetch(`${API_URL}/${tid}`, { method: "DELETE", headers: getAuthHeaders(), credentials: "include" });
+
     renderView();
   });
 };
@@ -964,14 +979,18 @@ const saveTask = async () => {
     await fetch(`${API_URL}/${editingTaskId}`, {
       method: "PUT",
       headers: getAuthHeaders(),
+      credentials: "include",
       body: JSON.stringify(data),
     });
+
   } else {
     await fetch(`${API_URL}`, {
       method: "POST",
       headers: getAuthHeaders(),
+      credentials: "include",
       body: JSON.stringify(data),
     });
+
   }
 
   $("task-modal").style.display = "none";
@@ -1191,7 +1210,9 @@ export const initTodoLogic = async () => {
       await fetch(`${API_URL}/projects/${currentProjectId}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
+        credentials: "include",
       });
+
       currentProjectId = null;
       renderProjectTabs();
       renderView();
@@ -1218,8 +1239,10 @@ export const initTodoLogic = async () => {
     const res = await fetch(`${API_URL}/projects`, {
       method: "POST",
       headers: getAuthHeaders(),
+      credentials: "include",
       body: JSON.stringify({ name, createdBy: cu?._id || cu?.userId }),
     });
+
 
     if (res.ok) {
       const newP = await res.json();

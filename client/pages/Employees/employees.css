@@ -649,4 +649,8 @@
 .rows-option.active {
     background: #ebf3ff;
     color: #5b6ef5;
+} 
+.error-input {
+    border-color: #ff4d4f !important;
+    box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.2) !important;
 }

@@ -1,5 +1,7 @@
 const User = require("../models/User");
+const UserPhoto = require("../models/UserPhoto");
 const Permission = require("../models/Permission");
+
 const jwt = require("jsonwebtoken");
 
 // JWT Secret fallback
@@ -28,9 +30,9 @@ exports.register = async (req, res) => {
     const newUser = new User({
       userId,
       username,
-      tel,
+      tel: tel || "000000000", // Telefon raqami bo'sh bo'lsa default qiymat
       email,
-      password,
+      password: password || "123456", // Parol bo'sh bo'lsa default qiymat
       gender,
       position,
       level,
@@ -39,13 +41,13 @@ exports.register = async (req, res) => {
 
     await newUser.save();
 
-    // YANGI: Foydalanuvchi uchun default 'true' ruxsatnomalar yaratish
+    // Foydalanuvchi uchun default ruxsatnomalar yaratish
     const defaultPerms = new Permission({
       userId: newUser.userId || newUser._id.toString(),
       perms: {
         tasks: true,
         employees: true,
-        settings: true // Yangi userlar uchun hamma narsa boshida ochiq bo'ladi
+        settings: true
       }
     });
     await defaultPerms.save();
@@ -86,14 +88,30 @@ exports.login = async (req, res) => {
         { expiresIn: "24h" },
       );
 
+      // Kukini o'rnatish
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 24 * 60 * 60 * 1000 // 24 soat
+      });
+
       // User ma'lumotlarini password'siz qaytarish
       const userObj = user.toObject();
       delete userObj.password;
 
-      res.status(200).json({ token, user: userObj });
+      // Avatar'ni yuklash (agar bo'lsa)
+      const photo = await UserPhoto.findOne({ userId: userObj.userId || userObj._id });
+      if (photo) {
+        userObj.avatar = photo.fileData;
+      }
+
+      res.status(200).json({ user: userObj }); 
+
     } else {
       res.status(401).json({ message: "Email yoki parol noto'g'ri" });
     }
+
   } catch (error) {
     console.error("Login error:", error);
     res
@@ -105,6 +123,12 @@ exports.login = async (req, res) => {
   }
 };
 
+// Logout
+exports.logout = async (req, res) => {
+  res.clearCookie("token");
+  res.status(200).json({ message: "Tizimdan chiqildi" });
+};
+
 // Get current user from token
 exports.getMe = async (req, res) => {
   try {
@@ -112,7 +136,15 @@ exports.getMe = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "Foydalanuvchi topilmadi!" });
     }
-    res.status(200).json(user);
+
+    const userObj = user.toObject();
+    const photo = await UserPhoto.findOne({ userId: userObj.userId || userObj._id });
+    if (photo) {
+      userObj.avatar = photo.fileData;
+    }
+
+    res.status(200).json(userObj);
+
   } catch (error) {
     res
       .status(500)

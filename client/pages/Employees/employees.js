@@ -154,8 +154,23 @@ export function initEmployeesPage() {
     reader.onload = (ev) => {
       currentImage = ev.target.result;
       modalAvatarImg.src = currentImage;
+      modalAvatarImg.classList.add("image-loaded");
     };
     reader.readAsDataURL(file);
+  };
+
+  genderInput.onchange = () => {
+    const g = genderInput.value;
+    // Faqat agar foydalanuvchi o'zi rasm yuklamagan bo'lsa (ya'ni rasm base64 bo'lmasa) genderga qarab o'zgartiramiz
+    if (!currentImage.startsWith("data:image")) {
+      currentImage =
+        g === "Male"
+          ? "./assets/images/user-avatar-male.png"
+          : g === "Female"
+            ? "./assets/images/user-avatar-female.png"
+            : "./assets/images/User-avatar.png";
+      modalAvatarImg.src = currentImage;
+    }
   };
 
   // ── Render ────────────────────────────────────────────────────
@@ -164,7 +179,9 @@ export function initEmployeesPage() {
     try {
       const res = await fetch(`${API_URL}/api/users`, {
         headers: getAuthHeaders(),
+        credentials: "include",
       });
+
       if (res.ok) users = await res.json();
     } catch (e) {
       console.error(e);
@@ -215,9 +232,10 @@ export function initEmployeesPage() {
             <div class="employee-card-inner">
                 <div class="employee-box">
                     <div class="emp-avatar-wrap">
-                        <img id="avatar-${u.userId || u._id}" src="./assets/images/User-avatar.png" alt="${u.username || "User"}"/>
+                        <img id="avatar-${u.userId || u._id}" src="${u.gender === "Male" ? "./assets/images/user-avatar-male.png" : u.gender === "Female" ? "./assets/images/user-avatar-female.png" : "./assets/images/User-avatar.png"}" alt="${u.username || "User"}"/>
                         <span class="emp-avatar-dot"></span>
                     </div>
+
                     <div class="name-email-box">
                         <span class="username">${u.username || "—"}</span>
                         <span class="useremail">${u.email || "—"}</span>
@@ -261,35 +279,7 @@ export function initEmployeesPage() {
             </div>`;
       list.appendChild(card);
 
-      // Fetch avatar
-      const img = document.getElementById(`avatar-${u.userId || u._id}`);
-      if (img) img.classList.add("image-loading");
 
-      fetch(`${API_URL}/api/user-photos/${u.userId || u._id}`, {
-        headers: getAuthHeaders(),
-      })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((f) => {
-          if (f && f.fileData && img) {
-            const tempImg = new Image();
-            tempImg.src = f.fileData;
-            tempImg.onload = () => {
-              img.src = f.fileData;
-              img.classList.remove("image-loading");
-              img.classList.add("image-loaded");
-            };
-          } else if (img) {
-            img.classList.remove("image-loading");
-            img.classList.add("image-loaded");
-          }
-        })
-        .catch((err) => {
-          console.error(err);
-          if (img) {
-            img.classList.remove("image-loading");
-            img.classList.add("image-loaded");
-          }
-        });
     });
 
     renderPagination(users.length);
@@ -458,15 +448,23 @@ export function initEmployeesPage() {
     }, 400); // Small fake delay for skeleton effect
 
     // 3️⃣ Fetch avatar with animation
-    currentImage = "./assets/images/User-avatar.png";
+    currentImage =
+      u.gender === "Male"
+        ? "./assets/images/user-avatar-male.png"
+        : u.gender === "Female"
+          ? "./assets/images/user-avatar-female.png"
+          : "./assets/images/User-avatar.png";
     modalAvatarImg.src = currentImage;
+
 
     try {
       const res = await fetch(
         `${API_URL}/api/user-photos/${u.userId || u._id}`, {
           headers: getAuthHeaders(),
+          credentials: "include",
         }
       );
+
       if (res.ok) {
         const file = await res.json();
         if (file.fileData) {
@@ -500,21 +498,49 @@ export function initEmployeesPage() {
         ? users[editIndex].userId || users[editIndex]._id
         : Date.now().toString();
 
-    const passwordVal = document.getElementById("emp-password").value;
+    const usernameInput = document.getElementById("emp-username");
+    const emailInput = document.getElementById("emp-email");
+    const telInput = document.getElementById("emp-tel");
+    const passwordInput = document.getElementById("emp-password");
+
+    // Validation
+    let isValid = true;
+    const requiredFields = [usernameInput, emailInput, telInput];
+    
+    // Agar yangi user bo'lsa parolni ham tekshirsa bo'ladi (ixtiyoriy)
+    if (editIndex === null) requiredFields.push(passwordInput);
+
+    requiredFields.forEach(input => {
+        if (!input.value.trim()) {
+            input.classList.add("error-input");
+            isValid = false;
+        } else {
+            input.classList.remove("error-input");
+        }
+        
+        // Foydalanuvchi yozishni boshlasa qizil chiziqni olib tashlaymiz
+        input.oninput = () => input.classList.remove("error-input");
+    });
+
+    if (!isValid) return;
 
     const data = {
-      userId: uId,
-      username: document.getElementById("emp-username").value,
-      email: document.getElementById("emp-email").value,
-      tel: document.getElementById("emp-tel").value,
+      username: usernameInput.value,
+      email: emailInput.value,
+      tel: telInput.value,
       gender: document.getElementById("emp-gender").value,
-      age: document.getElementById("emp-age").value,
+      age: document.getElementById("emp-age").value ? parseInt(document.getElementById("emp-age").value) : null,
       position: document.getElementById("emp-position").value,
       level: document.getElementById("emp-level").value,
     };
 
-    if (passwordVal) {
-      data.password = passwordVal;
+    if (editIndex !== null) {
+      data.userId = uId;
+    }
+
+
+    if (passwordInput.value) {
+      data.password = passwordInput.value;
     }
 
     const method = editIndex !== null ? "PUT" : "POST";
@@ -531,29 +557,34 @@ export function initEmployeesPage() {
       const res = await fetch(url, {
         method,
         headers: getAuthHeaders(),
+        credentials: "include",
         body: JSON.stringify(data),
       });
 
+
       if (res.ok) {
+        const savedUser = await res.json();
+        const finalUserId = savedUser.userId || savedUser._id;
+
         // Upload avatar
         if (
           currentImage &&
-          currentImage !== "./assets/images/User-avatar.png"
+          currentImage !== "./assets/images/User-avatar.png" &&
+          currentImage !== "./assets/images/user-avatar-male.png" &&
+          currentImage !== "./assets/images/user-avatar-female.png"
         ) {
           await fetch(`${API_URL}/api/user-photos/upload`, {
             method: "POST",
             headers: getAuthHeaders(),
+            credentials: "include",
             body: JSON.stringify({
-              userId: uId,
+              userId: finalUserId,
               fileType: "image",
               fileData: currentImage,
             }),
           });
         }
         modal.style.display = "none";
-
-        await res.json();
-
         await renderEmployees();
       } else {
         const err = await res.json();
@@ -598,10 +629,13 @@ export function initEmployeesPage() {
       levelInput,
     ].forEach((i) => (i.value = ""));
     genderInput.value = "";
+    
     currentImage = "./assets/images/User-avatar.png";
+    modalAvatarImg.src = currentImage;
+    
     passwordInput.placeholder = t("password");
     document.getElementById("pwd-label").innerText = t("password");
-    modalAvatarImg.src = currentImage;
+    
     modalAvatarImg.classList.add("image-loaded");
     modalAvatarImg.classList.remove("image-loading");
     modal.style.display = "flex";
@@ -627,7 +661,9 @@ export function initEmployeesPage() {
       const res = await fetch(`${API_URL}/api/users/${uId}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
+        credentials: "include",
       });
+
       if (res.ok) {
         deleteModal.style.display = "none";
         const currentUser = getCurrentUser();

@@ -10,15 +10,15 @@ export const LANGUAGE_CHANGED_EVENT = "language-changed";
  * @returns {string} The language code (e.g., 'uz', 'en', 'ru')
  */
 export const getCurrentLang = () => {
-    return localStorage.getItem("language") || "uz";
+    return sessionStorage.getItem("language") || "uz";
 };
 
 /**
- * Updates the language in localStorage and broadcasts a global event.
+ * Updates the language in sessionStorage and broadcasts a global event.
  * @param {string} lang The new language code.
  */
 export const setLanguage = (lang) => {
-    localStorage.setItem("language", lang);
+    sessionStorage.setItem("language", lang);
     
     // Broadcast event so components can re-render
     const event = new CustomEvent(LANGUAGE_CHANGED_EVENT, { detail: { lang } });

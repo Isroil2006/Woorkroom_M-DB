@@ -1004,7 +1004,7 @@ const attachRootEvents = () => {
 //  INIT
 // ═══════════════════════════════════════════════
 export const initMessengerLogic = () => {
-  currentLang = localStorage.getItem("language") || "uz";
+  currentLang = sessionStorage.getItem("language") || "uz";
   currentUser = getCurrent();
   activeContact = null;
   searchQuery = "";

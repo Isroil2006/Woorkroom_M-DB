@@ -45,7 +45,9 @@ export const getPermissions = async (userId) => {
   try {
     const res = await fetch(`${PERM_API}/${userId}`, {
       headers: getAuthHeaders(),
+      credentials: "include",
     });
+
     if (res.ok) {
       const data = await res.json();
       const perms =
@@ -71,8 +73,10 @@ export const savePermissions = async (userId, perms) => {
     const res = await fetch(`${PERM_API}/${userId}`, {
       method: "POST",
       headers: getAuthHeaders(),
+      credentials: "include",
       body: JSON.stringify({ perms }),
     });
+
     if (res.ok) {
       permissionCache.set(userId, perms);
     }

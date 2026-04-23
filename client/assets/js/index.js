@@ -1,7 +1,11 @@
 import "../../components/component.js";
 import "../../pages/pages.js";
-import { isAuthenticated } from "./api.js";
+import { fetchCurrentUser } from "./api.js";
 
-if (!isAuthenticated()) {
-  window.location.href = "login.html";
-}
+(async () => {
+  const user = await fetchCurrentUser();
+  if (!user) {
+    window.location.href = "login.html";
+  }
+})();
+

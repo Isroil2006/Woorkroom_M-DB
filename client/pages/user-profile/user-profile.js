@@ -11,7 +11,6 @@ function calcCompletion(user) {
     "username",
     "email",
     "tel",
-    "password",
     "gender",
     "age",
     "position",
@@ -82,6 +81,7 @@ export async function userProfileRender() {
     const uId = loggedInInfo.userId || loggedInInfo._id;
     const res = await fetch(`${API_URL}/api/users/${uId}`, {
       headers: getAuthHeaders(),
+      credentials: "include"
     });
     if (res.ok) {
       user = await res.json();
@@ -91,11 +91,19 @@ export async function userProfileRender() {
   }
 
   // Fetch avatar from backend
-  let userAvatar = user.avatar || "/assets/images/User-avatar.png";
+  // Fetch avatar from backend
+  let userAvatar = user.avatar ||
+    (user.gender === "Male"
+      ? "/assets/images/user-avatar-male.png"
+      : user.gender === "Female"
+        ? "/assets/images/user-avatar-female.png"
+        : "/assets/images/User-avatar.png");
+
   try {
     const uId = user.userId || user._id;
     const res = await fetch(`${API_URL}/api/user-photos/${uId}?type=image`, {
       headers: getAuthHeaders(),
+      credentials: "include"
     });
     if (res.ok) {
       const file = await res.json();
@@ -296,6 +304,7 @@ export async function userProfileRender() {
       const res = await fetch(`${API_URL}/api/users/${uId}`, {
         method: "PUT",
         headers: getAuthHeaders(),
+        credentials: "include",
         body: JSON.stringify(data),
       });
 
@@ -339,6 +348,7 @@ export async function userProfileRender() {
         const res = await fetch(`${API_URL}/api/user-photos/upload`, {
           method: "POST",
           headers: getAuthHeaders(),
+          credentials: "include",
           body: JSON.stringify({
             userId: uId,
             fileType: "image",

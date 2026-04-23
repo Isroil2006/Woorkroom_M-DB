@@ -146,7 +146,7 @@ const renderDetailView = (container, testId) => {
         </div>
     `;
 
-  const savedLang = localStorage.getItem("language") || "uz";
+  const savedLang = sessionStorage.getItem("language") || "uz";
   const select = document.getElementById("dash-language-selector");
   if (!select) return;
 
@@ -260,7 +260,7 @@ const renderQuestionList = (container, testId) => {
   if (!listDiv) return;
   listDiv.innerHTML = "";
 
-  const uiLang = localStorage.getItem("language") || "uz";
+  const uiLang = sessionStorage.getItem("language") || "uz";
 
   test.questions.forEach((q, index) => {
     const card = document.createElement("div");

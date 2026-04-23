@@ -1,5 +1,14 @@
-import { API_URL, setToken } from "./api.js";
+import { API_URL, fetchCurrentUser } from "./api.js";
 import { signInForm, signUpForm } from "../../pages/login/auth.js";
+
+// Agar user allaqachon login qilgan bo'lsa, asosiy sahifaga o'tkazamiz
+(async () => {
+  const user = await fetchCurrentUser();
+  if (user) {
+    window.location.href = "/";
+  }
+})();
+
 
 const wrapper = document.querySelector(".auth-wrapper");
 const container = document.getElementById("auth-container");
@@ -155,6 +164,7 @@ function attachEvents() {
       fetch(`${API_URL}/api/users/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include", // YANGI: Kuki yashash uchun shart
         body: JSON.stringify({ email, password }),
       })
         .then(async (res) => {
@@ -165,12 +175,12 @@ function attachEvents() {
               showError("email", "Email yoki parol xato");
               showError("password", "Email yoki parol xato");
             } else if (res.status === 200) {
-              setToken(data.token);
               window.location.href = "/";
             } else {
               alert(data.message || "Xatolik yuz berdi");
             }
           } else {
+
             const text = await res.text();
             console.error("Server error (not JSON):", text);
             alert("Tizimga kirishda xatolik yuz berdi. Iltimos keyinroq qayta urinib ko'ring.");

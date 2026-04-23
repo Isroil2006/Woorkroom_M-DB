@@ -8,7 +8,8 @@ const checkPermission = require("../middleware/permission.middleware");
 router.get("/:userId", auth, permissionController.getPermissionsByUserId);
 
 // Faqat ruxsatlarni o'zgartirish 'settings' huquqini talab qiladi
-router.post("/:userId", auth, checkPermission("settings"), permissionController.updatePermissions);
+router.post("/:userId", auth, checkPermission(), permissionController.updatePermissions);
+
 
 module.exports = router;
 
