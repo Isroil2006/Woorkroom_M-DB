@@ -145,7 +145,7 @@ export function initEmployeesPage() {
   let currentPageNum = 1;
   let editIndex = null;
   let indexToDelete = null;
-  let currentImage = "./assets/images/User-avatar.png";
+  let currentImage = "/assets/images/User-avatar.png";
 
   avatarInput.onchange = (e) => {
     const file = e.target.files[0];
@@ -165,10 +165,10 @@ export function initEmployeesPage() {
     if (!currentImage.startsWith("data:image")) {
       currentImage =
         g === "Male"
-          ? "./assets/images/user-avatar-male.png"
+          ? "/assets/images/user-avatar-male.png"
           : g === "Female"
-            ? "./assets/images/user-avatar-female.png"
-            : "./assets/images/User-avatar.png";
+            ? "/assets/images/user-avatar-female.png"
+            : "/assets/images/User-avatar.png";
       modalAvatarImg.src = currentImage;
     }
   };
@@ -232,7 +232,7 @@ export function initEmployeesPage() {
             <div class="employee-card-inner">
                 <div class="employee-box">
                     <div class="emp-avatar-wrap">
-                        <img id="avatar-${u.userId || u._id}" src="${u.gender === "Male" ? "./assets/images/user-avatar-male.png" : u.gender === "Female" ? "./assets/images/user-avatar-female.png" : "./assets/images/User-avatar.png"}" alt="${u.username || "User"}"/>
+                        <img id="avatar-${u.userId || u._id}" src="${u.gender === "Male" ? "/assets/images/user-avatar-male.png" : u.gender === "Female" ? "/assets/images/user-avatar-female.png" : "/assets/images/User-avatar.png"}" alt="${u.username || "User"}"/>
                         <span class="emp-avatar-dot"></span>
                     </div>
 
