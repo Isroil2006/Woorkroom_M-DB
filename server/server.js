@@ -16,7 +16,7 @@ mongoose
 
 // Start Server
 const PORT = process.env.PORT || 5000;
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   app.listen(PORT, () => {
     console.log(`Server ${PORT}-portda ishga tushdi`);
   });

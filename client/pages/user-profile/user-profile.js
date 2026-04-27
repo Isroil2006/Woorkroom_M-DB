@@ -1,31 +1,18 @@
 import { API_URL, getCurrentUser, getAuthHeaders, setCurrentUser } from "../../assets/js/api.js";
 import { profileTranslations } from "./translations.js";
 import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
- 
-const t = createTranslationHelper(profileTranslations);
 
+const t = createTranslationHelper(profileTranslations);
 
 // ───── Helpers ────────────────────────────────────────────
 function calcCompletion(user) {
-  const fields = [
-    "username",
-    "email",
-    "tel",
-    "gender",
-    "age",
-    "position",
-    "level",
-    "avatar",
-  ];
+  const fields = ["username", "email", "tel", "gender", "age", "position", "level", "avatar"];
   const filled = fields.filter((f) => user[f] && user[f] !== "").length;
   return Math.round((filled / fields.length) * 100);
 }
 
 function infoChip(label, value) {
-  const display =
-    value && value !== ""
-      ? value
-      : `<span class="up-empty">${t("not_specified")}</span>`;
+  const display = value && value !== "" ? value : `<span class="up-empty">${t("not_specified")}</span>`;
   return `<div class="up-info-chip">
         <span class="up-chip-label">${label}</span>
         <span class="up-chip-value">${display}</span>
@@ -81,7 +68,7 @@ export async function userProfileRender() {
     const uId = loggedInInfo.userId || loggedInInfo._id;
     const res = await fetch(`${API_URL}/api/users/${uId}`, {
       headers: getAuthHeaders(),
-      credentials: "include"
+      credentials: "include",
     });
     if (res.ok) {
       user = await res.json();
@@ -92,18 +79,14 @@ export async function userProfileRender() {
 
   // Fetch avatar from backend
   // Fetch avatar from backend
-  let userAvatar = user.avatar ||
-    (user.gender === "Male"
-      ? "/assets/images/user-avatar-male.png"
-      : user.gender === "Female"
-        ? "/assets/images/user-avatar-female.png"
-        : "/assets/images/User-avatar.png");
+  let userAvatar =
+    user.avatar || (user.gender === "Male" ? "/assets/images/user-avatar-male.png" : user.gender === "Female" ? "/assets/images/user-avatar-female.png" : "/assets/images/User-avatar.png");
 
   try {
     const uId = user.userId || user._id;
     const res = await fetch(`${API_URL}/api/user-photos/${uId}?type=image`, {
       headers: getAuthHeaders(),
-      credentials: "include"
+      credentials: "include",
     });
     if (res.ok) {
       const file = await res.json();

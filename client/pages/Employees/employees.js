@@ -1,11 +1,6 @@
 // employees.js
 import { API_URL, getCurrentUser, getAuthHeaders } from "../../assets/js/api.js";
-import {
-  openPermissionsModal,
-  getPermissions,
-  applyPermissions,
-  checkPermission,
-} from "./permission.js";
+import { openPermissionsModal, getPermissions, applyPermissions, checkPermission } from "./permission.js";
 import { translations } from "../Employees/translations.js";
 
 import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
@@ -164,12 +159,7 @@ export function initEmployeesPage() {
     const g = genderInput.value;
     // Faqat agar foydalanuvchi o'zi rasm yuklamagan bo'lsa (ya'ni rasm base64 bo'lmasa) genderga qarab o'zgartiramiz
     if (!currentImage.startsWith("data:image")) {
-      currentImage =
-        g === "Male"
-          ? "/assets/images/user-avatar-male.png"
-          : g === "Female"
-            ? "/assets/images/user-avatar-female.png"
-            : "/assets/images/User-avatar.png";
+      currentImage = g === "Male" ? "/assets/images/user-avatar-male.png" : g === "Female" ? "/assets/images/user-avatar-female.png" : "/assets/images/User-avatar.png";
       modalAvatarImg.src = currentImage;
     }
   };
@@ -213,12 +203,7 @@ export function initEmployeesPage() {
       let permBtnHtml = "";
       if (myPerms && checkPermission(myPerms, "emp_perm_btn")) {
         const lang = getCurrentLang();
-        const label =
-          lang === "ru"
-            ? "Ограничения"
-            : lang === "en"
-              ? "Permissions"
-              : "Cheklovlar";
+        const label = lang === "ru" ? "Ограничения" : lang === "en" ? "Permissions" : "Cheklovlar";
         permBtnHtml = `
             <button class="emp-perm-btn" data-userid="${u.userId || u._id}" data-username="${u.username}">
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
@@ -279,8 +264,6 @@ export function initEmployeesPage() {
                 </div>
             </div>`;
       list.appendChild(card);
-
-
     });
 
     renderPagination(users.length);
@@ -367,11 +350,7 @@ export function initEmployeesPage() {
     document.querySelectorAll(".emp-perm-btn[data-userid]").forEach((btn) => {
       btn.onclick = (e) => {
         e.stopPropagation();
-        openPermissionsModal(
-          btn.dataset.userid,
-          btn.dataset.username,
-          getCurrentLang(),
-        );
+        openPermissionsModal(btn.dataset.userid, btn.dataset.username, getCurrentLang());
       };
     });
   }
@@ -449,22 +428,14 @@ export function initEmployeesPage() {
     }, 400); // Small fake delay for skeleton effect
 
     // 3️⃣ Fetch avatar with animation
-    currentImage =
-      u.gender === "Male"
-        ? "./assets/images/user-avatar-male.png"
-        : u.gender === "Female"
-          ? "./assets/images/user-avatar-female.png"
-          : "./assets/images/User-avatar.png";
+    currentImage = u.gender === "Male" ? "./assets/images/user-avatar-male.png" : u.gender === "Female" ? "./assets/images/user-avatar-female.png" : "./assets/images/User-avatar.png";
     modalAvatarImg.src = currentImage;
 
-
     try {
-      const res = await fetch(
-        `${API_URL}/api/user-photos/${u.userId || u._id}`, {
-          headers: getAuthHeaders(),
-          credentials: "include",
-        }
-      );
+      const res = await fetch(`${API_URL}/api/user-photos/${u.userId || u._id}`, {
+        headers: getAuthHeaders(),
+        credentials: "include",
+      });
 
       if (res.ok) {
         const file = await res.json();
@@ -494,10 +465,7 @@ export function initEmployeesPage() {
 
   saveBtn.onclick = async () => {
     const users = window.usersData || [];
-    const uId =
-      editIndex !== null
-        ? users[editIndex].userId || users[editIndex]._id
-        : Date.now().toString();
+    const uId = editIndex !== null ? users[editIndex].userId || users[editIndex]._id : Date.now().toString();
 
     const usernameInput = document.getElementById("emp-username");
     const emailInput = document.getElementById("emp-email");
@@ -507,20 +475,20 @@ export function initEmployeesPage() {
     // Validation
     let isValid = true;
     const requiredFields = [usernameInput, emailInput, telInput];
-    
+
     // Agar yangi user bo'lsa parolni ham tekshirsa bo'ladi (ixtiyoriy)
     if (editIndex === null) requiredFields.push(passwordInput);
 
-    requiredFields.forEach(input => {
-        if (!input.value.trim()) {
-            input.classList.add("error-input");
-            isValid = false;
-        } else {
-            input.classList.remove("error-input");
-        }
-        
-        // Foydalanuvchi yozishni boshlasa qizil chiziqni olib tashlaymiz
-        input.oninput = () => input.classList.remove("error-input");
+    requiredFields.forEach((input) => {
+      if (!input.value.trim()) {
+        input.classList.add("error-input");
+        isValid = false;
+      } else {
+        input.classList.remove("error-input");
+      }
+
+      // Foydalanuvchi yozishni boshlasa qizil chiziqni olib tashlaymiz
+      input.oninput = () => input.classList.remove("error-input");
     });
 
     if (!isValid) return;
@@ -539,16 +507,12 @@ export function initEmployeesPage() {
       data.userId = uId;
     }
 
-
     if (passwordInput.value) {
       data.password = passwordInput.value;
     }
 
     const method = editIndex !== null ? "PUT" : "POST";
-    const url =
-      editIndex !== null
-        ? `${API_URL}/api/users/${uId}`
-        : `${API_URL}/api/users/register`;
+    const url = editIndex !== null ? `${API_URL}/api/users/${uId}` : `${API_URL}/api/users/register`;
 
     try {
       const btnOriginalText = saveBtn.innerText;
@@ -561,7 +525,6 @@ export function initEmployeesPage() {
         credentials: "include",
         body: JSON.stringify(data),
       });
-
 
       if (res.ok) {
         const savedUser = await res.json();
@@ -620,23 +583,15 @@ export function initEmployeesPage() {
     const positionInput = document.getElementById("emp-position");
     const levelInput = document.getElementById("emp-level");
 
-    [
-      usernameInput,
-      emailInput,
-      passwordInput,
-      telInput,
-      ageInput,
-      positionInput,
-      levelInput,
-    ].forEach((i) => (i.value = ""));
+    [usernameInput, emailInput, passwordInput, telInput, ageInput, positionInput, levelInput].forEach((i) => (i.value = ""));
     genderInput.value = "";
-    
+
     currentImage = "./assets/images/User-avatar.png";
     modalAvatarImg.src = currentImage;
-    
+
     passwordInput.placeholder = t("password");
     document.getElementById("pwd-label").innerText = t("password");
-    
+
     modalAvatarImg.classList.add("image-loaded");
     modalAvatarImg.classList.remove("image-loading");
     modal.style.display = "flex";
@@ -705,14 +660,14 @@ export function initEmployeesPage() {
       const val = parseInt(opt.dataset.val);
       ITEMS_PER_PAGE = val;
       currentRowsVal.innerText = val;
-      
-      rowsOptions.forEach(o => o.classList.remove("active"));
+
+      rowsOptions.forEach((o) => o.classList.remove("active"));
       opt.classList.add("active");
-      
+
       rowsDropdown.style.display = "none";
       const chevron = rowsSelectorBtn.querySelector(".chevron");
       if (chevron) chevron.style.transform = "rotate(0deg)";
-      
+
       currentPageNum = 1; // Reset to page 1
       renderEmployees();
     };
@@ -721,7 +676,7 @@ export function initEmployeesPage() {
   window.onclick = (e) => {
     if (e.target === modal) modal.style.display = "none";
     if (e.target === deleteModal) deleteModal.style.display = "none";
-    
+
     // Close rows dropdown if clicked outside
     if (!rowsSelectorBtn.contains(e.target) && !rowsDropdown.contains(e.target)) {
       rowsDropdown.style.display = "none";

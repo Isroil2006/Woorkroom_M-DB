@@ -6,9 +6,7 @@ exports.uploadFile = async (req, res) => {
     const { userId, fileType, fileData } = req.body;
 
     if (!userId || !fileData) {
-      return res
-        .status(400)
-        .json({ message: "Rasm/Video va userId kiritilishi shart!" });
+      return res.status(400).json({ message: "Rasm/Video va userId kiritilishi shart!" });
     }
 
     // Check if file already exists for this user (e.g. replacing avatar)
@@ -18,7 +16,6 @@ exports.uploadFile = async (req, res) => {
       fileType: fileType || "image",
     });
 
-
     if (existingFile) {
       existingFile.fileData = fileData;
       await existingFile.save();
@@ -26,7 +23,6 @@ exports.uploadFile = async (req, res) => {
     }
 
     const newFile = new UserPhoto({
-
       userId,
       fileType: fileType || "image",
       fileData,
@@ -35,9 +31,7 @@ exports.uploadFile = async (req, res) => {
     await newFile.save();
     res.status(201).json(newFile);
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Xatolik yuz berdi", error: error.message });
+    res.status(500).json({ message: "Xatolik yuz berdi", error: error.message });
   }
 };
 
@@ -50,16 +44,12 @@ exports.getFileByUserId = async (req, res) => {
     const file = await UserPhoto.findOne({ userId, fileType: type });
 
     if (!file) {
-      return res
-        .status(200)
-        .json({ fileData: null, message: "Fayl topilmadi!" });
+      return res.status(200).json({ fileData: null, message: "Fayl topilmadi!" });
     }
 
     res.status(200).json(file);
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Xatolik yuz berdi", error: error.message });
+    res.status(500).json({ message: "Xatolik yuz berdi", error: error.message });
   }
 };
 
@@ -73,8 +63,6 @@ exports.deleteFileByUserId = async (req, res) => {
 
     res.status(200).json({ message: "Fayl o'chirildi" });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Xatolik yuz berdi", error: error.message });
+    res.status(500).json({ message: "Xatolik yuz berdi", error: error.message });
   }
 };

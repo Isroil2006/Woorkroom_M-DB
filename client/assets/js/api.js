@@ -27,6 +27,7 @@ export const getAuthHeaders = () => {
 
 // ─── Current User Cache ─────────────────────────────────────────
 let cachedUser = null;
+let userPromise = null;
 
 export const getCurrentUser = () => {
   return cachedUser;
@@ -37,22 +38,31 @@ export const setCurrentUser = (user) => {
 };
 
 export const fetchCurrentUser = async () => {
-  try {
-    const res = await fetch(`${API_URL}/api/users/me`, {
-      method: "GET",
-      headers: getAuthHeaders(),
-      credentials: "include", // Kukini yuborish uchun shart
-    });
-    if (res.ok) {
-      cachedUser = await res.json();
-      return cachedUser;
-    } else if (res.status === 401) {
-      cachedUser = null;
-      return null;
+  if (cachedUser) return cachedUser;
+  if (userPromise) return userPromise;
+
+  userPromise = (async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/users/me`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+        credentials: "include",
+      });
+      if (res.ok) {
+        cachedUser = await res.json();
+        return cachedUser;
+      } else if (res.status === 401) {
+        cachedUser = null;
+        return null;
+      }
+    } catch (err) {
+      console.error("Failed to fetch current user:", err);
+    } finally {
+      userPromise = null;
     }
-  } catch (err) {
-    console.error("Failed to fetch current user:", err);
-  }
-  return null;
+    return null;
+  })();
+
+  return userPromise;
 };
 
