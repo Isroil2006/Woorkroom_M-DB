@@ -6,7 +6,7 @@ import { VacationsPage, initVacationsLogic } from "../../pages/Vacations/vacatio
 import { EmployeesPage, initEmployeesPage } from "../../pages/Employees/employees.js";
 import { MassangerPage, initMessengerLogic } from "../../pages/Messenger/messenger.js";
 import { InfoPortalPage, initInfoPortalLogic } from "../../pages/InfoPortal/infoportal.js";
-import { applyPermissions, getPermissions } from "../../pages/Employees/permission.js";
+import { applyPermissions, getPermissions, checkPermission } from "../../pages/Employees/permission.js";
 import { userProfileRender } from "../../pages/user-profile/user-profile.js";
 import { getCurrentLang, setLanguage, LANGUAGE_CHANGED_EVENT } from "../../assets/js/i18n.js";
 import { UnauthorizedPage, initUnauthorizedLogic } from "../../pages/Unauthorized/Unauthorized.js";
@@ -31,7 +31,7 @@ let userName = getCurrentLang() === "uz" ? "Foydalanuvchi" : "User";
 export const translations = {
   uz: {
     nav_tests: "Testlar",
-    nav_business: "To'lovlar",
+    nav_payments: "To'lovlar",
     nav_calendar: "Vazifalar",
     nav_vacations: "Ta'tillar",
     nav_employees: "Xodimlar",
@@ -43,7 +43,7 @@ export const translations = {
   },
   en: {
     nav_tests: "Tests",
-    nav_business: "Payments",
+    nav_payments: "Payments",
     nav_calendar: "Tasks",
     nav_vacations: "Vacations",
     nav_employees: "Employees",
@@ -55,7 +55,7 @@ export const translations = {
   },
   ru: {
     nav_tests: "Тесты",
-    nav_business: "Платежи",
+    nav_payments: "Платежи",
     nav_calendar: "Задачи",
     nav_vacations: "Отпуска",
     nav_employees: "Сотрудники",
@@ -74,7 +74,7 @@ const t = (key) => {
 
 const NAV_PERM_MAP = {
   Tests: "nav_dashboard",
-  Payments: "nav_business",
+  Payments: "nav_payments",
   Tasks: "nav_tasks",
   Vacations: "nav_vacations",
   Employees: "nav_employees",
@@ -158,10 +158,10 @@ const renderNavigation = () => {
             </a>
         </li>
 
-        <li data-page="Payments" data-perm="nav_business" class="${currentPageName === "Payments" ? "active" : ""}">
+        <li data-page="Payments" data-perm="nav_payments" class="${currentPageName === "Payments" ? "active" : ""}">
             <a href="#payments">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wallet-icon lucide-wallet"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
-                <span>${t("nav_business")}</span>
+                <span>${t("nav_payments")}</span>
             </a>
         </li>
 
@@ -279,7 +279,7 @@ const attachNavClickEvents = () => {
         const permKey = NAV_PERM_MAP[pageID];
         if (permKey) {
           const perms = await getPermissions(cu.userId || cu._id);
-          if (perms[permKey] === false) return;
+          if (!checkPermission(perms, permKey)) return;
         }
       }
       navigateTo(targetPath);
@@ -388,7 +388,7 @@ const navigateTo = async (path, pushState = true) => {
     const permKey = NAV_PERM_MAP[pageName];
     if (permKey) {
       const perms = await getPermissions(cu.userId || cu._id);
-      if (perms && perms[permKey] === false) {
+      if (perms && !checkPermission(perms, permKey)) {
         pageName = "Unauthorized";
       }
     }

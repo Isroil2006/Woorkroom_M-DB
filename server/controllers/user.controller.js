@@ -10,17 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_for_dev_only";
 // Register
 exports.register = async (req, res) => {
   try {
-    const {
-      userId,
-      username,
-      tel,
-      email,
-      password,
-      gender,
-      position,
-      level,
-      age,
-    } = req.body;
+    const { userId, username, tel, email, password, gender, position, level, age } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -45,10 +35,36 @@ exports.register = async (req, res) => {
     const defaultPerms = new Permission({
       userId: newUser.userId || newUser._id.toString(),
       perms: {
-        tasks: true,
-        employees: true,
-        settings: true
-      }
+        nav_dashboard: { access: true },
+        nav_payments: { access: true },
+        nav_tasks: {
+          access: true,
+          actions: {
+            task_add_project: true,
+            task_add_task: true,
+            task_delete_project: true,
+          },
+        },
+        nav_vacations: {
+          access: true,
+          actions: {
+            vac_add_tour: true,
+            vac_edit_tour: true,
+            vac_delete_tour: true,
+          },
+        },
+        nav_employees: {
+          access: true,
+          actions: {
+            emp_perm_btn: true,
+            emp_edit_btn: true,
+            emp_delete_btn: true,
+          },
+        },
+        nav_messenger: { access: true },
+        nav_infoportal: { access: true },
+        nav_settings: { access: true },
+      },
     });
     await defaultPerms.save();
 
@@ -59,15 +75,12 @@ exports.register = async (req, res) => {
     res.status(201).json(userObj);
   } catch (error) {
     console.error("Register error:", error);
-    res
-      .status(500)
-      .json({
-        message: "Ro'yxatdan o'tishda xatolik yuz berdi",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Ro'yxatdan o'tishda xatolik yuz berdi",
+      error: error.message,
+    });
   }
 };
-
 
 // Login
 exports.login = async (req, res) => {
@@ -82,18 +95,14 @@ exports.login = async (req, res) => {
     const isMatch = await user.comparePassword(password);
     if (isMatch) {
       // JWT token yaratish
-      const token = jwt.sign(
-        { id: user._id, userId: user.userId, email: user.email },
-        JWT_SECRET,
-        { expiresIn: "24h" },
-      );
+      const token = jwt.sign({ id: user._id, userId: user.userId, email: user.email }, JWT_SECRET, { expiresIn: "24h" });
 
       // Kukini o'rnatish
       res.cookie("token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
-        maxAge: 24 * 60 * 60 * 1000 // 24 soat
+        maxAge: 24 * 60 * 60 * 1000, // 24 soat
       });
 
       // User ma'lumotlarini password'siz qaytarish
@@ -106,20 +115,16 @@ exports.login = async (req, res) => {
         userObj.avatar = photo.fileData;
       }
 
-      res.status(200).json({ user: userObj }); 
-
+      res.status(200).json({ user: userObj });
     } else {
       res.status(401).json({ message: "Email yoki parol noto'g'ri" });
     }
-
   } catch (error) {
     console.error("Login error:", error);
-    res
-      .status(500)
-      .json({
-        message: "Tizimga kirishda xatolik yuz berdi",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Tizimga kirishda xatolik yuz berdi",
+      error: error.message,
+    });
   }
 };
 
@@ -144,11 +149,8 @@ exports.getMe = async (req, res) => {
     }
 
     res.status(200).json(userObj);
-
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Xatolik yuz berdi", error: error.message });
+    res.status(500).json({ message: "Xatolik yuz berdi", error: error.message });
   }
 };
 
@@ -158,9 +160,7 @@ exports.getAllUsers = async (req, res) => {
     const users = await User.find();
     res.status(200).json(users);
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Xatolik yuz berdi", error: error.message });
+    res.status(500).json({ message: "Xatolik yuz berdi", error: error.message });
   }
 };
 
@@ -217,9 +217,7 @@ exports.deleteUser = async (req, res) => {
     }
     res.status(200).json({ message: "O'chirildi" });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Xatolik yuz berdi", error: error.message });
+    res.status(500).json({ message: "Xatolik yuz berdi", error: error.message });
   }
 };
 
@@ -240,8 +238,6 @@ exports.getUserById = async (req, res) => {
     }
     res.status(200).json(user);
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Xatolik yuz berdi", error: error.message });
+    res.status(500).json({ message: "Xatolik yuz berdi", error: error.message });
   }
 };

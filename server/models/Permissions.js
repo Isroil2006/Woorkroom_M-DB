@@ -2,9 +2,15 @@ const mongoose = require("mongoose");
 
 const apiPermissionSchema = new mongoose.Schema(
   {
-    path: { type: String, required: true }, // masalan: "/api/tasks"
-    method: { type: String, default: "ALL" }, // GET, POST, ALL
-    requiredPermission: { type: String, required: true }, // masalan: "tasks"
+    module: { type: String, required: true }, // Masalan: "Tasks", "Employees"
+    rules: [
+      {
+        _id: false, // Ichki ID-lar kerak emas
+        path: { type: String, required: true },
+        method: { type: String, default: "ALL" },
+        requiredPermission: { type: String, required: true },
+      },
+    ],
   },
   {
     timestamps: true,

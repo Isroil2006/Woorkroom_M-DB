@@ -4,6 +4,7 @@ import {
   openPermissionsModal,
   getPermissions,
   applyPermissions,
+  checkPermission,
 } from "./permission.js";
 import { translations } from "../Employees/translations.js";
 
@@ -210,7 +211,7 @@ export function initEmployeesPage() {
       card.className = "employee-card";
 
       let permBtnHtml = "";
-      if (myPerms && myPerms["emp_perm_btn"] !== false) {
+      if (myPerms && checkPermission(myPerms, "emp_perm_btn")) {
         const lang = getCurrentLang();
         const label =
           lang === "ru"

@@ -2,29 +2,92 @@
 import { API_URL, getAuthHeaders, getCurrentUser } from "../../assets/js/api.js";
 const PERM_API = `${API_URL}/api/permissions`;
 
-const DEFAULT_PERMISSIONS = {
-  nav_dashboard: true,
-  nav_vacations: true,
-  nav_messenger: true,
-  nav_tasks: true,
-  nav_employees: true,
-  nav_business: true,
-  nav_infoportal: true,
+export const DEFAULT_PERMISSIONS = {
+  nav_dashboard: { access: true },
+  nav_payments: { access: true },
+  nav_tasks: {
+    access: true,
+    actions: {
+      task_add_project: true,
+      task_add_task: true,
+      task_delete_project: true,
+    },
+  },
+  nav_vacations: {
+    access: true,
+    actions: {
+      vac_add_tour: true,
+      vac_edit_tour: true,
+      vac_delete_tour: true,
+    },
+  },
+  nav_employees: {
+    access: true,
+    actions: {
+      emp_perm_btn: true,
+      emp_edit_btn: true,
+      emp_delete_btn: true,
+    },
+  },
+  nav_messenger: { access: true },
+  nav_infoportal: { access: true },
+  nav_settings: { access: true },
+};
 
-  // Vacations
-  vac_add_tour: true,
-  vac_edit_tour: true,
-  vac_delete_tour: true,
+/**
+ * Migration helper to convert old flat permissions to the new nested format.
+ */
+const migratePermissions = (perms) => {
+  if (!perms) return { ...DEFAULT_PERMISSIONS };
 
-  // Tasks
-  task_delete_project: true,
-  task_add_project: true,
-  task_add_task: true,
+  // If already in new format (contains objects with access key), return as is
+  const keys = Object.keys(perms);
+  const isNewFormat = keys.some((k) => perms[k] && typeof perms[k] === "object" && "access" in perms[k]);
+  if (isNewFormat) return perms;
 
-  // Employees
-  emp_perm_btn: true,
-  emp_edit_btn: true,
-  emp_delete_btn: true,
+  // Otherwise, migrate flat to nested
+  const newPerms = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
+
+  for (const parentKey in newPerms) {
+    if (perms[parentKey] !== undefined) {
+      newPerms[parentKey].access = !!perms[parentKey];
+    }
+    if (newPerms[parentKey].actions) {
+      for (const actionKey in newPerms[parentKey].actions) {
+        if (perms[actionKey] !== undefined) {
+          newPerms[parentKey].actions[actionKey] = !!perms[actionKey];
+        }
+      }
+    }
+  }
+  return newPerms;
+};
+
+/**
+ * Helper to check if a specific key is allowed in the nested structure.
+ */
+export const checkPermission = (perms, key) => {
+  if (!perms) return true;
+
+  // 1. Check if it's a top-level key
+  if (perms[key] && typeof perms[key] === "object" && "access" in perms[key]) {
+    return perms[key].access;
+  }
+
+  // 2. Check if it's an action within any parent
+  for (const parentKey in perms) {
+    const parent = perms[parentKey];
+    if (parent.actions && key in parent.actions) {
+      // If parent is blocked, all children are effectively blocked
+      if (parent.access === false) return false;
+      return parent.actions[key];
+    }
+  }
+
+  // 3. Fallback for flat structure (for safety during migration)
+  if (typeof perms[key] === "boolean") return perms[key];
+
+  return true;
 };
 
 // Internal cache to avoid redundant fetches within the same session
@@ -32,12 +95,10 @@ const permissionCache = new Map();
 
 /**
  * Fetches permissions for a given userId from the server.
- * Returns DEFAULT_PERMISSIONS if not found in DB.
  */
 export const getPermissions = async (userId) => {
   if (!userId) return { ...DEFAULT_PERMISSIONS };
 
-  // Check cache first
   if (permissionCache.has(userId)) {
     return permissionCache.get(userId);
   }
@@ -50,10 +111,7 @@ export const getPermissions = async (userId) => {
 
     if (res.ok) {
       const data = await res.json();
-      const perms =
-        data && data.perms
-          ? { ...DEFAULT_PERMISSIONS, ...data.perms }
-          : { ...DEFAULT_PERMISSIONS };
+      const perms = migratePermissions(data && data.perms ? data.perms : null);
       permissionCache.set(userId, perms);
       return perms;
     }
@@ -87,14 +145,14 @@ export const savePermissions = async (userId, perms) => {
 
 /**
  * Applies permissions to elements with [data-perm] attribute.
- * Now handles async data fetching.
  */
 export const applyPermissions = async (userId) => {
   if (!userId) return;
   const perms = await getPermissions(userId);
   document.querySelectorAll("[data-perm]").forEach((el) => {
     const key = el.getAttribute("data-perm");
-    if (perms[key] !== false) {
+    const allowed = checkPermission(perms, key);
+    if (allowed) {
       el.classList.add("perm-allowed");
     } else {
       el.classList.remove("perm-allowed");
@@ -117,7 +175,7 @@ const TR = {
     nav_messenger: "Messenger",
     nav_tasks: "Tasks",
     nav_employees: "Employees",
-    nav_business: "Payments",
+    nav_payments: "Payments",
     nav_infoportal: "InfoPortal",
     task_delete_project: "Loyihani o'chirish",
     task_add_project: "Yangi loyiha qo'shish",
@@ -143,7 +201,7 @@ const TR = {
     nav_messenger: "Messenger",
     nav_tasks: "Tasks",
     nav_employees: "Employees",
-    nav_business: "Payments",
+    nav_payments: "Payments",
     nav_infoportal: "InfoPortal",
     task_delete_project: "Delete project",
     task_add_project: "Add project",
@@ -169,7 +227,7 @@ const TR = {
     nav_messenger: "Мессенджер",
     nav_tasks: "Задачи",
     nav_employees: "Сотрудники",
-    nav_business: "Платежи",
+    nav_payments: "Платежи",
     nav_infoportal: "InfoPortal",
     task_delete_project: "Удалить проект",
     task_add_project: "Добавить проект",
@@ -189,7 +247,7 @@ const getModalSections = (tr) => [
     label: tr.section_nav,
     items: [
       { key: "nav_dashboard", label: tr.nav_dashboard },
-      { key: "nav_business", label: tr.nav_business },
+      { key: "nav_payments", label: tr.nav_payments },
       {
         key: "nav_tasks",
         label: tr.nav_tasks,
@@ -223,44 +281,38 @@ const getModalSections = (tr) => [
   },
 ];
 
-const blockedCount = (subs, perms) =>
-  subs.filter((s) => perms[s.key] === false).length;
-const countBadgeHtml = (count) =>
-  count > 0
-    ? `<span class="perm-sub-count perm-sub-count--active">${count}</span>`
-    : `<span class="perm-sub-count"></span>`;
+const countBlockedSubs = (subs, perms, parentKey) => {
+  if (!perms[parentKey] || !perms[parentKey].actions) return 0;
+  return subs.filter((s) => perms[parentKey].actions[s.key] === false).length;
+};
+
+const countBadgeHtml = (count) => (count > 0 ? `<span class="perm-sub-count perm-sub-count--active">${count}</span>` : `<span class="perm-sub-count"></span>`);
 
 // ─── MODAL ───────────────────────────────────────────────────────
-export const openPermissionsModal = async (
-  targetUserId,
-  targetUsername,
-  lang = "uz",
-) => {
+export const openPermissionsModal = async (targetUserId, targetUsername, lang = "uz") => {
   const tr = TR[lang] || TR.en;
   const perms = await getPermissions(targetUserId);
 
-  const badgeText = (on) =>
-    on
-      ? lang === "uz"
-        ? "Ruxsat"
-        : lang === "ru"
-          ? "Разрешено"
-          : "Allowed"
-      : lang === "uz"
-        ? "Bloklangan"
-        : lang === "ru"
-          ? "Заблокировано"
-          : "Blocked";
+  const badgeText = (on) => (on ? (lang === "uz" ? "Ruxsat" : lang === "ru" ? "Разрешено" : "Allowed") : lang === "uz" ? "Bloklangan" : lang === "ru" ? "Заблокировано" : "Blocked");
 
-  const toggleEl = (key, on) => `
-        <div class="perm-toggle ${on ? "perm-toggle--on" : ""}" data-toggle-for="${key}">
+  const toggleEl = (key, on, isSub = false, parentKey = null) => `
+        <div class="perm-toggle ${on ? "perm-toggle--on" : ""}" 
+             data-toggle-for="${key}" 
+             data-is-sub="${isSub}" 
+             ${parentKey ? `data-parent="${parentKey}"` : ""}>
             <div class="perm-toggle-thumb"></div>
             <input type="checkbox" class="perm-checkbox" data-key="${key}"
             ${on ? "checked" : ""} style="display:none"/>
         </div>`;
 
-  const rowHtml = (item, isSub = false) => {
-    const on = perms[item.key] !== false;
+  const rowHtml = (item, isSub = false, parentKey = null) => {
+    let on = true;
+    if (isSub && parentKey) {
+      on = perms[parentKey]?.actions?.[item.key] !== false;
+    } else {
+      on = perms[item.key]?.access !== false;
+    }
+
     return `
         <div class="perm-item ${on ? "perm-item--on" : "perm-item--off"}${isSub ? " perm-item--sub" : ""}"
             data-perm-key="${item.key}">
@@ -268,16 +320,16 @@ export const openPermissionsModal = async (
                 <span class="perm-item-label">${item.label}</span>
                 <span class="perm-item-badge ${on ? "badge--on" : "badge--off"}">${badgeText(on)}</span>
             </div>
-            <div class="perm-item-right">${toggleEl(item.key, on)}</div>
+            <div class="perm-item-right">${toggleEl(item.key, on, isSub, parentKey)}</div>
         </div>`;
   };
 
   const rowWithSubsHtml = (item) => {
-    const on = perms[item.key] !== false;
-    const count = blockedCount(item.subs, perms);
+    const on = perms[item.key]?.access !== false;
+    const count = countBlockedSubs(item.subs, perms, item.key);
 
     return `
-        <div class="perm-item-group">
+        <div class="perm-item-group" data-parent-key="${item.key}">
             <div class="perm-item ${on ? "perm-item--on" : "perm-item--off"}" data-perm-key="${item.key}">
                 <div class="perm-item-info">
                     <span class="perm-item-label">${item.label}</span>
@@ -296,7 +348,7 @@ export const openPermissionsModal = async (
             </div>
             <div class="perm-sub-panel" data-sub-for="${item.key}">
                 <div class="perm-sub-items">
-                    ${item.subs.map((s) => rowHtml(s, true)).join("")}
+                    ${item.subs.map((s) => rowHtml(s, true, item.key)).join("")}
                 </div>
             </div>
         </div>`;
@@ -346,79 +398,114 @@ export const openPermissionsModal = async (
   overlay.querySelectorAll(".perm-chevron-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      const panel = overlay.querySelector(
-        `.perm-sub-panel[data-sub-for="${btn.dataset.expandFor}"]`,
-      );
-      btn.classList.toggle(
-        "perm-chevron-btn--open",
-        panel.classList.toggle("perm-sub-panel--open"),
-      );
+      const panel = overlay.querySelector(`.perm-sub-panel[data-sub-for="${btn.dataset.expandFor}"]`);
+      btn.classList.toggle("perm-chevron-btn--open", panel.classList.toggle("perm-sub-panel--open"));
     });
   });
+
+  const updateUIForRow = (key, nowOn) => {
+    const row = overlay.querySelector(`.perm-item[data-perm-key="${key}"]`);
+    if (!row) return;
+    const bdg = row.querySelector(".perm-item-badge");
+    const tog = row.querySelector(".perm-toggle");
+    const cb = row.querySelector(".perm-checkbox");
+
+    cb.checked = nowOn;
+    tog.classList.toggle("perm-toggle--on", nowOn);
+    row.classList.toggle("perm-item--on", nowOn);
+    row.classList.toggle("perm-item--off", !nowOn);
+    if (bdg) {
+      bdg.className = `perm-item-badge ${nowOn ? "badge--on" : "badge--off"}`;
+      bdg.textContent = badgeText(nowOn);
+    }
+  };
 
   overlay.querySelectorAll(".perm-toggle").forEach((tog) => {
     tog.addEventListener("click", (e) => {
       e.stopPropagation();
       const cb = tog.querySelector(".perm-checkbox");
       const key = cb.dataset.key;
+      const isSub = tog.dataset.isSub === "true";
+      const parentKey = tog.dataset.parent;
       const nowOn = !cb.checked;
-      cb.checked = nowOn;
-      tog.classList.toggle("perm-toggle--on", nowOn);
 
-      const row = overlay.querySelector(`.perm-item[data-perm-key="${key}"]`);
-      const bdg = row?.querySelector(".perm-item-badge");
-      row?.classList.toggle("perm-item--on", nowOn);
-      row?.classList.toggle("perm-item--off", !nowOn);
-      if (bdg) {
-        bdg.className = `perm-item-badge ${nowOn ? "badge--on" : "badge--off"}`;
-        bdg.textContent = badgeText(nowOn);
+      // Update current row
+      updateUIForRow(key, nowOn);
+
+      // Parent-Child Dependency Logic
+      if (!isSub) {
+        // If parent toggled OFF, block all children
+        if (!nowOn) {
+          const panel = overlay.querySelector(`.perm-sub-panel[data-sub-for="${key}"]`);
+          if (panel) {
+            panel.querySelectorAll(".perm-toggle").forEach((subTog) => {
+              const subKey = subTog.querySelector(".perm-checkbox").dataset.key;
+              updateUIForRow(subKey, false);
+            });
+          }
+        }
+      } else if (parentKey) {
+        // If child toggled ON, parent MUST be ON
+        if (nowOn) {
+          updateUIForRow(parentKey, true);
+        }
       }
 
-      const group = row?.closest(".perm-item-group");
+      // Update blocked count badge
+      const activeParentKey = isSub ? parentKey : key;
+      const group = overlay.querySelector(`.perm-item-group[data-parent-key="${activeParentKey}"]`);
       if (group) {
         const countBadgeEl = group.querySelector(".perm-sub-count");
         if (countBadgeEl) {
-          const blockedNow = group.querySelectorAll(
-            ".perm-sub-panel .perm-checkbox:not(:checked)",
-          ).length;
+          const blockedNow = group.querySelectorAll(".perm-sub-panel .perm-checkbox:not(:checked)").length;
           countBadgeEl.textContent = blockedNow > 0 ? blockedNow : "";
-          countBadgeEl.classList.toggle(
-            "perm-sub-count--active",
-            blockedNow > 0,
-          );
+          countBadgeEl.classList.toggle("perm-sub-count--active", blockedNow > 0);
         }
       }
     });
   });
 
-  overlay
-    .querySelector("#perm-save-btn")
-    .addEventListener("click", async () => {
-      const newPerms = { ...perms };
-      overlay.querySelectorAll(".perm-checkbox[data-key]").forEach((cb) => {
-        newPerms[cb.dataset.key] = cb.checked;
-      });
+  overlay.querySelector("#perm-save-btn").addEventListener("click", async () => {
+    const newPerms = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
 
-      await savePermissions(targetUserId, newPerms);
+    // Fill newPerms from UI state
+    overlay.querySelectorAll(".perm-toggle").forEach((tog) => {
+      const cb = tog.querySelector(".perm-checkbox");
+      const key = cb.dataset.key;
+      const isSub = tog.dataset.isSub === "true";
+      const parentKey = tog.dataset.parent;
 
-      const btn = overlay.querySelector("#perm-save-btn");
-      btn.textContent = tr.saved;
-      btn.style.background = "#22c55e";
-      setTimeout(() => {
-        btn.textContent = tr.save;
-        btn.style.background = "";
-      }, 1600);
-
-      document.dispatchEvent(
-        new CustomEvent("permissions-updated", {
-          detail: { userId: targetUserId },
-        }),
-      );
-      const cu = getCurrentUser();
-      if (cu?.userId === targetUserId || cu?._id === targetUserId) {
-        applyPermissions(targetUserId);
+      if (isSub && parentKey) {
+        if (newPerms[parentKey] && newPerms[parentKey].actions) {
+          newPerms[parentKey].actions[key] = cb.checked;
+        }
+      } else {
+        if (newPerms[key]) {
+          newPerms[key].access = cb.checked;
+        }
       }
     });
+
+    await savePermissions(targetUserId, newPerms);
+
+    const btn = overlay.querySelector("#perm-save-btn");
+    btn.textContent = tr.saved;
+    btn.style.background = "#22c55e";
+    setTimeout(() => {
+      btn.textContent = tr.save;
+      btn.style.background = "";
+    }, 1600);
+
+    document.dispatchEvent(
+      new CustomEvent("permissions-updated", {
+        detail: { userId: targetUserId },
+      }),
+    );
+    const cu = getCurrentUser();
+    if (cu?.userId === targetUserId || cu?._id === targetUserId) {
+      applyPermissions(targetUserId);
+    }
+  });
 
   const close = () => {
     overlay.style.opacity = "0";
@@ -438,11 +525,7 @@ export const openPermissionsModal = async (
   });
 };
 
-export const createPermissionsBtn = (
-  targetUserId,
-  targetUsername,
-  lang = "uz",
-) => {
+export const createPermissionsBtn = (targetUserId, targetUsername, lang = "uz") => {
   const tr = TR[lang] || TR.en;
   return `
     <button class="emp-perm-btn" data-userid="${targetUserId}" data-username="${targetUsername}">

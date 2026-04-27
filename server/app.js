@@ -2,8 +2,32 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const cookieParser = require("cookie-parser");
+const swaggerUi = require("swagger-ui-express");
+const swaggerJsdoc = require("swagger-jsdoc");
 
 const app = express();
+
+// Swagger configuration
+const swaggerOptions = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "Woorkroom M-DB API",
+      version: "1.0.0",
+      description: "Woorkroom loyihasining barcha API yo'llari uchun dokumentatsiya",
+    },
+    servers: [
+      {
+        url: "http://localhost:5000",
+        description: "Local Server",
+      },
+    ],
+  },
+  apis: ["./routes/*.js"], // routes papkasidagi barcha js fayllarni qidiradi
+};
+
+const swaggerDocs = swaggerJsdoc(swaggerOptions);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // Middleware
 app.use(cors({ origin: true, credentials: true })); // CORS ni kuki bilan ishlashga moslash
@@ -11,8 +35,6 @@ app.use(cookieParser());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "../client")));
-
-
 
 // Routes
 app.use("/api/users", require("./routes/user.routes"));
@@ -28,6 +50,5 @@ const checkPermission = require("./middleware/permission.middleware");
 app.get(["/employees", "/tasks", "/calendar", "/messenger", "/payments", "/vacations"], auth, checkPermission(), (req, res) => {
   res.sendFile(path.join(__dirname, "../client/index.html"));
 });
-
 
 module.exports = app;
