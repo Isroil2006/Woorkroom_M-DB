@@ -100,15 +100,7 @@ const statusConfig = {
 };
 
 // ─── AVATAR ───────────────────────────────────────────────────
-const avatarColors = [
-  "#5b6ef5",
-  "#7c3aed",
-  "#0ea5e9",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#6d505f",
-];
+const avatarColors = ["#5b6ef5", "#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#6d505f"];
 const avatarColor = (name = "") => {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
@@ -128,8 +120,7 @@ const userAvatarHtml = (user, size = 26) => {
   if (!user)
     return `<div class="todo-avatar-empty" style="${s}"><svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="#aaa" stroke-width="2"/><circle cx="12" cy="7" r="4" stroke="#aaa" stroke-width="2"/></svg></div>`;
   const name = user.username || "User";
-  if (user.avatar && !user.avatar.includes("User-avatar.png"))
-    return `<img src="${user.avatar}" class="todo-avatar" style="${s}" title="${name}" />`;
+  if (user.avatar && !user.avatar.includes("User-avatar.png")) return `<img src="${user.avatar}" class="todo-avatar" style="${s}" title="${name}" />`;
   return `<div class="todo-avatar" style="${s};background:${avatarColor(name)};font-size:${Math.round(size * 0.35)}px;" title="${name}">${initials(name)}</div>`;
 };
 
@@ -143,8 +134,7 @@ const assigneeStackHtml = (task, size = 26) => {
   shown.forEach((u) => {
     html += userAvatarHtml(u, size);
   });
-  if (extra > 0)
-    html += `<div class="todo-avatar-extra" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.35)}px">+${extra}</div>`;
+  if (extra > 0) html += `<div class="todo-avatar-extra" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.35)}px">+${extra}</div>`;
   html += `</div>`;
   return html;
 };
@@ -161,10 +151,8 @@ const dueDateHtml = (dateStr) => {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const diff = Math.floor((due - now) / 86400000);
-  if (diff < 0)
-    return `<span class="todo-due-date date-overdue">${t("overdue")}</span>`;
-  if (diff === 0)
-    return `<span class="todo-due-date date-today">${t("today")}</span>`;
+  if (diff < 0) return `<span class="todo-due-date date-overdue">${t("overdue")}</span>`;
+  if (diff === 0) return `<span class="todo-due-date date-today">${t("today")}</span>`;
   return `<span class="todo-due-date date-normal">${due.toLocaleDateString()}</span>`;
 };
 
@@ -490,8 +478,7 @@ const renderView = async () => {
     }
     if (delProjBtn) delProjBtn.style.display = "none";
     container.innerHTML = "";
-    if ($("todo-project-title"))
-      $("todo-project-title").textContent = t("todo_title");
+    if ($("todo-project-title")) $("todo-project-title").textContent = t("todo_title");
     return;
   }
 
@@ -514,14 +501,8 @@ const renderView = async () => {
 
   // Filter tasks locally
   let tasks = allTasks;
-  if (currentFilter !== "all")
-    tasks = tasks.filter((t) => getVisibleStatus(t) === currentFilter);
-  if (searchQuery)
-    tasks = tasks.filter(
-      (t) =>
-        t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.description || "").toLowerCase().includes(searchQuery.toLowerCase()),
-    );
+  if (currentFilter !== "all") tasks = tasks.filter((t) => getVisibleStatus(t) === currentFilter);
+  if (searchQuery) tasks = tasks.filter((t) => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.description || "").toLowerCase().includes(searchQuery.toLowerCase()));
 
   if (currentView === "list") renderListView(tasks);
   else renderBoardView(tasks);
@@ -584,8 +565,7 @@ const renderListRow = (task) => {
   const myStatus = getVisibleStatus(task);
   const myDone = myStatus === "done";
   // check button: assignee yoki owner (assignee yo'q bo'lsa) ko'radi
-  const canCheck =
-    ids.length === 0 || (cu && (ids.includes(cuId) || isOwner(task)));
+  const canCheck = ids.length === 0 || (cu && (ids.includes(cuId) || isOwner(task)));
 
   return `
     <div class="todo-list-row todo-row-clickable" data-tid="${task._id}">
@@ -625,13 +605,10 @@ const attachListEvents = (container) => {
       if (e.target.closest(".todo-add-in-section")) return;
       const status = header.dataset.collapse;
       const body = $(`list-section-${status}`);
-      const icon = container.querySelector(
-        `.todo-collapse-icon[data-status="${status}"]`,
-      );
+      const icon = container.querySelector(`.todo-collapse-icon[data-status="${status}"]`);
       const hidden = body.style.display === "none";
       body.style.display = hidden ? "block" : "none";
-      if (icon)
-        icon.style.transform = hidden ? "rotate(0deg)" : "rotate(-90deg)";
+      if (icon) icon.style.transform = hidden ? "rotate(0deg)" : "rotate(-90deg)";
     });
   });
   container.querySelectorAll(".todo-add-in-section").forEach((btn) => {
@@ -757,20 +734,18 @@ const renderBoardCard = (task) => {
 
 // ─── DRAG & DROP ──────────────────────────────────────────────
 const initDragDrop = () => {
-  document
-    .querySelectorAll(".todo-board-card[draggable='true']")
-    .forEach((card) => {
-      card.addEventListener("dragstart", (e) => {
-        dragSrcTask = card.dataset.tid;
-        card.classList.add("dragging");
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", card.dataset.tid);
-      });
-      card.addEventListener("dragend", () => {
-        card.classList.remove("dragging");
-        dragSrcTask = null;
-      });
+  document.querySelectorAll(".todo-board-card[draggable='true']").forEach((card) => {
+    card.addEventListener("dragstart", (e) => {
+      dragSrcTask = card.dataset.tid;
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", card.dataset.tid);
     });
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+      dragSrcTask = null;
+    });
+  });
 
   document.querySelectorAll(".todo-board-col-body").forEach((col) => {
     col.addEventListener("dragover", (e) => {
@@ -817,7 +792,6 @@ const initDragDrop = () => {
             credentials: "include",
             body: JSON.stringify({ userId: cuId, status: newCol }),
           });
-
         } else {
           await fetch(`${API_URL}/${taskId}`, {
             method: "PUT",
@@ -825,7 +799,6 @@ const initDragDrop = () => {
             credentials: "include",
             body: JSON.stringify({ status: newCol }),
           });
-
         }
         renderView();
       } catch (err) {
@@ -837,9 +810,7 @@ const initDragDrop = () => {
 };
 
 function getDragAfterElement(container, y) {
-  const draggableElements = [
-    ...container.querySelectorAll(".todo-board-card:not(.dragging)"),
-  ];
+  const draggableElements = [...container.querySelectorAll(".todo-board-card:not(.dragging)")];
   return draggableElements.reduce(
     (closest, child) => {
       const box = child.getBoundingClientRect();
@@ -874,7 +845,6 @@ const toggleDone = async (tid) => {
       credentials: "include",
       body: JSON.stringify({ status: newStatus }),
     });
-
   } else if (ids.includes(cuId)) {
     // User specific toggle
     const cur = task.userStatus?.[cuId] || task.status || "todo";
@@ -885,7 +855,6 @@ const toggleDone = async (tid) => {
       credentials: "include",
       body: JSON.stringify({ userId: cuId, status: next }),
     });
-
   }
   renderView();
 };
@@ -913,9 +882,7 @@ const openTaskModal = async (taskId, defaultStatus = "todo") => {
   const tasks = await fetchTasks(currentProjectId);
   const task = taskId ? tasks.find((t) => t._id === taskId) : null;
 
-  $("task-modal-title").textContent = task
-    ? t("modal_edit_task")
-    : t("modal_create_task");
+  $("task-modal-title").textContent = task ? t("modal_edit_task") : t("modal_create_task");
   $("lbl-task-name").textContent = t("task_label");
   $("lbl-task-desc").textContent = t("description_label");
   $("lbl-task-status").textContent = t("status_label");
@@ -937,8 +904,7 @@ const openTaskModal = async (taskId, defaultStatus = "todo") => {
         <option value="urgent">${t("priority_urgent")}</option>`;
 
   // Init selected assignees
-  selectedAssignees =
-    task?.assigneeIds || (task?.assigneeId ? [task.assigneeId] : []);
+  selectedAssignees = task?.assigneeIds || (task?.assigneeId ? [task.assigneeId] : []);
   renderAssigneePicker();
 
   $("tm-title").value = task?.title || "";
@@ -982,7 +948,6 @@ const saveTask = async () => {
       credentials: "include",
       body: JSON.stringify(data),
     });
-
   } else {
     await fetch(`${API_URL}`, {
       method: "POST",
@@ -990,7 +955,6 @@ const saveTask = async () => {
       credentials: "include",
       body: JSON.stringify(data),
     });
-
   }
 
   $("task-modal").style.display = "none";
@@ -1013,43 +977,24 @@ const openDetailModal = async (tid) => {
   $("td-status-badge").className = `todo-detail-status-badge s-${task.status}`;
   $("td-status-badge").textContent = cfg.label();
   $("td-title").textContent = task.title;
-  $("td-desc").textContent =
-    task.description ||
-    (currentLang === "uz"
-      ? "Tavsif yo'q"
-      : currentLang === "ru"
-        ? "Нет описания"
-        : "No description");
+  $("td-desc").textContent = task.description || (currentLang === "uz" ? "Tavsif yo'q" : currentLang === "ru" ? "Нет описания" : "No description");
 
   // Labels
   $("td-lbl-desc").textContent = t("description_label");
-  $("td-lbl-details").textContent =
-    currentLang === "uz"
-      ? "Ma'lumotlar"
-      : currentLang === "ru"
-        ? "Сведения"
-        : "Details";
+  $("td-lbl-details").textContent = currentLang === "uz" ? "Ma'lumotlar" : currentLang === "ru" ? "Сведения" : "Details";
   $("td-lbl-status").textContent = t("status_label");
   $("td-lbl-priority").textContent = t("priority_label");
   $("td-lbl-duedate").textContent = t("duedate_label");
   $("td-lbl-assignees").textContent = t("assignee_label");
   $("td-lbl-created").textContent = t("create_time");
-  $("td-lbl-createdby").textContent =
-    currentLang === "uz"
-      ? "Muallif"
-      : currentLang === "ru"
-        ? "Автор"
-        : "Author";
+  $("td-lbl-createdby").textContent = currentLang === "uz" ? "Muallif" : currentLang === "ru" ? "Автор" : "Author";
   $("td-edit-label").textContent = t("edit");
 
   // Meta
-  $("td-meta-status").innerHTML =
-    `<span class="todo-detail-status-badge s-${task.status}">${cfg.label()}</span>`;
+  $("td-meta-status").innerHTML = `<span class="todo-detail-status-badge s-${task.status}">${cfg.label()}</span>`;
   $("td-meta-priority").innerHTML = getPriorityBadge(task.priority || "none");
   $("td-meta-duedate").innerHTML = dueDateHtml(task.dueDate);
-  $("td-meta-created").textContent = task.createdAt
-    ? new Date(task.createdAt).toLocaleString()
-    : "—";
+  $("td-meta-created").textContent = task.createdAt ? new Date(task.createdAt).toLocaleString() : "—";
   $("td-meta-createdby").textContent = task.createdBy?.username || "—";
 
   // Assignees — har birining completion holati ko'rsatiladi
@@ -1112,18 +1057,14 @@ const translateUI = () => {
   el("filter-todo", t("filter_todo"));
   el("filter-progress", t("filter_progress"));
   el("filter-done", t("filter_done"));
-  if ($("lbl-project-name"))
-    $("lbl-project-name").textContent = t("project_label");
-  if ($("project-modal-cancel"))
-    $("project-modal-cancel").textContent = t("cancel");
-  if ($("project-modal-save"))
-    $("project-modal-save").textContent = t("create");
+  if ($("lbl-project-name")) $("lbl-project-name").textContent = t("project_label");
+  if ($("project-modal-cancel")) $("project-modal-cancel").textContent = t("cancel");
+  if ($("project-modal-save")) $("project-modal-save").textContent = t("create");
   if ($("no-projects-msg")) $("no-projects-msg").textContent = t("no_projects");
   // No-project modal
   if ($("noproj-title")) $("noproj-title").textContent = t("no_projects_title");
   if ($("noproj-desc")) $("noproj-desc").textContent = t("no_projects_desc");
-  if ($("noproj-create-btn"))
-    $("noproj-create-btn").textContent = t("add_project");
+  if ($("noproj-create-btn")) $("noproj-create-btn").textContent = t("add_project");
   if ($("noproj-cancel-btn")) $("noproj-cancel-btn").textContent = t("cancel");
 };
 
@@ -1180,9 +1121,7 @@ export const initTodoLogic = async () => {
   document.querySelectorAll(".todo-filter-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       currentFilter = btn.dataset.filter;
-      document
-        .querySelectorAll(".todo-filter-btn")
-        .forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".todo-filter-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       renderView();
     });
@@ -1243,7 +1182,6 @@ export const initTodoLogic = async () => {
       body: JSON.stringify({ name, createdBy: cu?._id || cu?.userId }),
     });
 
-
     if (res.ok) {
       const newP = await res.json();
       currentProjectId = newP._id;
@@ -1264,8 +1202,7 @@ export const initTodoLogic = async () => {
   $("task-modal-close")?.addEventListener("click", closeTaskModal);
 
   // Detail modal
-  const closeDetailModal = () =>
-    ($("task-detail-modal").style.display = "none");
+  const closeDetailModal = () => ($("task-detail-modal").style.display = "none");
   $("task-detail-close")?.addEventListener("click", closeDetailModal);
 
   // Delete modal
@@ -1278,20 +1215,14 @@ export const initTodoLogic = async () => {
   });
 
   // No-project modal
-  $("noproj-cancel-btn")?.addEventListener(
-    "click",
-    () => ($("no-project-modal").style.display = "none"),
-  );
+  $("noproj-cancel-btn")?.addEventListener("click", () => ($("no-project-modal").style.display = "none"));
   $("noproj-create-btn")?.addEventListener("click", () => {
     $("no-project-modal").style.display = "none";
     $("pm-name").value = "";
     $("project-modal").style.display = "flex";
     setTimeout(() => $("pm-name").focus(), 100);
   });
-  $("del-modal-cancel")?.addEventListener(
-    "click",
-    () => ($("todo-del-modal").style.display = "none"),
-  );
+  $("del-modal-cancel")?.addEventListener("click", () => ($("todo-del-modal").style.display = "none"));
 
   initTaskAnalytics(lang);
 };

@@ -109,12 +109,6 @@ exports.login = async (req, res) => {
       const userObj = user.toObject();
       delete userObj.password;
 
-      // Avatar'ni yuklash (agar bo'lsa)
-      const photo = await UserPhoto.findOne({ userId: userObj.userId || userObj._id });
-      if (photo) {
-        userObj.avatar = photo.fileData;
-      }
-
       res.status(200).json({ user: userObj });
     } else {
       res.status(401).json({ message: "Email yoki parol noto'g'ri" });
@@ -145,7 +139,9 @@ exports.getMe = async (req, res) => {
     const userObj = user.toObject();
     const photo = await UserPhoto.findOne({ userId: userObj.userId || userObj._id });
     if (photo) {
-      userObj.avatar = photo.fileData;
+      userObj.avatar = `/api/user-photos/${userObj.userId || userObj._id}`;
+    } else {
+      userObj.avatar = "/assets/images/User-avatar.png";
     }
 
     res.status(200).json(userObj);

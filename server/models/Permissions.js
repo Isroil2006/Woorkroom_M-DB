@@ -1,21 +1,11 @@
 const mongoose = require("mongoose");
 
-const apiPermissionSchema = new mongoose.Schema(
+const permissionsSchema = new mongoose.Schema(
   {
-    module: { type: String, required: true }, // Masalan: "Tasks", "Employees"
-    rules: [
-      {
-        _id: false, // Ichki ID-lar kerak emas
-        path: { type: String, required: true },
-        method: { type: String, default: "ALL" },
-        requiredPermission: { type: String, required: true },
-      },
-    ],
+    module: { type: String, required: true },
+    apis: [{ type: String }], // Endi rules emas, faqat apiId-lar massivi
   },
-  {
-    timestamps: true,
-    collection: "permissions",
-  },
+  { timestamps: true }
 );
 
-module.exports = mongoose.model("Permissions", apiPermissionSchema);
+module.exports = mongoose.model("Permissions", permissionsSchema, "permissions");

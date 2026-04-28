@@ -1,4 +1,4 @@
-//  permission.js
+// Ruxsatnomalar bilan ishlash moduli (Frontend)
 import { API_URL, getAuthHeaders, getCurrentUser } from "../../assets/js/api.js";
 const PERM_API = `${API_URL}/api/permissions`;
 
@@ -34,18 +34,16 @@ export const DEFAULT_PERMISSIONS = {
   nav_settings: { access: true },
 };
 
-/**
- * Migration helper to convert old flat permissions to the new nested format.
- */
+//  Eski formatdagi ruxsatnomalarni yangi (ichma-ich) formatga o'tkazish.
 const migratePermissions = (perms) => {
   if (!perms) return { ...DEFAULT_PERMISSIONS };
 
-  // If already in new format (contains objects with access key), return as is
+  // Agar allaqachon yangi formatda bo'lsa, o'zini qaytaramiz
   const keys = Object.keys(perms);
   const isNewFormat = keys.some((k) => perms[k] && typeof perms[k] === "object" && "access" in perms[k]);
   if (isNewFormat) return perms;
 
-  // Otherwise, migrate flat to nested
+  // Aks holda eski formatni yangisiga ko'chiramiz
   const newPerms = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
 
   for (const parentKey in newPerms) {
@@ -63,68 +61,77 @@ const migratePermissions = (perms) => {
   return newPerms;
 };
 
-/**
- * Helper to check if a specific key is allowed in the nested structure.
- */
+// Muayyan kalit (bo'lim) uchun ruxsat borligini tekshirish.
 export const checkPermission = (perms, key) => {
   if (!perms) return true;
 
-  // 1. Check if it's a top-level key
+  // 1. Asosiy bo'limni tekshirish (masalan: nav_tasks)
   if (perms[key] && typeof perms[key] === "object" && "access" in perms[key]) {
     return perms[key].access;
   }
 
-  // 2. Check if it's an action within any parent
+  // 2. Ichki harakatlarni tekshirish (masalan: task_add_task)
   for (const parentKey in perms) {
     const parent = perms[parentKey];
     if (parent.actions && key in parent.actions) {
-      // If parent is blocked, all children are effectively blocked
+      // Agar asosiy bo'lim yopiq bo'lsa, ichki harakatlar ham yopiq hisoblanadi
       if (parent.access === false) return false;
       return parent.actions[key];
     }
   }
 
-  // 3. Fallback for flat structure (for safety during migration)
+  // 3. Eski format uchun zaxira tekshiruv
   if (typeof perms[key] === "boolean") return perms[key];
 
   return true;
 };
 
-// Internal cache to avoid redundant fetches within the same session
+// Ortiqcha so'rovlarni kamaytirish uchun kesh (xotira)
 const permissionCache = new Map();
+const pendingRequests = new Map(); // Ketayotgan so'rovlar promislari
 
-/**
- * Fetches permissions for a given userId from the server.
- */
+// Serverdan foydalanuvchi ruxsatnomalarini yuklab olish.
 export const getPermissions = async (userId) => {
   if (!userId) return { ...DEFAULT_PERMISSIONS };
 
+  // 1. Agar keshda ma'lumot bo'lsa, uni qaytaramiz
   if (permissionCache.has(userId)) {
     return permissionCache.get(userId);
   }
 
-  try {
-    const res = await fetch(`${PERM_API}/${userId}`, {
-      headers: getAuthHeaders(),
-      credentials: "include",
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      const perms = migratePermissions(data && data.perms ? data.perms : null);
-      permissionCache.set(userId, perms);
-      return perms;
-    }
-  } catch (err) {
-    console.error("Error fetching permissions:", err);
+  // 2. Agar aynan shu foydalanuvchi uchun so'rov ketayotgan bo'lsa, o'sha promissni qaytaramiz
+  if (pendingRequests.has(userId)) {
+    return pendingRequests.get(userId);
   }
 
-  return { ...DEFAULT_PERMISSIONS };
+  // 3. Yangi so'rov yaratamiz va uni pendingRequests ga saqlaymiz
+  const fetchPromise = (async () => {
+    try {
+      const res = await fetch(`${PERM_API}/${userId}`, {
+        headers: getAuthHeaders(),
+        credentials: "include",
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const perms = migratePermissions(data && data.perms ? data.perms : null);
+        permissionCache.set(userId, perms);
+        return perms;
+      }
+    } catch (err) {
+      console.error("Error fetching permissions:", err);
+    } finally {
+      // So'rov yakunlangach, uni pendingRequests dan o'chiramiz
+      pendingRequests.delete(userId);
+    }
+    return { ...DEFAULT_PERMISSIONS };
+  })();
+
+  pendingRequests.set(userId, fetchPromise);
+  return fetchPromise;
 };
 
-/**
- * Saves permissions for a given userId to the server.
- */
+// Yangi ruxsatnomalarni serverga saqlash.
 export const savePermissions = async (userId, perms) => {
   if (!userId) return;
   try {
@@ -143,15 +150,17 @@ export const savePermissions = async (userId, perms) => {
   }
 };
 
-/**
- * Applies permissions to elements with [data-perm] attribute.
- */
+// HTML elementlardagi [data-perm] bo'yicha ruxsatlarni qo'llash.
 export const applyPermissions = async (userId) => {
   if (!userId) return;
   const perms = await getPermissions(userId);
   document.querySelectorAll("[data-perm]").forEach((el) => {
     const key = el.getAttribute("data-perm");
     const allowed = checkPermission(perms, key);
+    
+    // Yuklanish animatsiyasini olib tashlaymiz
+    el.classList.remove("loading");
+
     if (allowed) {
       el.classList.add("perm-allowed");
     } else {
@@ -288,7 +297,7 @@ const countBlockedSubs = (subs, perms, parentKey) => {
 
 const countBadgeHtml = (count) => (count > 0 ? `<span class="perm-sub-count perm-sub-count--active">${count}</span>` : `<span class="perm-sub-count"></span>`);
 
-// ─── MODAL ───────────────────────────────────────────────────────
+// ─── Ruxsatnomalar oynasi (Modal) ───────────────────────────────
 export const openPermissionsModal = async (targetUserId, targetUsername, lang = "uz") => {
   const tr = TR[lang] || TR.en;
   const perms = await getPermissions(targetUserId);
@@ -432,9 +441,9 @@ export const openPermissionsModal = async (targetUserId, targetUsername, lang = 
       // Update current row
       updateUIForRow(key, nowOn);
 
-      // Parent-Child Dependency Logic
+      // Bo'lim va ichki harakatlar o'rtasidagi bog'liqlik logikasi
       if (!isSub) {
-        // If parent toggled OFF, block all children
+        // Agar asosiy bo'lim o'chirilsa, barcha ichki amallarni ham o'chiramiz
         if (!nowOn) {
           const panel = overlay.querySelector(`.perm-sub-panel[data-sub-for="${key}"]`);
           if (panel) {
@@ -445,13 +454,13 @@ export const openPermissionsModal = async (targetUserId, targetUsername, lang = 
           }
         }
       } else if (parentKey) {
-        // If child toggled ON, parent MUST be ON
+        // Agar birorta ichki amal yoqilsa, asosiy bo'lim ham yoqilishi shart
         if (nowOn) {
           updateUIForRow(parentKey, true);
         }
       }
 
-      // Update blocked count badge
+      // Bloklangan ichki amallar sonini yangilash (badge)
       const activeParentKey = isSub ? parentKey : key;
       const group = overlay.querySelector(`.perm-item-group[data-parent-key="${activeParentKey}"]`);
       if (group) {
@@ -468,7 +477,7 @@ export const openPermissionsModal = async (targetUserId, targetUsername, lang = 
   overlay.querySelector("#perm-save-btn").addEventListener("click", async () => {
     const newPerms = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS));
 
-    // Fill newPerms from UI state
+    // Oynadagi holatdan yangi ruxsatnomalar obyektini yig'amiz
     overlay.querySelectorAll(".perm-toggle").forEach((tog) => {
       const cb = tog.querySelector(".perm-checkbox");
       const key = cb.dataset.key;

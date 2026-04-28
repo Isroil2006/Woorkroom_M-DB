@@ -144,49 +144,49 @@ const renderNavigation = () => {
     </div>
 
     <ul class="nav-menu">
-        <li data-page="Tasks" data-perm="nav_tasks" class="${currentPageName === "Tasks" ? "active" : ""}">
+        <li data-page="Tasks" data-perm="nav_tasks" class="${currentPageName === "Tasks" ? "active" : ""} loading">
             <a href="#calendar">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-check-icon lucide-clipboard-check"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>
                 <span>${t("nav_calendar")}</span>
             </a>
         </li>
 
-        <li data-page="Tests" data-perm="nav_dashboard" class="${currentPageName === "Tests" ? "active" : ""}">
+        <li data-page="Tests" data-perm="nav_dashboard" class="${currentPageName === "Tests" ? "active" : ""} loading">
             <a href="#tests">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-square-check-big-icon lucide-square-check-big"><path d="M21 10.656V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.344"/><path d="m9 11 3 3L22 4"/></svg>
                 <span>${t("nav_tests")}</span>
             </a>
         </li>
 
-        <li data-page="Payments" data-perm="nav_payments" class="${currentPageName === "Payments" ? "active" : ""}">
+        <li data-page="Payments" data-perm="nav_payments" class="${currentPageName === "Payments" ? "active" : ""} loading">
             <a href="#payments">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wallet-icon lucide-wallet"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
                 <span>${t("nav_payments")}</span>
             </a>
         </li>
 
-        <li data-page="Vacations" data-perm="nav_vacations" class="${currentPageName === "Vacations" ? "active" : ""}">
+        <li data-page="Vacations" data-perm="nav_vacations" class="${currentPageName === "Vacations" ? "active" : ""} loading">
             <a href="#vacations">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-tickets-plane-icon lucide-tickets-plane"><path d="M10.5 17h1.227a2 2 0 0 0 1.345-.52L18 12"/><path d="m12 13.5 3.794.506"/><path d="m3.173 8.18 11-5a2 2 0 0 1 2.647.993L18.56 8"/><path d="M6 10V8"/><path d="M6 14v1"/><path d="M6 19v2"/><rect x="2" y="8" width="20" height="13" rx="2"/></svg>
                 <span>${t("nav_vacations")}</span>
             </a>
         </li>
 
-        <li data-page="Employees" data-perm="nav_employees" class="${currentPageName === "Employees" ? "active" : ""}">
+        <li data-page="Employees" data-perm="nav_employees" class="${currentPageName === "Employees" ? "active" : ""} loading">
             <a href="#employees">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users-icon lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg>
                 <span>${t("nav_employees")}</span>
             </a>
         </li>
 
-        <li data-page="Messenger" data-perm="nav_messenger" class="${currentPageName === "Messenger" ? "active" : ""}">
+        <li data-page="Messenger" data-perm="nav_messenger" class="${currentPageName === "Messenger" ? "active" : ""} loading">
             <a href="#messenger">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-messages-square-icon lucide-messages-square"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg>
                 <span>${t("nav_messenger")}</span>
             </a>
         </li>
 
-        <li data-page="Infoportal" data-perm="nav_infoportal" class="${currentPageName === "Infoportal" ? "active" : ""}">
+        <li data-page="Infoportal" data-perm="nav_infoportal" class="${currentPageName === "Infoportal" ? "active" : ""} loading">
             <a href="#calendar">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-days-icon lucide-calendar-days"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
                 <span>${t("nav_infoportal")}</span>
@@ -214,7 +214,10 @@ const renderNavigation = () => {
         </div>
 
         <div class="user-profile-btn sidebar-profile">
-            <img src="${displayAvatar}" class="nav-user-avatar" alt="Avatar" />
+            <div class="nav-avatar-container">
+                <div class="avatar-skeleton" id="nav-avatar-skeleton"></div>
+                <img src="${displayAvatar}" class="nav-user-avatar" alt="Avatar" id="nav-user-img" onload="this.classList.add('loaded'); document.getElementById('nav-avatar-skeleton').style.display='none';" />
+            </div>
             <span class="nav-user-name">${displayName}</span>
             <svg class="chevron-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="18 15 12 9 6 15"></polyline>
@@ -412,37 +415,42 @@ window.addEventListener("popstate", (e) => {
 });
 
 const initNavigation = async () => {
+  // 1. Foydalanuvchini yuklash (lekin bloklamaslik uchun paralellikka harakat qilamiz)
   const cu = await fetchCurrentUser();
 
-  // 1. Initial render of navigation structure (required for applyPermissions to find elements)
+  // 2. Navigatsiyani chizish (Rasm yuklanmagan bo'lsa skeleton chiqadi)
   renderNavigation();
 
-  if (cu) {
-    // 2. Fetch profile picture separately if not in user object
-    try {
-      const uId = cu.userId || cu._id;
-      const res = await fetch(`${API_URL}/api/user-photos/${uId}?type=image`, {
-        headers: getAuthHeaders(),
-        credentials: "include",
-      });
-      if (res.ok) {
-        const file = await res.json();
-        if (file && file.fileData) {
-          setCurrentUser({ ...cu, avatar: file.fileData });
-          // Re-render to show new avatar
-          renderNavigation();
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch nav avatar:", err);
-    }
+  // 3. Sahifa mazmunini DARXOL yuklash (Rasmni kutmasdan!)
+  navigateTo(window.location.pathname, false);
 
-    // 3. Apply permissions to the now-rendered navigation items
+  if (cu) {
+    // 4. Rasmni orqa fonda (background) yuklash
+    (async () => {
+      try {
+        const uId = cu.userId || cu._id;
+        const res = await fetch(`${API_URL}/api/user-photos/${uId}?type=image`, {
+          headers: getAuthHeaders(),
+          credentials: "include",
+        });
+        if (res.ok) {
+          const file = await res.json();
+          if (file && file.fileData) {
+            const img = document.getElementById("nav-user-img");
+            if (img) {
+              img.src = file.fileData;
+              setCurrentUser({ ...cu, avatar: file.fileData });
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch nav avatar:", err);
+      }
+    })();
+
+    // 5. Ruxsatnomalarni qo'llash
     await applyPermissions(cu.userId || cu._id);
   }
-
-  // 4. Initial page load
-  navigateTo(window.location.pathname, false);
 };
 
 const handleLanguageChange = () => {

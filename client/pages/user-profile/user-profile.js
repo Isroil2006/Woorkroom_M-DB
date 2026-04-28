@@ -77,24 +77,9 @@ export async function userProfileRender() {
     console.error("Failed to fetch user data:", err);
   }
 
-  // Fetch avatar from backend
-  // Fetch avatar from backend
+  // Rasmni keshdan (loggedInInfo) olamiz, serverga qayta so'rov yubormaymiz
   let userAvatar =
-    user.avatar || (user.gender === "Male" ? "/assets/images/user-avatar-male.png" : user.gender === "Female" ? "/assets/images/user-avatar-female.png" : "/assets/images/User-avatar.png");
-
-  try {
-    const uId = user.userId || user._id;
-    const res = await fetch(`${API_URL}/api/user-photos/${uId}?type=image`, {
-      headers: getAuthHeaders(),
-      credentials: "include",
-    });
-    if (res.ok) {
-      const file = await res.json();
-      if (file && file.fileData) userAvatar = file.fileData;
-    }
-  } catch (err) {
-    console.error("Failed to fetch avatar:", err);
-  }
+    loggedInInfo.avatar || (user.gender === "Male" ? "/assets/images/user-avatar-male.png" : user.gender === "Female" ? "/assets/images/user-avatar-female.png" : "/assets/images/User-avatar.png");
 
   const completion = calcCompletion({ ...user, avatar: userAvatar });
 
@@ -359,5 +344,3 @@ export async function userProfileRender() {
     reader.readAsDataURL(file);
   };
 }
-
-// ── Nav button logic removed (handled by navigation.js) ──

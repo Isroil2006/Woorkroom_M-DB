@@ -22,6 +22,20 @@ const swaggerOptions = {
         description: "Local Server",
       },
     ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
+    },
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
   },
   apis: ["./routes/*.js"], // routes papkasidagi barcha js fayllarni qidiradi
 };
