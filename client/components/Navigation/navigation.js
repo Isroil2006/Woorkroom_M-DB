@@ -425,8 +425,8 @@ const initNavigation = async () => {
   navigateTo(window.location.pathname, false);
 
   if (cu) {
-    // 4. Rasmni orqa fonda (background) yuklash
-    (async () => {
+    // 4. Rasmni bir oz kechikish (1 sek) bilan yuklash (Priority optimization)
+    setTimeout(async () => {
       try {
         const uId = cu.userId || cu._id;
         const res = await fetch(`${API_URL}/api/user-photos/${uId}?type=image`, {
@@ -446,7 +446,7 @@ const initNavigation = async () => {
       } catch (err) {
         console.error("Failed to fetch nav avatar:", err);
       }
-    })();
+    }, 1000);
 
     // 5. Ruxsatnomalarni qo'llash
     await applyPermissions(cu.userId || cu._id);
