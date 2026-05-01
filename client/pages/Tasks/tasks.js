@@ -9,28 +9,60 @@ const t = createTranslationHelper(translations);
 // ─── DATA HELPERS (API) ──────────────────────────────────────────
 const API_URL = `${BASE_URL}/api/tasks`;
 
-const fetchProjects = async () => {
-  try {
-    const res = await fetch(`${API_URL}/projects`, {
-      headers: getAuthHeaders(),
-      credentials: "include",
-    });
+let projectsCache = null;
+let usersCache = null;
+let tasksCache = {}; // { projectId: [tasks] }
+let isFetchingProjects = false;
 
-    return await res.json();
-  } catch (err) {
-    console.error("Fetch projects error:", err);
-    return [];
+const updateLocalTaskCache = (task, fallbackPid) => {
+  const pid = task.project?._id || task.project || fallbackPid;
+  if (!pid || !tasksCache[pid]) return;
+  const idx = tasksCache[pid].findIndex((t) => String(t._id) === String(task._id));
+  if (idx > -1) {
+    const oldTask = tasksCache[pid][idx];
+    // Aqlli birlashtirish: Agar yangi kelgan ma'lumotda obyekt o'rniga faqat string(ID) kelsa, eskisini saqlaymiz
+    const merged = { ...oldTask, ...task };
+    if (task.assignees && task.assignees.length > 0 && typeof task.assignees[0] === "string") {
+      merged.assignees = oldTask.assignees;
+    }
+    if (task.createdBy && typeof task.createdBy === "string" && oldTask.createdBy?._id) {
+      merged.createdBy = oldTask.createdBy;
+    }
+    tasksCache[pid][idx] = merged;
+  } else {
+    tasksCache[pid].unshift(task);
   }
 };
 
-const fetchTasks = async (projectId) => {
+const fetchProjects = async (force = false) => {
+  if (projectsCache && !force) return projectsCache;
+  if (isFetchingProjects) {
+    while (isFetchingProjects) await new Promise((r) => setTimeout(r, 50));
+    return projectsCache;
+  }
+  isFetchingProjects = true;
+  try {
+    const res = await fetch(`${API_URL}/projects`, { headers: getAuthHeaders(), credentials: "include" });
+    const data = await res.json();
+    projectsCache = Array.isArray(data) ? data : [];
+    return projectsCache;
+  } catch (err) {
+    return [];
+  } finally {
+    isFetchingProjects = false;
+  }
+};
+
+const fetchTasks = async (projectId, force = false) => {
+  if (tasksCache[projectId] && !force) return tasksCache[projectId];
   try {
     const res = await fetch(`${API_URL}/?projectId=${projectId}`, {
       headers: getAuthHeaders(),
       credentials: "include",
     });
-
-    return await res.json();
+    const data = await res.json();
+    tasksCache[projectId] = Array.isArray(data) ? data : [];
+    return tasksCache[projectId];
   } catch (err) {
     console.error("Fetch tasks error:", err);
     return [];
@@ -38,13 +70,15 @@ const fetchTasks = async (projectId) => {
 };
 
 const fetchUsers = async () => {
+  if (usersCache) return usersCache;
   try {
     const res = await fetch(`${BASE_URL}/api/users`, {
       headers: getAuthHeaders(),
       credentials: "include",
     });
-
-    return await res.json();
+    const data = await res.json();
+    usersCache = Array.isArray(data) ? data : [];
+    return usersCache;
   } catch (err) {
     return [];
   }
@@ -460,14 +494,22 @@ const showLoader = () => {
 };
 
 // ─── RENDER VIEW ──────────────────────────────────────────────
-const renderView = async () => {
-  const container = $("todo-view-container");
+const renderView = async (forceRefresh = false) => {
+  const container = document.getElementById("todo-view-container");
   if (!container) return;
 
-  // Show loader immediately
+  const projects = (await fetchProjects(forceRefresh)) || [];
   showLoader();
 
-  const projects = await fetchProjects();
+  if (projects.length > 0) {
+    if (!currentProjectId || !projects.find((p) => p._id === currentProjectId)) {
+      currentProjectId = projects[0]._id;
+    }
+  }
+
+  // Loyiha tablarini ham yangilaymiz
+  await renderProjectTabs();
+
   const noProj = $("todo-no-projects");
   const delProjBtn = $("todo-delete-project-btn");
 
@@ -489,15 +531,11 @@ const renderView = async () => {
     delProjBtn.style.display = "flex";
   }
 
-  if (!currentProjectId || !projects.find((p) => p._id === currentProjectId)) {
-    currentProjectId = projects[0]._id;
-  }
-
   const proj = projects.find((p) => p._id === currentProjectId);
   if ($("todo-project-title")) $("todo-project-title").textContent = proj.name;
 
-  // Fetch tasks for the current project
-  const allTasks = await fetchTasks(currentProjectId);
+  // Vazifalarni keshdan yoki serverdan olish
+  const allTasks = await fetchTasks(currentProjectId, forceRefresh);
 
   // Filter tasks locally
   let tasks = allTasks;
@@ -779,31 +817,49 @@ const initDragDrop = () => {
       const cuId = String(cu.userId || cu._id || "");
 
       try {
-        const tasks = await fetchTasks(currentProjectId);
+        const tasks = tasksCache[currentProjectId] || [];
         const task = tasks.find((t) => String(t._id) === String(taskId));
         if (!task) return;
 
         const ids = (task.assignees || []).map((u) => String(u._id || u || ""));
 
+        let url = `${API_URL}/${taskId}`;
+        let body = { status: newCol };
+
         if (ids.length > 0 && ids.includes(cuId)) {
-          await fetch(`${API_URL}/${taskId}/user-status`, {
-            method: "PUT",
-            headers: getAuthHeaders(),
-            credentials: "include",
-            body: JSON.stringify({ userId: cuId, status: newCol }),
-          });
+          url = `${API_URL}/${taskId}/user-status`;
+          body = { userId: cuId, status: newCol };
+          // Optimistik yangilash
+          const newUserStatus = { ...(task.userStatus || {}), [cuId]: newCol };
+          updateLocalTaskCache({ _id: taskId, userStatus: newUserStatus }, currentProjectId);
         } else {
-          await fetch(`${API_URL}/${taskId}`, {
-            method: "PUT",
-            headers: getAuthHeaders(),
-            credentials: "include",
-            body: JSON.stringify({ status: newCol }),
-          });
+          // Optimistik yangilash
+          updateLocalTaskCache({ _id: taskId, status: newCol }, currentProjectId);
         }
-        renderView();
+
+        renderView(); // UI darhol o'zgaradi
+
+        // Fonda serverga so'rov
+        fetch(url, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          credentials: "include",
+          body: JSON.stringify(body),
+        })
+          .then((res) => {
+            if (res.ok) return res.json();
+            throw new Error("Drop update failed");
+          })
+          .then((updated) => {
+            updateLocalTaskCache(updated);
+          })
+          .catch((err) => {
+            console.error("Drop error:", err);
+            renderView(true); // Xato bo'lsa serverdan qayta tiklash
+          });
       } catch (err) {
-        console.error("Drop error:", err);
-        renderView();
+        console.error("Drop handling error:", err);
+        renderView(true);
       }
     });
   });
@@ -825,38 +881,51 @@ function getDragAfterElement(container, y) {
   ).element;
 }
 
-// ─── TASK ACTIONS (API) ───────────────────────────────────────
 const toggleDone = async (tid) => {
-  const tasks = await fetchTasks(currentProjectId);
+  const tasks = tasksCache[currentProjectId] || [];
   const task = tasks.find((t) => t._id === tid);
   if (!task) return;
 
+  let url = `${API_URL}/${tid}`;
+  let body = {};
   const cu = getCurrent();
-  if (!cu) return;
   const cuId = cu.userId || cu._id;
   const ids = (task.assignees || []).map((u) => u._id || u);
 
   if (ids.length === 0 || (!ids.includes(cuId) && isOwner(task))) {
-    // Global toggle
-    const newStatus = task.status === "done" ? "todo" : "done";
-    await fetch(`${API_URL}/${tid}`, {
-      method: "PUT",
-      headers: getAuthHeaders(),
-      credentials: "include",
-      body: JSON.stringify({ status: newStatus }),
-    });
+    const nextStatus = task.status === "done" ? "todo" : "done";
+    body = { status: nextStatus };
+    updateLocalTaskCache({ _id: tid, status: nextStatus }, currentProjectId);
   } else if (ids.includes(cuId)) {
-    // User specific toggle
+    url = `${API_URL}/${tid}/user-status`;
     const cur = task.userStatus?.[cuId] || task.status || "todo";
     const next = cur === "done" ? "todo" : "done";
-    await fetch(`${API_URL}/${tid}/user-status`, {
-      method: "PUT",
-      headers: getAuthHeaders(),
-      credentials: "include",
-      body: JSON.stringify({ userId: cuId, status: next }),
-    });
+    body = { userId: cuId, status: next };
+    const newUserStatus = { ...(task.userStatus || {}), [cuId]: next };
+    updateLocalTaskCache({ _id: tid, userStatus: newUserStatus }, currentProjectId);
+  } else {
+    return;
   }
+
   renderView();
+
+  fetch(url, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    credentials: "include",
+    body: JSON.stringify(body),
+  })
+    .then((res) => {
+      if (res.ok) return res.json();
+      throw new Error("Update failed");
+    })
+    .then((updated) => {
+      updateLocalTaskCache(updated, currentProjectId);
+    })
+    .catch((err) => {
+      console.error("Toggle error:", err);
+      renderView(true);
+    });
 };
 
 // ─── NO-PROJECT MODAL ────────────────────────────────────────
@@ -870,9 +939,14 @@ const showNoProjectModal = () => {
 
 const deleteTask = (tid) => {
   showDeleteConfirm(t("confirm_delete_task"), async () => {
-    await fetch(`${API_URL}/${tid}`, { method: "DELETE", headers: getAuthHeaders(), credentials: "include" });
-
-    renderView();
+    const res = await fetch(`${API_URL}/${tid}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
+    if (res.ok) {
+      await renderView(true);
+    }
   });
 };
 
@@ -904,14 +978,14 @@ const openTaskModal = async (taskId, defaultStatus = "todo") => {
         <option value="urgent">${t("priority_urgent")}</option>`;
 
   // Init selected assignees
-  selectedAssignees = task?.assigneeIds || (task?.assigneeId ? [task.assigneeId] : []);
+  selectedAssignees = (task?.assignees || []).map(u => u._id || u);
   renderAssigneePicker();
 
   $("tm-title").value = task?.title || "";
   $("tm-desc").value = task?.desc || "";
   $("tm-status").value = task?.status || defaultStatus;
   $("tm-priority").value = task?.priority || "none";
-  $("tm-duedate").value = task?.dueDate || "";
+  $("tm-duedate").value = task?.dueDate ? task.dueDate.split("T")[0] : "";
 
   $("tm-title").placeholder = t("task_title_placeholder");
   $("tm-desc").placeholder = t("task_desc_placeholder");
@@ -941,15 +1015,16 @@ const saveTask = async () => {
     createdBy: cu?._id || cu?.userId,
   };
 
+  let res;
   if (editingTaskId) {
-    await fetch(`${API_URL}/${editingTaskId}`, {
+    res = await fetch(`${API_URL}/${editingTaskId}`, {
       method: "PUT",
       headers: getAuthHeaders(),
       credentials: "include",
       body: JSON.stringify(data),
     });
   } else {
-    await fetch(`${API_URL}`, {
+    res = await fetch(`${API_URL}`, {
       method: "POST",
       headers: getAuthHeaders(),
       credentials: "include",
@@ -957,8 +1032,10 @@ const saveTask = async () => {
     });
   }
 
-  $("task-modal").style.display = "none";
-  renderView();
+  if (res.ok) {
+    $("task-modal").style.display = "none";
+    await renderView(true);
+  }
 };
 
 // ─── TASK DETAIL MODAL ────────────────────────────────────────
@@ -973,21 +1050,22 @@ const openDetailModal = async (tid) => {
   const assignees = task.assignees || [];
   const cu = getCurrent();
   const cuId = cu?.userId || cu?._id;
+  const lang = getCurrentLang();
 
   $("td-status-badge").className = `todo-detail-status-badge s-${task.status}`;
   $("td-status-badge").textContent = cfg.label();
   $("td-title").textContent = task.title;
-  $("td-desc").textContent = task.description || (currentLang === "uz" ? "Tavsif yo'q" : currentLang === "ru" ? "Нет описания" : "No description");
+  $("td-desc").textContent = task.description || (lang === "uz" ? "Tavsif yo'q" : lang === "ru" ? "Нет описания" : "No description");
 
   // Labels
   $("td-lbl-desc").textContent = t("description_label");
-  $("td-lbl-details").textContent = currentLang === "uz" ? "Ma'lumotlar" : currentLang === "ru" ? "Сведения" : "Details";
+  $("td-lbl-details").textContent = lang === "uz" ? "Ma'lumotlar" : lang === "ru" ? "Сведения" : "Details";
   $("td-lbl-status").textContent = t("status_label");
   $("td-lbl-priority").textContent = t("priority_label");
   $("td-lbl-duedate").textContent = t("duedate_label");
   $("td-lbl-assignees").textContent = t("assignee_label");
   $("td-lbl-created").textContent = t("create_time");
-  $("td-lbl-createdby").textContent = currentLang === "uz" ? "Muallif" : currentLang === "ru" ? "Автор" : "Author";
+  $("td-lbl-createdby").textContent = lang === "uz" ? "Muallif" : lang === "ru" ? "Автор" : "Author";
   $("td-edit-label").textContent = t("edit");
 
   // Meta
@@ -1081,15 +1159,11 @@ export const initTodoLogic = async () => {
     }
   }
 
-  const projects = await fetchProjects();
-  if (projects.length === 0) {
-    currentProjectId = null;
-  } else {
-    if (!currentProjectId) currentProjectId = projects[0]._id;
-  }
+  // Sahifaga kirganda keshni tozalaymiz, shunda renderView o'zi 1 martadan yangi ma'lumot oladi
+  projectsCache = null;
+  tasksCache = {};
 
-  renderProjectTabs();
-  renderView();
+  await renderView();
 
   const cu = getCurrent();
   if (cu) applyPermissions(cu.userId || cu._id);
@@ -1146,15 +1220,20 @@ export const initTodoLogic = async () => {
   $("todo-delete-project-btn")?.addEventListener("click", () => {
     if (!currentProjectId) return;
     showDeleteConfirm(t("confirm_delete_project"), async () => {
-      await fetch(`${API_URL}/projects/${currentProjectId}`, {
+      const res = await fetch(`${API_URL}/projects/${currentProjectId}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
         credentials: "include",
       });
 
-      currentProjectId = null;
-      renderProjectTabs();
-      renderView();
+      if (res.ok) {
+        // Loyihani keshdan ham olib tashlaymiz (Optimistic)
+        if (projectsCache) {
+          projectsCache = projectsCache.filter((p) => p._id !== currentProjectId);
+        }
+        currentProjectId = null;
+        await renderView(true); // Faqat bir marta shu yerda chaqiramiz
+      }
     });
   });
 
@@ -1183,11 +1262,19 @@ export const initTodoLogic = async () => {
     });
 
     if (res.ok) {
-      const newP = await res.json();
-      currentProjectId = newP._id;
+      const newProj = await res.json();
       $("project-modal").style.display = "none";
-      renderProjectTabs();
-      renderView();
+      $("pm-name").value = "";
+
+      // Loyihalar keshini qo'lda yangilaymiz (serverdan qayta so'ramaslik uchun)
+      if (projectsCache) {
+        projectsCache.push(newProj);
+      } else {
+        projectsCache = [newProj];
+      }
+
+      currentProjectId = newProj._id;
+      await renderView(); // renderView(true) emas, oddiy renderView chaqiramiz
     }
   });
 
@@ -1206,12 +1293,12 @@ export const initTodoLogic = async () => {
   $("task-detail-close")?.addEventListener("click", closeDetailModal);
 
   // Delete modal
-  $("del-modal-confirm")?.addEventListener("click", () => {
+  $("del-modal-confirm").addEventListener("click", async () => {
     if (deleteCallback) {
-      deleteCallback();
+      await deleteCallback();
       deleteCallback = null;
+      $("todo-del-modal").style.display = "none";
     }
-    $("todo-del-modal").style.display = "none";
   });
 
   // No-project modal

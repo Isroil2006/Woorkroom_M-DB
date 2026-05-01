@@ -14,8 +14,11 @@ exports.getProjects = async (req, res) => {
 
 exports.createProject = async (req, res) => {
   try {
-    const { name, createdBy } = req.body;
-    const project = new Project({ name, createdBy });
+    const { name } = req.body;
+    const project = new Project({ 
+      name, 
+      createdBy: req.user.userId // Tokendan avtomatik olish
+    });
     const saved = await project.save();
     res.status(201).json(saved);
   } catch (err) {
@@ -42,7 +45,19 @@ exports.getTasks = async (req, res) => {
     const { projectId } = req.query;
     if (!projectId) return res.status(400).json({ message: "Project ID required" });
 
-    const tasks = await Task.find({ project: projectId }).populate("assignees", "username avatar email").populate("createdBy", "username avatar").sort({ createdAt: -1 });
+    const userId = req.user.userId;
+
+    const tasks = await Task.find({
+      project: projectId,
+      $or: [
+        { createdBy: userId }, 
+        { assignees: userId }
+      ]
+    })
+      .populate("assignees", "username avatar email")
+      .populate("createdBy", "username avatar")
+      .sort({ createdAt: -1 });
+
     res.json(tasks);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -51,7 +66,11 @@ exports.getTasks = async (req, res) => {
 
 exports.createTask = async (req, res) => {
   try {
-    const task = new Task(req.body);
+    const taskData = {
+      ...req.body,
+      createdBy: req.user.userId // Tokendan avtomatik olish
+    };
+    const task = new Task(taskData);
     const saved = await task.save();
     res.status(201).json(saved);
   } catch (err) {
