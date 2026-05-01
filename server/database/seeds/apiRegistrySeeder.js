@@ -3,7 +3,6 @@ const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 const Api = require("../../models/Api");
 
-// 6 xonali SONLI ID-lar (Tirnoqlarsiz)
 const apisData = [
   // --- USERS (100...) ---
   { _id: 100001, path: "/api/users/register", method: "POST", module: "Users", description: "Register new user" },
@@ -48,7 +47,7 @@ async function seed() {
       method: item.method,
       module: item.module,
       description: item.description,
-      apiId: item._id, 
+      apiId: item._id,
     }));
 
     await Api.insertMany(formattedApis);

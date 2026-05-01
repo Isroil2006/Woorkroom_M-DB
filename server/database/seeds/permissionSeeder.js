@@ -9,10 +9,10 @@ async function seedDB() {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log("MongoDB ga ulandi...");
 
-    // 1. Barcha API-larni yuklaymiz
+    // 1. Barcha API-larni yuklash
     const apis = await Api.find({});
 
-    // API-larni mantiqiy guruhlash yordamchi funksiya
+    // API-larni guruhlash yordamchi funksiya
     const getApiId = (path, method) => {
       const found = apis.find((a) => a.path === path && a.method === method);
       return found ? found.apiId : null;
@@ -22,7 +22,7 @@ async function seedDB() {
     const seedData = [
       // --- TASKS MODULE SPLIT ---
       {
-        module: "nav_tasks", // Faqat kirish va ko'rish
+        module: "nav_tasks",
         apis: [getApiId("/api/tasks/projects", "GET"), getApiId("/api/tasks", "GET")].filter((id) => id),
       },
       {
