@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const permissionsSchema = new mongoose.Schema(
   {
     module: { type: String, required: true },
-    apis: [{ type: String }], // Endi rules emas, faqat apiId-lar massivi
+    apis: [{ type: Number }], // Endi haqiqiy SONLAR massivi
   },
   { timestamps: true }
 );
