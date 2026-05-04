@@ -433,3 +433,28 @@
 .emp-perm-btn:hover {
     background: #eef0fd;
 }
+
+/* Loading state for button */
+.perm-btn-save--loading {
+    pointer-events: none;
+    opacity: 0.8;
+    position: relative;
+    color: transparent !important;
+}
+
+.perm-btn-save--loading::after {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    top: calc(50% - 10px);
+    left: calc(50% - 10px);
+    border: 2.5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: permBtnSpin 0.6s linear infinite;
+}
+
+@keyframes permBtnSpin {
+    to { transform: rotate(360deg); }
+}

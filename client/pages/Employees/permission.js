@@ -169,7 +169,7 @@ export const getPermissions = async (userId) => {
 
 // Yangi ruxsatnomalarni serverga saqlash.
 export const savePermissions = async (userId, perms) => {
-  if (!userId) return;
+  if (!userId) return false;
   try {
     const res = await fetch(`${PERM_API}/${userId}`, {
       method: "POST",
@@ -180,9 +180,12 @@ export const savePermissions = async (userId, perms) => {
 
     if (res.ok) {
       permissionCache.set(userId, perms);
+      return true;
     }
+    return false;
   } catch (err) {
     console.error("Error saving permissions:", err);
+    return false;
   }
 };
 
@@ -492,6 +495,10 @@ export const openPermissionsModal = async (targetUserId, targetUsername, lang = 
   });
 
   overlay.querySelector("#perm-save-btn").addEventListener("click", async () => {
+    const btn = overlay.querySelector("#perm-save-btn");
+    if (btn.classList.contains("perm-btn-save--loading")) return;
+
+    btn.classList.add("perm-btn-save--loading");
     const newPerms = {};
 
     NAV_ITEMS_CACHE.forEach((item) => {
@@ -513,15 +520,27 @@ export const openPermissionsModal = async (targetUserId, targetUsername, lang = 
       };
     });
 
-    await savePermissions(targetUserId, newPerms);
+    try {
+      const success = await savePermissions(targetUserId, newPerms);
 
-    const btn = overlay.querySelector("#perm-save-btn");
-    btn.textContent = tr.saved;
-    btn.style.background = "#22c55e";
-    setTimeout(() => {
+      btn.classList.remove("perm-btn-save--loading");
+      
+      if (success) {
+        btn.textContent = tr.saved;
+        btn.style.background = "#22c55e";
+        setTimeout(() => {
+          btn.textContent = tr.save;
+          btn.style.background = "";
+        }, 1600);
+      } else {
+        // Xatolik bo'lsa loadingni olib tashlaymiz va xabar beramiz (ixtiyoriy)
+        btn.textContent = tr.save;
+      }
+    } catch (err) {
+      btn.classList.remove("perm-btn-save--loading");
       btn.textContent = tr.save;
-      btn.style.background = "";
-    }, 1600);
+      console.error("Save failed:", err);
+    }
 
     document.dispatchEvent(
       new CustomEvent("permissions-updated", {
