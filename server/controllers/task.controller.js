@@ -97,23 +97,3 @@ exports.deleteTask = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-exports.updateUserStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { userId, status } = req.body; // userId is string representation of ObjectId
-
-    const task = await Task.findById(id);
-    if (!task) return res.status(404).json({ message: "Task not found" });
-
-    // Update map
-    task.userStatus.set(userId, status);
-
-    // Recalculate global status if needed (optional logic)
-    // For now just save
-    await task.save();
-    res.json(task);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-};

@@ -108,14 +108,6 @@ const canSeeTask = (task) => {
 };
 
 const getVisibleStatus = (task) => {
-  const cu = getCurrent();
-  if (!cu) return task.status || "todo";
-  const cuId = cu.userId || cu._id;
-  const ids = (task.assignees || []).map((u) => u._id || u);
-
-  if (ids.includes(cuId)) {
-    return task.userStatus?.[cuId] || task.status || "todo";
-  }
   return task.status || "todo";
 };
 
@@ -596,14 +588,8 @@ const renderListRow = (task) => {
   const owner = isOwner(task);
   const canEdit = owner;
   const canDel = owner;
-  const cu = getCurrent();
-  const cuId = cu?.userId || cu?._id;
-  const assignees = task.assignees || [];
-  const ids = assignees.map((u) => u._id || u);
   const myStatus = getVisibleStatus(task);
   const myDone = myStatus === "done";
-  // check button: assignee yoki owner (assignee yo'q bo'lsa) ko'radi
-  const canCheck = ids.length === 0 || (cu && (ids.includes(cuId) || isOwner(task)));
 
   return `
     <div class="todo-list-row todo-row-clickable" data-tid="${task._id}">
@@ -729,17 +715,11 @@ const renderBoardView = (tasks) => {
 
 const renderBoardCard = (task) => {
   const owner = isOwner(task);
-  const cu = getCurrent();
-  const cuId = cu?.userId || cu?._id;
-  const assignees = task.assignees || [];
-  const ids = assignees.map((u) => u._id || u);
   const myStatus = getVisibleStatus(task);
   const myDone = myStatus === "done";
-  // Assignee yoki owner — hamma drag qila oladi, check ko'radi
-  const canDrag = cu && (ids.includes(cuId) || ids.length === 0 || owner);
 
   return `
-    <div class="todo-board-card" draggable="${canDrag}" data-tid="${task._id}">
+    <div class="todo-board-card" draggable="true" data-tid="${task._id}">
       <div class="todo-card-top">
         <button class="todo-check-btn ${myDone ? "checked" : ""}" data-tid="${task._id}" data-action="check">
           ${myDone ? `<svg width="10" height="10" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/></svg>` : ""}
@@ -826,16 +806,7 @@ const initDragDrop = () => {
         let url = `${API_URL}/${taskId}`;
         let body = { status: newCol };
 
-        if (ids.length > 0 && ids.includes(cuId)) {
-          url = `${API_URL}/${taskId}/user-status`;
-          body = { userId: cuId, status: newCol };
-          // Optimistik yangilash
-          const newUserStatus = { ...(task.userStatus || {}), [cuId]: newCol };
-          updateLocalTaskCache({ _id: taskId, userStatus: newUserStatus }, currentProjectId);
-        } else {
-          // Optimistik yangilash
-          updateLocalTaskCache({ _id: taskId, status: newCol }, currentProjectId);
-        }
+        updateLocalTaskCache({ _id: taskId, status: newCol }, currentProjectId);
 
         renderView(); // UI darhol o'zgaradi
 
@@ -892,17 +863,10 @@ const toggleDone = async (tid) => {
   const cuId = cu.userId || cu._id;
   const ids = (task.assignees || []).map((u) => u._id || u);
 
-  if (ids.length === 0 || (!ids.includes(cuId) && isOwner(task))) {
+  if (ids.length === 0 || ids.includes(cuId) || isOwner(task)) {
     const nextStatus = task.status === "done" ? "todo" : "done";
     body = { status: nextStatus };
     updateLocalTaskCache({ _id: tid, status: nextStatus }, currentProjectId);
-  } else if (ids.includes(cuId)) {
-    url = `${API_URL}/${tid}/user-status`;
-    const cur = task.userStatus?.[cuId] || task.status || "todo";
-    const next = cur === "done" ? "todo" : "done";
-    body = { userId: cuId, status: next };
-    const newUserStatus = { ...(task.userStatus || {}), [cuId]: next };
-    updateLocalTaskCache({ _id: tid, userStatus: newUserStatus }, currentProjectId);
   } else {
     return;
   }
@@ -1080,13 +1044,10 @@ const openDetailModal = async (tid) => {
     ? assignees
         .map((u) => {
           const uId = u._id;
-          const done = task.userStatus?.[uId] === "done";
-          const isCu = cuId === uId;
           return `
-            <div class="todo-detail-assignee-item ${done ? "assignee-done" : ""}" data-uid="${uId}">
+            <div class="todo-detail-assignee-item" data-uid="${uId}">
               ${userAvatarHtml(u, 26)}
-              <span class="assignee-name ${done ? "assignee-name-done" : ""}">${u?.username || "User"}</span>
-              ${done ? `<svg width="14" height="14" fill="none" viewBox="0 0 24 24" style="margin-left:auto;flex-shrink:0"><path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/></svg>` : `<span style="margin-left:auto;font-size:10px;color:#c0c7d4;flex-shrink:0">${isCu ? "…" : ""}</span>`}
+              <span class="assignee-name">${u?.username || "User"}</span>
             </div>`;
         })
         .join("")

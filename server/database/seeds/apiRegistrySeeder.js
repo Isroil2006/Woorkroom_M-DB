@@ -22,7 +22,6 @@ const apisData = [
   { _id: 200005, path: "/api/tasks", method: "POST", module: "Tasks", description: "Create new task" },
   { _id: 200006, path: "/api/tasks/:id", method: "PUT", module: "Tasks", description: "Edit task details" },
   { _id: 200007, path: "/api/tasks/:id", method: "DELETE", module: "Tasks", description: "Delete task" },
-  { _id: 200008, path: "/api/tasks/:id/user-status", method: "PUT", module: "Tasks", description: "Update task status" },
 
   // --- FILES (300...) ---
   { _id: 300001, path: "/api/user-photos/:userId", method: "GET", module: "Files", description: "Get user avatar image" },

@@ -45,10 +45,6 @@ async function seedDB() {
         module: "task_delete_task",
         apis: [getApiId("/api/tasks/:id", "DELETE")].filter((id) => id),
       },
-      {
-        module: "task_update_status",
-        apis: [getApiId("/api/tasks/:id/user-status", "PUT")].filter((id) => id),
-      },
 
       // --- EMPLOYEES / USERS ---
       {

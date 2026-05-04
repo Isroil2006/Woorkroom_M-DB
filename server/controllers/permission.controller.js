@@ -1,4 +1,5 @@
 const Permission = require("../models/Permission");
+const NavItem = require("../models/NavItem");
 
 exports.getPermissionsByUserId = async (req, res) => {
   try {
@@ -25,5 +26,14 @@ exports.updatePermissions = async (req, res) => {
     res.status(200).json(permissions);
   } catch (error) {
     res.status(500).json({ message: "Permissions update error", error: error.message });
+  }
+};
+
+exports.getNavItems = async (req, res) => {
+  try {
+    const navItems = await NavItem.find().sort({ id: 1 });
+    res.status(200).json(navItems);
+  } catch (error) {
+    res.status(500).json({ message: "Nav items fetching error", error: error.message });
   }
 };

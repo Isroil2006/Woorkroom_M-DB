@@ -1,6 +1,15 @@
 const Permission = require("../models/Permission");
 const PermissionsRegistry = require("../models/Permissions");
 const Api = require("../models/Api");
+const NavItem = require("../models/NavItem");
+
+let NAV_ITEMS_CACHE = null;
+
+const getNavItems = async () => {
+  if (NAV_ITEMS_CACHE) return NAV_ITEMS_CACHE;
+  NAV_ITEMS_CACHE = await NavItem.find().lean();
+  return NAV_ITEMS_CACHE;
+};
 
 // Super adminlar bypass
 const SUPER_ADMIN_EMAILS = ["isroil@gmail.com", "admin@gmail.com", "test@gmail.com"];
@@ -70,35 +79,41 @@ const checkPermission = (manualPageKey = null) => {
       }
 
       const perms = userPermissions.perms;
+      const navItems = await getNavItems();
       let isAllowed = true;
 
-      // Frontend logicasi bilan bir xil tekshirish
-      // 1. To'g'ridan-to'g'ri modulni tekshirish (masalan: nav_tasks)
-      if (perms[requiredModule] !== undefined) {
-        if (typeof perms[requiredModule] === "object" && "access" in perms[requiredModule]) {
-          if (perms[requiredModule].access === false) isAllowed = false;
-        } else if (perms[requiredModule] === false) {
-          isAllowed = false;
+      // 1. requiredModule bo'limmi yoki ichki amalmi aniqlaymiz
+      let targetNavItem = null;
+      let parentSection = null;
+
+      for (const item of navItems) {
+        if (item.key === requiredModule) {
+          targetNavItem = item;
+          break;
         }
-      } else {
-        // 2. Ichki harakatlarni tekshirish (masalan: task_add_task)
-        let foundAction = false;
-        for (const parentKey in perms) {
-          const parent = perms[parentKey];
-          if (parent && typeof parent === "object" && parent.actions && requiredModule in parent.actions) {
-            foundAction = true;
-            // Agar asosiy bo'lim yopiq bo'lsa, ichki harakat ham yopiq
-            if (parent.access === false) {
-              isAllowed = false;
-            } else {
-              isAllowed = parent.actions[requiredModule] !== false;
-            }
-            break;
+        const action = item.actions.find((a) => a.key === requiredModule);
+        if (action) {
+          targetNavItem = action;
+          parentSection = item;
+          break;
+        }
+      }
+
+      if (targetNavItem) {
+        if (parentSection) {
+          // Bu ichki amal (action)
+          const userSection = perms[parentSection.key];
+          if (!userSection || userSection.access === false) {
+            isAllowed = false;
+          } else {
+            // ID bo'yicha tekshiramiz
+            isAllowed = Array.isArray(userSection.actions) && userSection.actions.includes(targetNavItem.id);
           }
+        } else {
+          // Bu asosiy bo'lim (section)
+          const userSection = perms[targetNavItem.key];
+          isAllowed = userSection && userSection.access !== false;
         }
-        
-        // Agar na modul, na action topilmasa, default true qoladi (fail-open)
-        // Lekin xavfsizlik uchun buni ham o'ylab ko'rish kerak
       }
 
       if (!isAllowed) {

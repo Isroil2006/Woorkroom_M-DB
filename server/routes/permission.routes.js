@@ -4,6 +4,8 @@ const permissionController = require("../controllers/permission.controller");
 const auth = require("../middleware/auth.middleware");
 const checkPermission = require("../middleware/permission.middleware");
 
+router.get("/nav-items", auth, permissionController.getNavItems);
+
 /**
  * @swagger
  * tags:

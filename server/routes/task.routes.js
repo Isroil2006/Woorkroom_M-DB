@@ -20,7 +20,17 @@ const checkPermission = require("../middleware/permission.middleware");
  *     tags: [Tasks]
  *     responses:
  *       200:
- *         description: Loyihalar ro'yxati
+ *         description: Loyihalar ro'yxati muvaffaqiyatli qaytarildi
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Project'
+ *       401:
+ *         description: Avtorizatsiyadan o'tmagan
+ *       403:
+ *         description: Sizda ushbu amal uchun ruxsat yo'q
  */
 router.get("/projects", auth, checkPermission(), taskController.getProjects);
 
@@ -43,7 +53,15 @@ router.get("/projects", auth, checkPermission(), taskController.getProjects);
  *                 type: string
  *     responses:
  *       201:
- *         description: Loyiha yaratildi
+ *         description: Loyiha muvaffaqiyatli yaratildi
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Project'
+ *       400:
+ *         description: Noto'g'ri ma'lumot yuborildi
+ *       403:
+ *         description: Loyiha yaratish uchun ruxsat yo'q
  */
 router.post("/projects", auth, checkPermission(), taskController.createProject);
 
@@ -143,27 +161,6 @@ router.put("/:id", auth, checkPermission(), taskController.updateTask);
  */
 router.delete("/:id", auth, checkPermission(), taskController.deleteTask);
 
-/**
- * @swagger
- * /api/tasks/{id}/user-status:
- *   put:
- *     summary: Vazifa holatini (status) o'zgartirish
- *     tags: [Tasks]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *     responses:
- *       200:
- *         description: Status yangilandi
- */
-router.put("/:id/user-status", auth, checkPermission(), taskController.updateUserStatus);
+
 
 module.exports = router;

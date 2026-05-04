@@ -30,6 +30,34 @@ const swaggerOptions = {
           bearerFormat: "JWT",
         },
       },
+      schemas: {
+        User: {
+          type: "object",
+          properties: {
+            userId: { type: "string" },
+            username: { type: "string" },
+            email: { type: "string" },
+            position: { type: "string" },
+          },
+        },
+        Project: {
+          type: "object",
+          properties: {
+            _id: { type: "string" },
+            name: { type: "string" },
+            createdBy: { type: "string" },
+          },
+        },
+        Task: {
+          type: "object",
+          properties: {
+            _id: { type: "string" },
+            title: { type: "string" },
+            status: { type: "string" },
+            projectId: { type: "string" },
+          },
+        },
+      },
     },
     security: [
       {

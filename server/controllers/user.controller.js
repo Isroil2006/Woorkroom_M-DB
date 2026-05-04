@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const UserPhoto = require("../models/UserPhoto");
 const Permission = require("../models/Permission");
+const NavItem = require("../models/NavItem");
 
 const jwt = require("jsonwebtoken");
 
@@ -31,40 +32,20 @@ exports.register = async (req, res) => {
 
     await newUser.save();
 
-    // Foydalanuvchi uchun default ruxsatnomalar yaratish
+    // Foydalanuvchi uchun default ruxsatnomalar yaratish (Dinamik yangi struktura)
+    const navItems = await NavItem.find({});
+    const permsObject = {};
+    navItems.forEach((item) => {
+      permsObject[item.key] = {
+        access: true,
+        id: item.id,
+        actions: item.actions.map((a) => a.id),
+      };
+    });
+
     const defaultPerms = new Permission({
       userId: newUser.userId || newUser._id.toString(),
-      perms: {
-        nav_dashboard: { access: true },
-        nav_payments: { access: true },
-        nav_tasks: {
-          access: true,
-          actions: {
-            task_add_project: true,
-            task_add_task: true,
-            task_delete_project: true,
-          },
-        },
-        nav_vacations: {
-          access: true,
-          actions: {
-            vac_add_tour: true,
-            vac_edit_tour: true,
-            vac_delete_tour: true,
-          },
-        },
-        nav_employees: {
-          access: true,
-          actions: {
-            emp_perm_btn: true,
-            emp_edit_btn: true,
-            emp_delete_btn: true,
-          },
-        },
-        nav_messenger: { access: true },
-        nav_infoportal: { access: true },
-        nav_settings: { access: true },
-      },
+      perms: permsObject,
     });
     await defaultPerms.save();
 
@@ -109,7 +90,10 @@ exports.login = async (req, res) => {
       const userObj = user.toObject();
       delete userObj.password;
 
-      res.status(200).json({ user: userObj });
+      res.status(200).json({
+        user: userObj,
+        token: token,
+      });
     } else {
       res.status(401).json({ message: "Email yoki parol noto'g'ri" });
     }
