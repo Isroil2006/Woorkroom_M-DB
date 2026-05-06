@@ -124,7 +124,8 @@ router.post("/", auth, checkPermission(), taskController.createTask);
  * @swagger
  * /api/tasks/{id}:
  *   put:
- *     summary: Vazifani tahrirlash
+ *     summary: Vazifani tahrirlash yoki statusini o'zgartirish
+ *     description: Vazifa ma'lumotlarini tahrirlash (task_edit_task) yoki statusini o'zgartirish (task_change_status). Faqat vazifa egasi, ijrochisi yoki adminlar uchun.
  *     tags: [Tasks]
  *     parameters:
  *       - in: path
@@ -140,6 +141,8 @@ router.post("/", auth, checkPermission(), taskController.createTask);
  *     responses:
  *       200:
  *         description: Yangilangan vazifa
+ *       403:
+ *         description: Sizda ushbu vazifani tahrirlash yoki statusini o'zgartirish huquqi yo'q
  */
 router.put("/:id", auth, checkPermission(), taskController.updateTask);
 
@@ -148,6 +151,7 @@ router.put("/:id", auth, checkPermission(), taskController.updateTask);
  * /api/tasks/{id}:
  *   delete:
  *     summary: Vazifani o'chirish
+ *     description: Vazifa egasi yoki admin o'chira oladi (task_delete_task).
  *     tags: [Tasks]
  *     parameters:
  *       - in: path
@@ -158,6 +162,8 @@ router.put("/:id", auth, checkPermission(), taskController.updateTask);
  *     responses:
  *       200:
  *         description: Vazifa o'chirildi
+ *       403:
+ *         description: Sizda ushbu vazifani o'chirish huquqi yo'q
  */
 router.delete("/:id", auth, checkPermission(), taskController.deleteTask);
 

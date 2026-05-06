@@ -855,7 +855,7 @@ const initDragDrop = () => {
           })
           .then((updated) => {
             updateLocalTaskCache(updated);
-            showNotification(t("task_updated") || "Task updated", "success");
+            showNotification(t("status_updated") || "Status updated", "success");
           })
           .catch((err) => {
             console.error("Drop error:", err);
