@@ -230,6 +230,7 @@ const TR = {
     task_add_task: "Yangi vazifa qo'shish",
     task_edit_task: "Vazifani tahrirlash",
     task_delete_task: "Vazifani o'chirish",
+    task_change_status: "Vazifa statusini o'zgartirish",
     vac_add_tour: "Yangi tur qo'shish",
     vac_edit_tour: "Turni tahrirlash",
     vac_delete_tour: "Turni o'chirish",
@@ -258,6 +259,7 @@ const TR = {
     task_add_task: "Add task",
     task_edit_task: "Edit task",
     task_delete_task: "Delete task",
+    task_change_status: "Change task status",
     vac_add_tour: "Add tour",
     vac_edit_tour: "Edit tour",
     vac_delete_tour: "Delete tour",
@@ -286,6 +288,7 @@ const TR = {
     task_add_task: "Добавить задачу",
     task_edit_task: "Редактировать задачу",
     task_delete_task: "Удалить задачу",
+    task_change_status: "Изменить статус задачи",
     vac_add_tour: "Добавить тур",
     vac_edit_tour: "Редактировать тур",
     vac_delete_tour: "Удалить тур",
@@ -563,10 +566,14 @@ export const openPermissionsModal = async (targetUserId, targetUsername, lang = 
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) close();
   });
-  document.addEventListener("keydown", function esc(e) {
+  document.addEventListener("keydown", function keyHandlers(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      overlay.querySelector("#perm-save-btn")?.click();
+    }
     if (e.key === "Escape") {
       close();
-      document.removeEventListener("keydown", esc);
+      document.removeEventListener("keydown", keyHandlers);
     }
   });
 };

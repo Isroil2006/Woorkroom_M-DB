@@ -22,7 +22,8 @@ const navItemsData = [
       { key: "task_add_task", defaultValue: true, id: 100302 },
       { key: "task_edit_task", defaultValue: true, id: 100303 },
       { key: "task_delete_task", defaultValue: true, id: 100304 },
-      { key: "task_delete_project", defaultValue: true, id: 100305 }
+      { key: "task_delete_project", defaultValue: true, id: 100305 },
+      { key: "task_change_status", defaultValue: true, id: 100306 }
     ]
   },
   {

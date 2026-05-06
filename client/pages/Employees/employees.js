@@ -105,10 +105,16 @@ export const EmployeesPage = () => `
 
     <div class="modal" id="deleteConfirmModal" style="display:none;">
         <div class="modal-content delete-modal">
-            <h3>O'chirishni tasdiqlaysizmi?</h3>
+            <div class="todo-del-icon-wrap">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <h3 class="todo-del-title">O'chirish?</h3>
+            <p class="todo-del-desc">Ushbu xodimni ro'yxatdan o'chirib yubormoqchimisiz ?</p>
             <div class="delete-modal-actions modal-actions">
-                <button id="cancelDelete"  class="btn-cancel">Yo'q</button>
-                <button id="confirmDelete" class="btn-delete-confirm">Ha</button>
+                <button id="cancelDelete"  class="btn-cancel">Bekor qilish</button>
+                <button id="confirmDelete" class="btn-delete-confirm">O'chirish</button>
             </div>
         </div>
     </div>
@@ -166,6 +172,11 @@ export function initEmployeesPage() {
 
   // ── Render ────────────────────────────────────────────────────
   async function renderEmployees() {
+    list.innerHTML = `
+        <div style="display:flex; justify-content:center; align-items:center; padding:40px; width:100%;">
+            <div class="spinner" style="width:36px; height:36px;"></div>
+        </div>`;
+
     let users = [];
     try {
       const res = await fetch(`${API_URL}/api/users`, {
@@ -614,6 +625,7 @@ export function initEmployeesPage() {
     const uId = userToDelete.userId || userToDelete._id;
 
     try {
+      confirmDeleteBtn.classList.add("loading");
       const res = await fetch(`${API_URL}/api/users/${uId}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
@@ -638,8 +650,30 @@ export function initEmployeesPage() {
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      confirmDeleteBtn.classList.remove("loading");
     }
   };
+
+  // Global Key Listeners for Modals
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      // Check which modal is open
+      if (modal.style.display === "flex") {
+        e.preventDefault();
+        saveBtn.click();
+      } else if (deleteModal.style.display === "flex") {
+        e.preventDefault();
+        confirmDeleteBtn.click();
+      }
+    }
+    if (e.key === "Escape") {
+      modal.style.display = "none";
+      deleteModal.style.display = "none";
+      // Permissions modal is in another file, but we can try to close it if it exists
+      document.getElementById("perm-modal-overlay")?.remove();
+    }
+  });
 
   // ── Rows Per Page Dropdown Logic ──
   const rowsSelectorBtn = document.getElementById("rows-selector-btn");

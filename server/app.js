@@ -44,7 +44,7 @@ const swaggerOptions = {
           type: "object",
           properties: {
             _id: { type: "string" },
-            name: { type: "string" },
+            name: { type: "string", minLength: 3, maxLength: 20 },
             createdBy: { type: "string" },
           },
         },
@@ -52,8 +52,8 @@ const swaggerOptions = {
           type: "object",
           properties: {
             _id: { type: "string" },
-            title: { type: "string" },
-            status: { type: "string" },
+            title: { type: "string", minLength: 3, maxLength: 20 },
+            status: { type: "string", enum: ["todo", "progress", "done"] },
             projectId: { type: "string" },
           },
         },

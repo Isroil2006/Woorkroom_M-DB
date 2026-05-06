@@ -1,8 +1,9 @@
 import { API_URL as BASE_URL, getCurrentUser, getAuthHeaders } from "../../assets/js/api.js";
 import { createTaskAnalyticsBtn, initTaskAnalytics } from "./analytics.js";
 import { translations } from "./trasnslations.js";
-import { applyPermissions } from "../Employees/permission.js";
+import { applyPermissions, checkPermission, getPermissions } from "../Employees/permission.js";
 import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
+import { showNotification } from "../../components/Notification/notification.js";
 
 const t = createTranslationHelper(translations);
 
@@ -13,6 +14,7 @@ let projectsCache = null;
 let usersCache = null;
 let tasksCache = {}; // { projectId: [tasks] }
 let isFetchingProjects = false;
+let currentUserPermissions = null;
 
 const updateLocalTaskCache = (task, fallbackPid) => {
   const pid = task.project?._id || task.project || fallbackPid;
@@ -216,6 +218,9 @@ export const TodoPage = () => `
     </div>
   </div>
 
+  <div class="todo-project-tabs" id="todo-project-tabs"></div>
+
+
   <div class="todo-toolbar">
     <div class="todo-search-wrap">
       <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#aaa" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#aaa" stroke-width="2" stroke-linecap="round"/></svg>
@@ -233,7 +238,6 @@ export const TodoPage = () => `
     </button>
   </div>
 
-  <div class="todo-project-tabs" id="todo-project-tabs"></div>
 
   <div class="todo-content-area">
     <div class="todo-no-projects" id="todo-no-projects" style="display:none">
@@ -258,6 +262,7 @@ export const TodoPage = () => `
       <div class="todo-form-group">
         <label class="todo-form-label" id="lbl-task-name">Task Name</label>
         <input class="todo-form-input" id="tm-title" placeholder="Enter task title..." />
+        <span class="todo-form-error" id="tm-title-error"></span>
       </div>
       <div class="todo-form-group">
         <label class="todo-form-label" id="lbl-task-desc">Description</label>
@@ -377,6 +382,7 @@ export const TodoPage = () => `
       <div class="todo-form-group">
         <label class="todo-form-label" id="lbl-project-name">Project Name</label>
         <input class="todo-form-input" id="pm-name" placeholder="Enter project name..." />
+        <span class="todo-form-error" id="pm-name-error"></span>
       </div>
     </div>
     <div class="todo-modal-footer">
@@ -490,8 +496,23 @@ const renderView = async (forceRefresh = false) => {
   const container = document.getElementById("todo-view-container");
   if (!container) return;
 
-  const projects = (await fetchProjects(forceRefresh)) || [];
+  const cu = getCurrent();
+  if (cu) {
+    currentUserPermissions = await getPermissions(cu.userId || cu._id);
+  }
+
   showLoader();
+  
+  // Loyiha tablari uchun ham yuklanish holati
+  const tabsEl = $("todo-project-tabs");
+  if (tabsEl && (!projectsCache || forceRefresh)) {
+    tabsEl.innerHTML = `
+      <div class="todo-tabs-loader">
+        <div class="todo-spinner" style="width:18px; height:18px; border-width:2px;"></div>
+      </div>`;
+  }
+
+  const projects = (await fetchProjects(forceRefresh)) || [];
 
   if (projects.length > 0) {
     if (!currentProjectId || !projects.find((p) => p._id === currentProjectId)) {
@@ -537,8 +558,9 @@ const renderView = async (forceRefresh = false) => {
   if (currentView === "list") renderListView(tasks);
   else renderBoardView(tasks);
 
-  const cu = getCurrent();
-  if (cu) applyPermissions(cu.userId || cu._id);
+  if (cu) {
+    applyPermissions(cu.userId || cu._id);
+  }
 };
 
 // ─── LIST VIEW ────────────────────────────────────────────────
@@ -590,6 +612,7 @@ const renderListRow = (task) => {
   const canDel = owner;
   const myStatus = getVisibleStatus(task);
   const myDone = myStatus === "done";
+  const canChangeStatus = checkPermission(currentUserPermissions, "task_change_status");
 
   return `
     <div class="todo-list-row todo-row-clickable" data-tid="${task._id}">
@@ -635,6 +658,7 @@ const attachListEvents = (container) => {
       if (icon) icon.style.transform = hidden ? "rotate(0deg)" : "rotate(-90deg)";
     });
   });
+
   container.querySelectorAll(".todo-add-in-section").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -717,9 +741,10 @@ const renderBoardCard = (task) => {
   const owner = isOwner(task);
   const myStatus = getVisibleStatus(task);
   const myDone = myStatus === "done";
+  const canChangeStatus = checkPermission(currentUserPermissions, "task_change_status");
 
   return `
-    <div class="todo-board-card" draggable="true" data-tid="${task._id}">
+    <div class="todo-board-card" draggable="${canChangeStatus ? "true" : "false"}" data-tid="${task._id}">
       <div class="todo-card-top">
         <button class="todo-check-btn ${myDone ? "checked" : ""}" data-tid="${task._id}" data-action="check">
           ${myDone ? `<svg width="10" height="10" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/></svg>` : ""}
@@ -794,6 +819,13 @@ const initDragDrop = () => {
 
       const cu = getCurrent();
       if (!cu) return;
+
+      if (!checkPermission(currentUserPermissions, "task_change_status")) {
+        showNotification(t("error_no_permission"), "error");
+        renderView(true);
+        return;
+      }
+
       const cuId = String(cu.userId || cu._id || "");
 
       try {
@@ -823,9 +855,11 @@ const initDragDrop = () => {
           })
           .then((updated) => {
             updateLocalTaskCache(updated);
+            showNotification(t("task_updated") || "Task updated", "success");
           })
           .catch((err) => {
             console.error("Drop error:", err);
+            showNotification(t("error_updating_task") || "Error updating task", "error");
             renderView(true); // Xato bo'lsa serverdan qayta tiklash
           });
       } catch (err) {
@@ -863,6 +897,11 @@ const toggleDone = async (tid) => {
   const cuId = cu.userId || cu._id;
   const ids = (task.assignees || []).map((u) => u._id || u);
 
+  if (!checkPermission(currentUserPermissions, "task_change_status")) {
+    showNotification(t("error_no_permission"), "error");
+    return;
+  }
+
   if (ids.length === 0 || ids.includes(cuId) || isOwner(task)) {
     const nextStatus = task.status === "done" ? "todo" : "done";
     body = { status: nextStatus };
@@ -885,9 +924,11 @@ const toggleDone = async (tid) => {
     })
     .then((updated) => {
       updateLocalTaskCache(updated, currentProjectId);
+      showNotification(t("status_updated") || "Status updated", "success");
     })
     .catch((err) => {
       console.error("Toggle error:", err);
+      showNotification(t("error_updating_status") || "Error updating status", "error");
       renderView(true);
     });
 };
@@ -909,7 +950,10 @@ const deleteTask = (tid) => {
       credentials: "include",
     });
     if (res.ok) {
+      showNotification(t("task_deleted") || "Task deleted", "success");
       await renderView(true);
+    } else {
+      showNotification(t("error_deleting_task") || "Error deleting task", "error");
     }
   });
 };
@@ -942,7 +986,7 @@ const openTaskModal = async (taskId, defaultStatus = "todo") => {
         <option value="urgent">${t("priority_urgent")}</option>`;
 
   // Init selected assignees
-  selectedAssignees = (task?.assignees || []).map(u => u._id || u);
+  selectedAssignees = (task?.assignees || []).map((u) => u._id || u);
   renderAssigneePicker();
 
   $("tm-title").value = task?.title || "";
@@ -953,20 +997,44 @@ const openTaskModal = async (taskId, defaultStatus = "todo") => {
 
   $("tm-title").placeholder = t("task_title_placeholder");
   $("tm-desc").placeholder = t("task_desc_placeholder");
+
+  // Clear error states
+  $("tm-title").classList.remove("error");
+  $("tm-title-error").classList.remove("visible");
+  $("tm-title-error").textContent = "";
+
   $("task-modal").style.display = "flex";
   setTimeout(() => $("tm-title").focus(), 100);
 };
 
 const saveTask = async () => {
-  const title = $("tm-title").value.trim();
-  if (!title) {
-    $("tm-title").style.borderColor = "#ef4444";
+  const titleInput = $("tm-title");
+  const titleError = $("tm-title-error");
+  const title = titleInput.value.trim();
+
+  // Reset error state
+  titleInput.classList.remove("error");
+  titleError.classList.remove("visible");
+  titleError.textContent = "";
+
+  if (title.length < 3) {
+    titleInput.classList.add("error");
+    titleError.textContent = t("error_min_length_3") || "Kamida 3 ta belgi bo'lishi kerak";
+    titleError.classList.add("visible");
+    titleInput.focus();
     return;
   }
-  $("tm-title").style.borderColor = "";
+  if (title.length > 20) {
+    titleInput.classList.add("error");
+    titleError.textContent = t("error_max_length_20") || "Maksimal 20 ta belgi bo'lishi kerak";
+    titleError.classList.add("visible");
+    titleInput.focus();
+    return;
+  }
 
   const cu = getCurrent();
   const cuId = cu?.userId || cu?._id;
+  const saveBtn = $("task-modal-save");
 
   const data = {
     title,
@@ -979,26 +1047,38 @@ const saveTask = async () => {
     createdBy: cu?._id || cu?.userId,
   };
 
-  let res;
-  if (editingTaskId) {
-    res = await fetch(`${API_URL}/${editingTaskId}`, {
-      method: "PUT",
-      headers: getAuthHeaders(),
-      credentials: "include",
-      body: JSON.stringify(data),
-    });
-  } else {
-    res = await fetch(`${API_URL}`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      credentials: "include",
-      body: JSON.stringify(data),
-    });
-  }
+  saveBtn.classList.add("loading");
 
-  if (res.ok) {
-    $("task-modal").style.display = "none";
-    await renderView(true);
+  let res;
+  try {
+    if (editingTaskId) {
+      res = await fetch(`${API_URL}/${editingTaskId}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+    } else {
+      res = await fetch(`${API_URL}`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+    }
+
+    if (res.ok) {
+      $("task-modal").style.display = "none";
+      showNotification(editingTaskId ? t("task_updated") || "Task updated" : t("task_created") || "Task created", "success");
+      await renderView(true);
+    } else {
+      showNotification(t("error_saving_task") || "Error saving task", "error");
+    }
+  } catch (err) {
+    console.error("Save task error:", err);
+    showNotification(t("error_saving_task") || "Error saving task", "error");
+  } finally {
+    saveBtn.classList.remove("loading");
   }
 };
 
@@ -1168,6 +1248,37 @@ export const initTodoLogic = async () => {
     renderView();
   });
 
+  // Clear errors on input
+  $("pm-name")?.addEventListener("input", () => {
+    $("pm-name").classList.remove("error");
+    $("pm-name-error").classList.remove("visible");
+  });
+  $("tm-title")?.addEventListener("input", () => {
+    $("tm-title").classList.remove("error");
+    $("tm-title-error").classList.remove("visible");
+  });
+
+  // Enter key support
+  $("pm-name")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      $("project-modal-save")?.click();
+    }
+  });
+  $("tm-title")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      $("task-modal-save")?.click();
+    }
+  });
+  $("tm-desc")?.addEventListener("keydown", (e) => {
+    // Description textarea'da Ctrl+Enter or Cmd+Enter bilan yuborish
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      $("task-modal-save")?.click();
+    }
+  });
+
   // Create task
   $("todo-create-task-btn")?.addEventListener("click", () => {
     if (!currentProjectId) {
@@ -1193,7 +1304,10 @@ export const initTodoLogic = async () => {
           projectsCache = projectsCache.filter((p) => p._id !== currentProjectId);
         }
         currentProjectId = null;
+        showNotification(t("project_deleted") || "Project deleted", "success");
         await renderView(true); // Faqat bir marta shu yerda chaqiramiz
+      } else {
+        showNotification(t("error_deleting_project") || "Error deleting project", "error");
       }
     });
   });
@@ -1202,40 +1316,76 @@ export const initTodoLogic = async () => {
   $("todo-add-project-btn")?.addEventListener("click", () => {
     $("pm-name").value = "";
     $("pm-name").placeholder = t("project_name_placeholder");
+
+    // Clear error states
+    $("pm-name").classList.remove("error");
+    $("pm-name-error").classList.remove("visible");
+    $("pm-name-error").textContent = "";
+
     $("project-modal").style.display = "flex";
     setTimeout(() => $("pm-name").focus(), 100);
   });
 
   $("project-modal-save")?.addEventListener("click", async () => {
-    const name = $("pm-name").value.trim();
-    if (!name) {
-      $("pm-name").style.borderColor = "#ef4444";
+    const nameInput = $("pm-name");
+    const nameError = $("pm-name-error");
+    const name = nameInput.value.trim();
+
+    // Reset error state
+    nameInput.classList.remove("error");
+    nameError.classList.remove("visible");
+    nameError.textContent = "";
+
+    if (name.length < 3) {
+      nameInput.classList.add("error");
+      nameError.textContent = t("error_min_length_3") || "Kamida 3 ta belgi bo'lishi kerak";
+      nameError.classList.add("visible");
+      nameInput.focus();
       return;
     }
-    $("pm-name").style.borderColor = "";
+    if (name.length > 20) {
+      nameInput.classList.add("error");
+      nameError.textContent = t("error_max_length_20") || "Maksimal 20 ta belgi bo'lishi kerak";
+      nameError.classList.add("visible");
+      nameInput.focus();
+      return;
+    }
 
     const cu = getCurrent();
-    const res = await fetch(`${API_URL}/projects`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      credentials: "include",
-      body: JSON.stringify({ name, createdBy: cu?._id || cu?.userId }),
-    });
+    const saveBtn = $("project-modal-save");
+    saveBtn.classList.add("loading");
 
-    if (res.ok) {
-      const newProj = await res.json();
-      $("project-modal").style.display = "none";
-      $("pm-name").value = "";
+    try {
+      const res = await fetch(`${API_URL}/projects`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify({ name, createdBy: cu?._id || cu?.userId }),
+      });
 
-      // Loyihalar keshini qo'lda yangilaymiz (serverdan qayta so'ramaslik uchun)
-      if (projectsCache) {
-        projectsCache.push(newProj);
+      if (res.ok) {
+        const newProj = await res.json();
+        $("project-modal").style.display = "none";
+        $("pm-name").value = "";
+
+        // Loyihalar keshini qo'lda yangilaymiz (serverdan qayta so'ramaslik uchun)
+        if (projectsCache) {
+          projectsCache.push(newProj);
+        } else {
+          projectsCache = [newProj];
+        }
+
+        currentProjectId = newProj._id;
+        showNotification(t("project_created") || "Project created", "success");
+        await renderView(); // renderView(true) emas, oddiy renderView chaqiramiz
       } else {
-        projectsCache = [newProj];
+        showNotification(t("error_creating_project") || "Error creating project", "error");
       }
-
-      currentProjectId = newProj._id;
-      await renderView(); // renderView(true) emas, oddiy renderView chaqiramiz
+    } catch (err) {
+      console.error("Create project error:", err);
+      showNotification(t("error_creating_project") || "Error creating project", "error");
+    } finally {
+      saveBtn.classList.remove("loading");
     }
   });
 
@@ -1256,9 +1406,15 @@ export const initTodoLogic = async () => {
   // Delete modal
   $("del-modal-confirm").addEventListener("click", async () => {
     if (deleteCallback) {
-      await deleteCallback();
-      deleteCallback = null;
-      $("todo-del-modal").style.display = "none";
+      const btn = $("del-modal-confirm");
+      btn.classList.add("loading");
+      try {
+        await deleteCallback();
+        deleteCallback = null;
+        $("todo-del-modal").style.display = "none";
+      } finally {
+        btn.classList.remove("loading");
+      }
     }
   });
 
@@ -1271,6 +1427,25 @@ export const initTodoLogic = async () => {
     setTimeout(() => $("pm-name").focus(), 100);
   });
   $("del-modal-cancel")?.addEventListener("click", () => ($("todo-del-modal").style.display = "none"));
+
+  // Global Enter key for delete modal
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      const delModal = $("todo-del-modal");
+      if (delModal && delModal.style.display === "flex") {
+        e.preventDefault();
+        $("del-modal-confirm")?.click();
+      }
+    }
+    if (e.key === "Escape") {
+      // Escape orqali modallarni yopish
+      $("task-modal").style.display = "none";
+      $("project-modal").style.display = "none";
+      $("todo-del-modal").style.display = "none";
+      $("task-detail-modal").style.display = "none";
+      $("no-project-modal").style.display = "none";
+    }
+  });
 
   initTaskAnalytics(lang);
 };

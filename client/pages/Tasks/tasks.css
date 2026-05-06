@@ -82,8 +82,8 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    background: #eef0fd;
-    color: #5b6ef5;
+    background: #5b6ef5;
+    color: #eef0fd;
     border: none;
     border-radius: 10px;
     padding: 8px 16px;
@@ -92,9 +92,11 @@
     cursor: pointer;
     transition: all 0.2s;
     font-family: inherit;
+    box-shadow: 0 2px 10px rgba(91, 110, 245, 0.3);
 }
 .todo-add-project-btn:hover {
-    background: #dde1fb;
+     background: #4a5de4;
+    transform: translateY(-1px);
 }
 
 /* ── TOOLBAR ── */
@@ -108,23 +110,47 @@
 .todo-search-wrap {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0;
     background: #fff;
     border-radius: 10px;
-    padding: 9px 14px;
+    padding: 9px 12px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    min-width: 200px;
-    flex: 1;
+    width: 40px;
+    min-width: 40px;
     max-width: 280px;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    cursor: pointer;
 }
+
+.todo-search-wrap:hover,
+.todo-search-wrap:focus-within {
+    width: 240px;
+    gap: 8px;
+    padding: 9px 14px;
+}
+
+.todo-search-wrap svg {
+    flex-shrink: 0;
+    color: #8892a4;
+}
+
 .todo-search-wrap input {
     border: none;
     outline: none;
     font-size: 13px;
     background: transparent;
-    width: 100%;
+    width: 0;
+    opacity: 0;
     color: #1a1d2e;
     font-family: inherit;
+    transition: opacity 0.2s, width 0.3s;
+}
+
+.todo-search-wrap:hover input,
+.todo-search-wrap:focus-within input {
+    width: 100%;
+    opacity: 1;
 }
 .todo-filters {
     display: flex;
@@ -198,6 +224,7 @@
     transition: all 0.2s;
     box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
     border: 2px solid transparent;
+    margin-top: 30px;
 }
 .todo-project-tab.active {
     border-color: #5b6ef5;
@@ -809,7 +836,7 @@
     background: #fff;
     border-radius: 20px;
     width: 100%;
-    max-width: 500px;
+    max-width: 520px;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
     animation: todoPopIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
     overflow: hidden;
@@ -860,7 +887,7 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
-    max-height: 60vh;
+    max-height: 65vh;
     overflow-y: auto;
 }
 .todo-modal-footer {
@@ -902,6 +929,20 @@
 }
 .todo-form-input:focus {
     border-color: #5b6ef5;
+}
+.todo-form-input.error {
+    border-color: #ef4444;
+}
+.todo-form-error {
+    font-size: 11px;
+    font-weight: 600;
+    color: transparent;
+    margin-top: 2px;
+    height: 14px;
+    transition: color 0.2s;
+}
+.todo-form-error.visible {
+    color: #ef4444;
 }
 
 /* delete modal */
@@ -980,6 +1021,33 @@
 }
 .todo-btn-danger:hover {
     background: #dc2626;
+}
+
+/* ── BUTTON LOADING STATE ── */
+.todo-btn-primary.loading,
+.todo-btn-danger.loading {
+    position: relative;
+    color: transparent !important;
+    pointer-events: none;
+    opacity: 0.8;
+}
+.todo-btn-primary.loading::after,
+.todo-btn-danger.loading::after {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    top: 50%;
+    left: 50%;
+    margin-top: -9px;
+    margin-left: -9px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: todo-spin 0.6s linear infinite;
+}
+@keyframes todo-spin {
+    to { transform: rotate(360deg); }
 }
 
 /* ══════════════════════════════════════════════
@@ -1313,4 +1381,10 @@
 @keyframes todo-spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+.todo-tabs-loader {
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    height: 40px;
 }
