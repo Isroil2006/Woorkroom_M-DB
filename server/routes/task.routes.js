@@ -64,7 +64,56 @@ router.get("/projects", auth, checkPermission(), taskController.getProjects);
  *         description: Loyiha yaratish uchun ruxsat yo'q
  */
 router.post("/projects", auth, checkPermission(), taskController.createProject);
+/**
+ * @swagger
+ * /api/tasks/projects/{id}:
+ *   put:
+ *     summary: Loyihani tahrirlash
+ *     tags: [Tasks]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Project'
+ *     responses:
+ *       200:
+ *         description: Loyiha yangilandi
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Project'
+ */
 router.put("/projects/:id", auth, checkPermission(), taskController.updateProject);
+
+/**
+ * @swagger
+ * /api/tasks/projects/{projectId}/history:
+ *   get:
+ *     summary: Loyiha tarixini olish
+ *     tags: [Tasks]
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Loyiha tarixi muvaffaqiyatli olingan
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ */
 router.get("/projects/:projectId/history", auth, checkPermission(), taskController.getProjectHistory);
 
 /**
@@ -170,7 +219,28 @@ router.put("/:id", auth, checkPermission(), taskController.updateTask);
  */
 router.delete("/:id", auth, checkPermission(), taskController.deleteTask);
 
-// Task history
+/**
+ * @swagger
+ * /api/tasks/{id}/history:
+ *   get:
+ *     summary: Vazifa tarixini olish
+ *     tags: [Tasks]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Vazifa tarixi
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ */
 router.get("/:id/history", auth, checkPermission(), taskController.getTaskHistory);
 
 /**
@@ -191,7 +261,32 @@ router.get("/:id/history", auth, checkPermission(), taskController.getTaskHistor
  */
 router.patch("/:id/toggle-user-done", auth, checkPermission(), taskController.toggleUserDone);
 
-// Status update (used by todo-check-btn or similar logic)
+/**
+ * @swagger
+ * /api/tasks/{id}/status:
+ *   patch:
+ *     summary: Vazifa statusini o'zgartirish
+ *     tags: [Tasks]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [todo, progress, done]
+ *     responses:
+ *       200:
+ *         description: Vazifa statusi yangilandi
+ */
 router.patch("/:id/status", auth, checkPermission(), taskController.updateTask);
 
 

@@ -4,6 +4,22 @@ const permissionController = require("../controllers/permission.controller");
 const auth = require("../middleware/auth.middleware");
 const checkPermission = require("../middleware/permission.middleware");
 
+/**
+ * @swagger
+ * /api/permissions/nav-items:
+ *   get:
+ *     summary: Foydalanuvchiga ruxsat etilgan navigatsiya elementlarini olish
+ *     tags: [Permissions]
+ *     responses:
+ *       200:
+ *         description: Navigatsiya elementlari ro'yxati
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ */
 router.get("/nav-items", auth, permissionController.getNavItems);
 
 /**

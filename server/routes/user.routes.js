@@ -102,6 +102,12 @@ router.get("/me", auth, userController.getMe);
  *     responses:
  *       200:
  *         description: Foydalanuvchilar ro'yxati
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/User'
  */
 router.get("/search", auth, userController.searchUsers);
 router.get("/", auth, checkPermission(), userController.getAllUsers);
@@ -121,6 +127,10 @@ router.get("/", auth, checkPermission(), userController.getAllUsers);
  *     responses:
  *       200:
  *         description: Foydalanuvchi ma'lumotlari
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
  */
 router.get("/:id", auth, checkPermission(), userController.getUserById);
 
@@ -140,7 +150,7 @@ router.get("/:id", auth, checkPermission(), userController.getUserById);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
+ *             $ref: '#/components/schemas/User'
  *     responses:
  *       200:
  *         description: Yangilangan ma'lumotlar

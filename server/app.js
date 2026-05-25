@@ -33,30 +33,59 @@ const swaggerOptions = {
       schemas: {
         User: {
           type: "object",
+          required: ["username", "email", "password"],
           properties: {
-            userId: { type: "string" },
-            username: { type: "string" },
-            email: { type: "string" },
-            position: { type: "string" },
+            userId: { type: "string", description: "Mongoose ObjectId" },
+            username: { type: "string", minLength: 3, maxLength: 50, example: "ali_valiyev" },
+            email: { type: "string", format: "email", example: "ali@example.com" },
+            password: { type: "string", minLength: 6, example: "secret123" },
+            tel: { type: "string", pattern: "^\\+?\\d{9,15}$", example: "+998901234567" },
+            position: { type: "string", example: "Developer" },
+            role: { type: "string", enum: ["user", "admin"], default: "user" }
           },
         },
         Project: {
           type: "object",
+          required: ["name"],
           properties: {
-            _id: { type: "string" },
-            name: { type: "string", minLength: 3, maxLength: 20 },
-            createdBy: { type: "string" },
+            _id: { type: "string", description: "Loyiha ID" },
+            name: { type: "string", minLength: 3, maxLength: 100, example: "Yangi loyiha" },
+            description: { type: "string", example: "Loyiha haqida ma'lumot" },
+            createdBy: { type: "string", description: "Yaratuvchi foydalanuvchi ID" },
+            members: { type: "array", items: { type: "string" }, description: "A'zolar ID lari ro'yxati" },
+            createdAt: { type: "string", format: "date-time" }
           },
         },
         Task: {
           type: "object",
+          required: ["title", "projectId"],
           properties: {
-            _id: { type: "string" },
-            title: { type: "string", minLength: 3, maxLength: 20 },
-            status: { type: "string", enum: ["todo", "progress", "done"] },
-            projectId: { type: "string" },
+            _id: { type: "string", description: "Vazifa ID" },
+            title: { type: "string", minLength: 3, maxLength: 200, example: "Fayl yuklash API sini qilish" },
+            description: { type: "string", example: "Barcha fayllar S3 ga yuklanishi kerak" },
+            status: { type: "string", enum: ["todo", "progress", "done"], default: "todo" },
+            projectId: { type: "string", description: "Tegishli loyiha ID" },
+            assignees: { type: "array", items: { type: "string" }, description: "Biriktirilgan foydalanuvchilar" },
+            estimatedTime: { type: "number", minimum: 0, example: 5 },
+            createdAt: { type: "string", format: "date-time" }
           },
         },
+        Permission: {
+          type: "object",
+          required: ["module", "apis"],
+          properties: {
+            module: { type: "string", example: "Tasks" },
+            apis: { type: "array", items: { type: "number" }, example: [101, 102, 103] }
+          }
+        },
+        File: {
+          type: "object",
+          required: ["userId", "fileData"],
+          properties: {
+            userId: { type: "string", description: "Rasm tegishli bo'lgan foydalanuvchi" },
+            fileData: { type: "string", description: "Base64 string yoki rasm URL'i" }
+          }
+        }
       },
     },
     security: [

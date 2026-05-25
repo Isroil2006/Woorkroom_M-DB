@@ -134,17 +134,18 @@ const getVisibleStatus = (task) => {
   const cu = getCurrent();
   const cuId = String(cu?.userId || cu?._id || "");
   const isAuthor = String(task.createdBy?._id || task.createdBy || "") === cuId;
+  const isAssignee = (task.assignees || []).some(a => String(a._id || a) === cuId);
 
-  // Yaratuvchi (Author) uchun: Faqat hamma bitirgandagina Done ko'rinadi
-  if (isAuthor) {
-    return task.status || "todo";
+  // Ijrochi (Assignee) uchun: Faqat o'zining shaxsiy statusini ko'radi
+  if (isAssignee) {
+    if (task.userStatus && task.userStatus[cuId]) {
+      return task.userStatus[cuId];
+    }
+    // Hali boshlamagan bo'lsa
+    return "todo";
   }
 
-  // Ijrochi (Assignee) uchun: O'zi bitirgan bo'lsa Done ko'radi
-  if (task.userStatus && task.userStatus[cuId] === "done") {
-    return "done";
-  }
-
+  // Yaratuvchi (Author) yoki Boshqa kuzatuvchilar uchun: Global status ko'rinadi
   return task.status || "todo";
 };
 

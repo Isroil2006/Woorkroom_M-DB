@@ -303,13 +303,18 @@ exports.updateTask = async (req, res) => {
         task.markModified("userStatus");
         delete req.body.status; // Global statusni o'zgartirmaslik uchun
         
-        // Agar barcha ijrochilar done qilgan bo'lsa, global statusni done qilamiz
+        // Yangi global statusni hisoblaymiz
         const allDone = task.assignees.every(aId => task.userStatus.get(String(aId)) === "done");
+        const anyProgressOrDone = task.assignees.some(aId => ["progress", "done"].includes(task.userStatus.get(String(aId))));
+
         if (allDone) {
           task.status = "done";
           updatedGlobalStatus = true;
-        } else if (oldStatus === "done") {
+        } else if (anyProgressOrDone) {
           task.status = "progress";
+          updatedGlobalStatus = true;
+        } else {
+          task.status = "todo";
           updatedGlobalStatus = true;
         }
       } else {
@@ -420,13 +425,16 @@ exports.toggleUserDone = async (req, res) => {
     task.userStatus.set(userId, nextStatus);
     task.markModified("userStatus");
 
-    // Agar hamma assignees "done" bo'lsa, task statusini "done" ga o'tkazamiz
+    // Hamma assignees statusiga qarab global statusni yangilash
     const allDone = task.assignees.every(aId => task.userStatus.get(String(aId)) === "done");
+    const anyProgressOrDone = task.assignees.some(aId => ["progress", "done"].includes(task.userStatus.get(String(aId))));
+
     if (allDone) {
       task.status = "done";
-    } else if (task.status === "done") {
-      // Agar kimdir "done" dan qaytsa, statusni "progress" ga qaytaramiz
+    } else if (anyProgressOrDone) {
       task.status = "progress";
+    } else {
+      task.status = "todo";
     }
 
     const updated = await task.save();
