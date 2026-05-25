@@ -188,7 +188,7 @@ const applyProjectPermissions = () => {
   const role = getProjectRole();
   const isAdmin = role === "admin";
   const isMember = role === "member";
-  const canCreate = isAdmin || isMember;
+  const canCreate = isAdmin;
   const isViewer = role === "viewer" || role === "none";
 
   // Header buttons
@@ -202,11 +202,6 @@ const applyProjectPermissions = () => {
   // Row actions (Edit/Delete - usually for admins or owners)
   document.querySelectorAll("[data-action='edit'], [data-action='del']").forEach((btn) => {
     btn.style.display = isAdmin ? "flex" : "none";
-  });
-
-  // Checkbox and Dragging (Admins and Members)
-  document.querySelectorAll("[data-action='check']").forEach((btn) => {
-    btn.style.display = canCreate ? "flex" : "none";
   });
 
   // Section buttons
@@ -279,6 +274,33 @@ const dueDateHtml = (dateStr) => {
 };
 
 // ─── PAGE HTML ────────────────────────────────────────────────
+const initMemberRoleTabs = (container) => {
+  if (!container) return;
+  const roleGroups = container.querySelectorAll(".member-role-tabs");
+  roleGroups.forEach(group => {
+    const uid = group.dataset.uid;
+    const tabs = group.querySelectorAll(".role-tab");
+    tabs.forEach(tab => {
+      tab.onclick = () => {
+        tabs.forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        const newRole = tab.dataset.value;
+        const memberIdx = selectedProjectMembers.findIndex(m => {
+          const mId = typeof m === "string" ? m : (m.user?._id || m.user);
+          return String(mId) === String(uid);
+        });
+        if (memberIdx !== -1) {
+          if (typeof selectedProjectMembers[memberIdx] === "string") {
+            selectedProjectMembers[memberIdx] = { user: selectedProjectMembers[memberIdx], role: newRole };
+          } else {
+            selectedProjectMembers[memberIdx].role = newRole;
+          }
+        }
+      };
+    });
+  });
+};
+
 const renderProjectMembersList = async (targetId = "project-members-list") => {
   const listEl = $(targetId);
   if (!listEl) return;
@@ -333,7 +355,7 @@ const renderProjectMembersList = async (targetId = "project-members-list") => {
 
 const fetchProjectHistory = async (projectId) => {
   try {
-    const res = await fetch(`${BASE_URL}/api/projects/${projectId}/history`, {
+    const res = await fetch(`${BASE_URL}/api/tasks/projects/${projectId}/history`, {
       headers: getAuthHeaders(),
       credentials: "include"
     });
@@ -346,13 +368,28 @@ const fetchProjectHistory = async (projectId) => {
   return [];
 };
 
+const fetchTaskHistory = async (taskId) => {
+  try {
+    const res = await fetch(`${BASE_URL}/api/tasks/${taskId}/history`, {
+      headers: getAuthHeaders(),
+      credentials: "include"
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error("Error fetching task history:", err);
+  }
+  return [];
+};
+
 const renderProjectOverviewView = async () => {
   const container = $("todo-view-container");
   const proj = projectsCache.find((p) => p._id === currentProjectId);
   if (!proj) return;
 
   const cu = getCurrent();
-  const isAdmin = getProjectRole() === "admin" || checkPermission(currentUserPermissions, "project_edit_project");
+  const isAdmin = getProjectRole() === "admin";
 
   selectedProjectMembers = proj.members ? [...proj.members] : [];
 
@@ -693,7 +730,7 @@ const renderProjectOverviewView = async () => {
         saveBtn.classList.add("loading");
 
         try {
-          const res = await fetch(`${BASE_URL}/api/projects/${currentProjectId}`, {
+          const res = await fetch(`${BASE_URL}/api/tasks/projects/${currentProjectId}`, {
             method: "PUT",
             headers: getAuthHeaders(),
             credentials: "include",
@@ -701,7 +738,7 @@ const renderProjectOverviewView = async () => {
               name: newName,
               members: selectedProjectMembers.map((m) => {
                 if (typeof m === "string") return { user: m, role: "viewer" };
-                return m;
+                return { user: (m.user && m.user._id) ? m.user._id : m.user, role: m.role || "viewer" };
               }),
               isPublic: $("settings-public-toggle").checked,
             }),
@@ -713,6 +750,9 @@ const renderProjectOverviewView = async () => {
             showNotification("Muvaffaqiyatli saqlandi", "success");
             viewMode = "tasks";
             renderView();
+          } else {
+            const errData = await res.json();
+            showNotification(errData.message || "Saqlashda xatolik", "error");
           }
         } catch (e) {
           showNotification("Xatolik yuz berdi", "error");
@@ -1546,17 +1586,23 @@ const renderListRow = (task) => {
   const canDel = owner;
   const myStatus = getVisibleStatus(task);
   const myDone = myStatus === "done";
+  
+  const role = getProjectRole();
+  const cu = getCurrent();
+  const cuId = cu?.userId || cu?._id;
+  const isAssignee = task.assignees && task.assignees.some((a) => String(a._id || a) === String(cuId));
+  const canChangeStatus = role === "admin" || (role === "member" && isAssignee);
 
   return `
     <div class="todo-list-row todo-row-clickable" data-tid="${task._id}">
       <div class="todo-row-name-cell">
-        <button class="todo-check-btn ${myDone ? "checked" : ""}" data-tid="${task._id}" data-action="check">
+        <button class="todo-check-btn ${myDone ? "checked" : ""}" data-tid="${task._id}" data-action="check" style="${canChangeStatus ? "" : "display:none;"}">
           ${myDone ? `<svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/></svg>` : ""}
         </button>
         <span class="todo-row-title ${myDone ? "done-text" : ""}">${task.title}</span>
       </div>
       <div class="todo-row-center-cell">
-        <div class="todo-list-status-custom-select s-${myStatus}" data-tid="${task._id}" data-action="change-status-custom">
+        <div class="todo-list-status-custom-select s-${myStatus} ${canChangeStatus ? "" : "disabled"}" data-tid="${task._id}" data-action="change-status-custom" style="${canChangeStatus ? "" : "pointer-events:none;"}">
           <div class="status-selected">
             <span>${myStatus === "todo" ? t("status_todo") : myStatus === "progress" ? t("status_progress") : t("status_done")}</span>
             <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -1659,7 +1705,14 @@ const attachListEvents = (container) => {
         if (!taskId || !nextStatus) return;
 
         const role = getProjectRole();
-        if (role === "viewer" || !checkPermission(currentUserPermissions, "task_change_status")) {
+        
+        const tasks = tasksCache[currentProjectId] || [];
+        const task = tasks.find((t) => String(t._id) === String(taskId));
+        const cu = getCurrent();
+        const cuId = cu?.userId || cu?._id;
+        const isAssignee = task && task.assignees && task.assignees.some((a) => String(a._id || a) === String(cuId));
+
+        if (role === "viewer" || (role === "member" && !isAssignee)) {
           showNotification(t("error_no_permission"), "error");
           renderView(true);
           return;
@@ -1771,12 +1824,17 @@ const renderBoardCard = (task) => {
   const owner = isOwner(task);
   const myStatus = getVisibleStatus(task);
   const myDone = myStatus === "done";
-  const canChangeStatus = checkPermission(currentUserPermissions, "task_change_status");
+  
+  const role = getProjectRole();
+  const cu = getCurrent();
+  const cuId = cu?.userId || cu?._id;
+  const isAssignee = task.assignees && task.assignees.some((a) => String(a._id || a) === String(cuId));
+  const canChangeStatus = role === "admin" || (role === "member" && isAssignee);
 
   return `
     <div class="todo-board-card" draggable="${canChangeStatus ? "true" : "false"}" data-tid="${task._id}">
       <div class="todo-card-top">
-        <button class="todo-check-btn ${myDone ? "checked" : ""}" data-tid="${task._id}" data-action="check">
+        <button class="todo-check-btn ${myDone ? "checked" : ""}" data-tid="${task._id}" data-action="check" style="${canChangeStatus ? "" : "display:none;"}">
           ${myDone ? `<svg width="10" height="10" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/></svg>` : ""}
         </button>
         <span class="todo-card-title ${myDone ? "done-text" : ""}">${task.title}</span>
@@ -1850,7 +1908,13 @@ const initDragDrop = () => {
       if (!cu) return;
 
       const role = getProjectRole();
-      if (role === "viewer" || !checkPermission(currentUserPermissions, "task_change_status")) {
+      const cuId = cu?.userId || cu?._id;
+      
+      const tasksObj = tasksCache[currentProjectId] || [];
+      const draggedTask = tasksObj.find((t) => String(t._id) === String(taskId));
+      const isAssignee = draggedTask && draggedTask.assignees && draggedTask.assignees.some((a) => String(a._id || a) === String(cuId));
+
+      if (role === "viewer" || (role === "member" && !isAssignee)) {
         showNotification(t("error_no_permission"), "error");
         renderView(true);
         return;
@@ -1940,7 +2004,12 @@ const toggleDone = (tid) => {
 
   const cu = getCurrent();
   const cuId = cu?.userId || cu?._id;
-  const isAssignee = task.assignees.some((a) => String(a._id || a) === String(cuId));
+  const isAssignee = task.assignees && task.assignees.some((a) => String(a._id || a) === String(cuId));
+
+  if (role === "member" && !isAssignee) {
+    showNotification(t("error_no_permission"), "error");
+    return;
+  }
 
   // Agar user assignee bo'lsa, /toggle-user-done chaqiramiz
   // Aks holda (Admin/Owner) statusni global o'zgartiradi
@@ -2287,6 +2356,14 @@ const renderTaskHistoryView = async () => {
 const renderTaskDetailView = async () => {
   const container = $("todo-view-container");
   if (!container) return;
+
+  container.innerHTML = `
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; min-height: 400px; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;">
+      <div style="width: 36px; height: 36px; border: 3px solid #e2e8f0; border-top-color: #5b6ef5; border-radius: 50%; animation: cal-spin 0.8s linear infinite;"></div>
+      <style>@keyframes cal-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+    </div>
+  `;
+
 
   const allTasks = await fetchTasks(currentProjectId);
   const task = allTasks.find((t) => t._id === activeDetailTaskId);

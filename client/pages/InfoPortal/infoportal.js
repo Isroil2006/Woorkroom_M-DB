@@ -294,14 +294,14 @@ export const InfoPortalPage = () => `
             <h1 class="cal-title">${t("title")}</h1>
             <div class="cal-view-dropdown" id="cal-view-dropdown">
                 <button class="cal-view-btn" id="cal-view-btn">
-                    <span id="cal-view-label">${t("month")}</span>
+                    <span id="cal-view-label">${t(currentView)}</span>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 <div class="cal-view-menu" id="cal-view-menu">
-                    <button class="cal-view-option active" data-view="month">${t("month")}</button>
-                    <button class="cal-view-option" data-view="week">${t("week")}</button>
-                    <button class="cal-view-option" data-view="day">${t("day")}</button>
-                    <button class="cal-view-option" data-view="horizontal">${t("horizontal")}</button>
+                    <button class="cal-view-option ${currentView === 'month' ? 'active' : ''}" data-view="month">${t("month")}</button>
+                    <button class="cal-view-option ${currentView === 'week' ? 'active' : ''}" data-view="week">${t("week")}</button>
+                    <button class="cal-view-option ${currentView === 'day' ? 'active' : ''}" data-view="day">${t("day")}</button>
+                    <button class="cal-view-option ${currentView === 'horizontal' ? 'active' : ''}" data-view="horizontal">${t("horizontal")}</button>
                 </div>
             </div>
         </div>
@@ -922,6 +922,26 @@ const showEventDetails = async (dateStr) => {
   renderCalendar();
 };
 
+const animateAndRenderCalendar = async () => {
+  const grid = document.getElementById("cal-grid");
+  const weekdays = document.getElementById("cal-weekdays");
+  
+  if (grid && weekdays) {
+      weekdays.innerHTML = "";
+      grid.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; min-height: 300px; grid-column: 1 / -1;">
+          <div style="width: 36px; height: 36px; border: 3px solid #e2e8f0; border-top-color: #5b6ef5; border-radius: 50%; animation: cal-spin 0.8s linear infinite;"></div>
+          <style>@keyframes cal-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+        </div>
+      `;
+      
+      await new Promise(r => setTimeout(r, 200));
+      await renderCalendar();
+  } else {
+      await renderCalendar();
+  }
+};
+
 export const initInfoPortalLogic = async () => {
   await renderCalendar();
 
@@ -951,7 +971,7 @@ export const initInfoPortalLogic = async () => {
       }
     });
 
-    renderCalendar();
+    animateAndRenderCalendar();
     if (selectedDate) {
       showEventDetails(selectedDate);
     }
@@ -976,7 +996,7 @@ export const initInfoPortalLogic = async () => {
       currentView = opt.dataset.view;
       document.getElementById("cal-view-label").textContent = t(currentView);
       viewMenu?.classList.remove("active");
-      renderCalendar();
+      animateAndRenderCalendar();
     });
   });
 
@@ -988,7 +1008,7 @@ export const initInfoPortalLogic = async () => {
     } else {
       viewDate.setMonth(viewDate.getMonth() - 1);
     }
-    renderCalendar();
+    animateAndRenderCalendar();
   });
 
   document.getElementById("cal-next")?.addEventListener("click", () => {
@@ -999,12 +1019,12 @@ export const initInfoPortalLogic = async () => {
     } else {
       viewDate.setMonth(viewDate.getMonth() + 1);
     }
-    renderCalendar();
+    animateAndRenderCalendar();
   });
 
   document.getElementById("cal-today-btn")?.addEventListener("click", () => {
     viewDate = new Date();
-    renderCalendar();
+    animateAndRenderCalendar();
   });
 
   document.getElementById("cal-panel-close")?.addEventListener("click", () => {
