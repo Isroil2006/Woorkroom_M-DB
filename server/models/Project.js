@@ -9,6 +9,11 @@ const projectSchema = new mongoose.Schema({
         maxlength: [20, 'Loyiha nomi 20 ta belgidan oshmasligi kerak']
     },
     createdBy: { type: String, ref: 'User' },
+    members: [{
+        user: { type: String, ref: 'User' },
+        role: { type: String, enum: ['viewer', 'member', 'admin'], default: 'viewer' }
+    }],
+    isPublic: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
 

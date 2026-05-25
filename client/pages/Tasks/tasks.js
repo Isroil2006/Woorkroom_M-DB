@@ -2,7 +2,7 @@ import { API_URL as BASE_URL, getCurrentUser, getAuthHeaders } from "../../asset
 import { createTaskAnalyticsBtn, initTaskAnalytics } from "./analytics.js";
 import { translations } from "./trasnslations.js";
 import { applyPermissions, checkPermission, getPermissions } from "../Employees/permission.js";
-import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
+import { getCurrentLang, createTranslationHelper, LANGUAGE_CHANGED_EVENT } from "../../assets/js/i18n.js";
 import { showNotification } from "../../components/Notification/notification.js";
 
 const t = createTranslationHelper(translations);
@@ -15,6 +15,24 @@ let usersCache = null;
 let tasksCache = {}; // { projectId: [tasks] }
 let isFetchingProjects = false;
 let currentUserPermissions = null;
+
+// ─── STATE ────────────────────────────────────────────────────
+let currentProjectId = null;
+let viewMode = "tasks"; // "tasks" or "overview"
+let searchTab = "username"; // "username" or "email"
+let editingProjectId = null;
+let selectedProjectMembers = [];
+let projectSearchQuery = "";
+let currentView = "list"; // "list" or "board"
+let currentFilter = "all"; // "all", "todo", "progress", "done"
+let searchQuery = "";
+let dragSrcTask = null;
+let editingTaskId = null;
+let activeDetailTaskId = null;
+let selectedAssignees = [];
+let deleteCallback = null;
+
+const $ = (id) => document.getElementById(id);
 
 const updateLocalTaskCache = (task, fallbackPid) => {
   const pid = task.project?._id || task.project || fallbackPid;
@@ -29,6 +47,9 @@ const updateLocalTaskCache = (task, fallbackPid) => {
     }
     if (task.createdBy && typeof task.createdBy === "string" && oldTask.createdBy?._id) {
       merged.createdBy = oldTask.createdBy;
+    }
+    if (task.userStatus && oldTask.userStatus) {
+      merged.userStatus = { ...oldTask.userStatus, ...task.userStatus };
     }
     tasksCache[pid][idx] = merged;
   } else {
@@ -110,6 +131,20 @@ const canSeeTask = (task) => {
 };
 
 const getVisibleStatus = (task) => {
+  const cu = getCurrent();
+  const cuId = String(cu?.userId || cu?._id || "");
+  const isAuthor = String(task.createdBy?._id || task.createdBy || "") === cuId;
+
+  // Yaratuvchi (Author) uchun: Faqat hamma bitirgandagina Done ko'rinadi
+  if (isAuthor) {
+    return task.status || "todo";
+  }
+
+  // Ijrochi (Assignee) uchun: O'zi bitirgan bo'lsa Done ko'radi
+  if (task.userStatus && task.userStatus[cuId] === "done") {
+    return "done";
+  }
+
   return task.status || "todo";
 };
 
@@ -125,6 +160,59 @@ const statusConfig = {
   todo: { label: () => t("status_todo"), cls: "s-todo" },
   progress: { label: () => t("status_progress"), cls: "s-progress" },
   done: { label: () => t("status_done"), cls: "s-done" },
+};
+const getProjectRole = () => {
+  if (!currentProjectId) return "none";
+  const proj = projectsCache?.find((p) => p._id === currentProjectId);
+  if (!proj) return "none";
+
+  const cu = getCurrent();
+  if (!cu) return "none";
+  const uid = cu.userId || cu._id;
+
+  if (String(proj.createdBy) === String(uid)) return "admin";
+
+  const members = proj.members || [];
+  const member = members.find((m) => {
+    const mId = typeof m === "string" ? m : m.user?._id || m.user;
+    return String(mId) === String(uid);
+  });
+
+  if (member) return typeof member === "string" ? "viewer" : member.role || "viewer";
+  if (proj.isPublic) return "viewer";
+
+  return "none";
+};
+
+const applyProjectPermissions = () => {
+  const role = getProjectRole();
+  const isAdmin = role === "admin";
+  const isMember = role === "member";
+  const canCreate = isAdmin || isMember;
+  const isViewer = role === "viewer" || role === "none";
+
+  // Header buttons
+  const createBtn = $("todo-create-task-btn");
+  if (createBtn) createBtn.style.display = canCreate ? "flex" : "none";
+
+  // Previously settingsBtn was hidden here for non-admins, now it's globally visible.
+  const overviewBtn = $("project-overview-btn");
+  if (overviewBtn) overviewBtn.style.display = "flex";
+
+  // Row actions (Edit/Delete - usually for admins or owners)
+  document.querySelectorAll("[data-action='edit'], [data-action='del']").forEach((btn) => {
+    btn.style.display = isAdmin ? "flex" : "none";
+  });
+
+  // Checkbox and Dragging (Admins and Members)
+  document.querySelectorAll("[data-action='check']").forEach((btn) => {
+    btn.style.display = canCreate ? "flex" : "none";
+  });
+
+  // Section buttons
+  document.querySelectorAll(".todo-add-in-section, .todo-board-add-btn").forEach((btn) => {
+    btn.style.display = canCreate ? "block" : "none";
+  });
 };
 
 // ─── AVATAR ───────────────────────────────────────────────────
@@ -143,13 +231,17 @@ const initials = (name = "") =>
     .join("")
     .toUpperCase();
 
-const userAvatarHtml = (user, size = 26) => {
+const userAvatarHtml = (user, size = 26, isDone = false) => {
   const s = `width:${size}px;height:${size}px;`;
+  const doneClass = isDone ? "is-done" : "";
   if (!user)
-    return `<div class="todo-avatar-empty" style="${s}"><svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="#aaa" stroke-width="2"/><circle cx="12" cy="7" r="4" stroke="#aaa" stroke-width="2"/></svg></div>`;
-  const name = user.username || "User";
-  if (user.avatar && !user.avatar.includes("User-avatar.png")) return `<img src="${user.avatar}" class="todo-avatar" style="${s}" title="${name}" />`;
-  return `<div class="todo-avatar" style="${s};background:${avatarColor(name)};font-size:${Math.round(size * 0.35)}px;" title="${name}">${initials(name)}</div>`;
+    return `<div class="todo-avatar-empty ${doneClass}" style="${s}"><svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="#aaa" stroke-width="2"/><circle cx="12" cy="7" r="4" stroke="#aaa" stroke-width="2"/></svg></div>`;
+
+  const name = user.username || user.email || "User";
+  if (user.avatar && !user.avatar.includes("User-avatar.png")) {
+    return `<img src="${user.avatar}" class="todo-avatar ${doneClass}" style="${s}" title="${name}" />`;
+  }
+  return `<div class="todo-avatar ${doneClass}" style="${s};background:${avatarColor(name)};font-size:${Math.round(size * 0.35)}px;" title="${name}">${initials(name)}</div>`;
 };
 
 // Bir nechta assignee avatarlarini stack ko'rinishida chiqaradi
@@ -160,7 +252,9 @@ const assigneeStackHtml = (task, size = 26) => {
   const extra = assignees.length - 3;
   let html = `<div class="todo-avatar-stack">`;
   shown.forEach((u) => {
-    html += userAvatarHtml(u, size);
+    const uId = u._id || u;
+    const isDone = task.userStatus && task.userStatus[uId] === "done";
+    html += userAvatarHtml(u, size, isDone);
   });
   if (extra > 0) html += `<div class="todo-avatar-extra" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.35)}px">+${extra}</div>`;
   html += `</div>`;
@@ -185,70 +279,797 @@ const dueDateHtml = (dateStr) => {
 };
 
 // ─── PAGE HTML ────────────────────────────────────────────────
-export const TodoPage = () => `
-<div class="todo-wrap">
-  <div class="todo-header">
-    <div class="todo-header-left" style="display:flex; align-items:center;">
-      <h1 class="todo-main-title" style="display:flex; align-items:center;">
-        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" style="flex-shrink:0">
-          <path d="M9 11l3 3L22 4" stroke="#5b6ef5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="#5b6ef5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span id="todo-project-title">Tasks</span>
-      </h1>
-      <button id="todo-delete-project-btn" class="todo-action-btn del" data-perm="task_delete_project" title="Delete Project" style="margin-left: 0; display: none; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; border: none; background: rgba(239, 68, 68, 0.1); color: #ef4444; opacity: 1;">
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
+const renderProjectMembersList = async (targetId = "project-members-list") => {
+  const listEl = $(targetId);
+  if (!listEl) return;
+
+  if (selectedProjectMembers.length === 0) {
+    listEl.innerHTML = `<div class="no-members-msg">${t("no_members_added") || "A'zolar qo'shilmagan"}</div>`;
+    return;
+  }
+
+  const membersHtml = await Promise.all(
+    selectedProjectMembers.map(async (m) => {
+      const uid = typeof m === "string" ? m : m.user?._id || m.user;
+      const role = typeof m === "string" ? "viewer" : m.role || "viewer";
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/users/${uid}`, {
+          headers: getAuthHeaders(),
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error("User not found");
+        const user = await res.json();
+        return `
+        <div class="member-card animated-item" data-uid="${uid}">
+          <div class="member-card-left">
+            ${userAvatarHtml(user, 42)}
+            <div class="member-card-info">
+              <span class="member-name">${user.username || user.email}</span>
+              <span class="member-email">${user.email || ""}</span>
+            </div>
+          </div>
+          <div class="member-card-actions">
+            <div class="member-role-tabs" data-uid="${uid}">
+              <button class="role-tab ${role === "viewer" ? "active" : ""}" data-value="viewer">${t("role_viewer")}</button>
+              <button class="role-tab ${role === "member" ? "active" : ""}" data-value="member">${t("role_member")}</button>
+              <button class="role-tab ${role === "admin" ? "active" : ""}" data-value="admin">${t("role_admin")}</button>
+            </div>
+            <button class="member-delete-btn" onclick="removeProjectMember('${uid}')" title="${t("delete")}">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+      `;
+      } catch (e) {
+        console.error("Member fetch error:", e);
+        return "";
+      }
+    }),
+  );
+  listEl.innerHTML = membersHtml.join("");
+  initMemberRoleTabs(listEl);
+};
+
+const fetchProjectHistory = async (projectId) => {
+  try {
+    const res = await fetch(`${BASE_URL}/api/projects/${projectId}/history`, {
+      headers: getAuthHeaders(),
+      credentials: "include"
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error("Error fetching project history:", err);
+  }
+  return [];
+};
+
+const renderProjectOverviewView = async () => {
+  const container = $("todo-view-container");
+  const proj = projectsCache.find((p) => p._id === currentProjectId);
+  if (!proj) return;
+
+  const cu = getCurrent();
+  const isAdmin = getProjectRole() === "admin" || checkPermission(currentUserPermissions, "project_edit_project");
+
+  selectedProjectMembers = proj.members ? [...proj.members] : [];
+
+  showLoader(true);
+
+  // Fetch data for history/stats
+  const history = await fetchProjectHistory(currentProjectId);
+  const tasks = await fetchTasks(currentProjectId);
+  const users = await fetchUsers();
+  
+  // Calculate statistics
+  const totalTasks = tasks.length;
+  const todoTasks = tasks.filter(t => t.status === "todo").length;
+  const progressTasks = tasks.filter(t => t.status === "progress").length;
+  const doneTasks = tasks.filter(t => t.status === "done").length;
+
+  const priorityUrgent = tasks.filter(t => t.priority === "urgent").length;
+  const priorityHigh = tasks.filter(t => t.priority === "high").length;
+  const priorityMedium = tasks.filter(t => t.priority === "medium").length;
+  const priorityLow = tasks.filter(t => t.priority === "low").length;
+  const priorityNone = tasks.filter(t => t.priority === "none").length;
+
+  // Assignee workload
+  const assigneeWorkload = {};
+  tasks.forEach(t => {
+    (t.assignees || []).forEach(a => {
+      const aId = a._id || a;
+      const u = users.find(user => (user._id || user.userId) === String(aId));
+      const name = u ? (u.username || u.email) : "Unknown User";
+      if (!assigneeWorkload[name]) {
+        assigneeWorkload[name] = { total: 0, done: 0, avatar: u ? u.avatar : null, userObj: u };
+      }
+      assigneeWorkload[name].total += 1;
+      if (t.status === "done" || (t.userStatus && t.userStatus[aId] === "done")) {
+        assigneeWorkload[name].done += 1;
+      }
+    });
+  });
+
+  const settingsTabHtml = isAdmin ? `
+    <button class="view-tab active" data-tab="settings">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/></svg>
+      <span>${t("settings") || "Settings"}</span>
+    </button>
+  ` : '';
+
+  container.innerHTML = `
+    <div class="project-settings-view animated-view project-overview-view">
+      <div class="settings-header">
+        <div class="settings-title-box">
+          <button class="back-to-tasks" id="back-to-tasks-btn" style="margin-right: 12px;">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M19 12H5m0 0l7 7m-7-7l7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          
+          <div class="view-switch overview-tabs" style="margin: 0;">
+            ${settingsTabHtml}
+            <button class="view-tab ${!isAdmin ? 'active' : ''}" data-tab="stats">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>${t("statistika") || "Statistic"}</span>
+            </button>
+            <button class="view-tab" data-tab="history">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>${t("history") || "History"}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-actions" style="gap: 8px; ${isAdmin ? 'display:flex;' : 'display:none;'}">
+           <button class="todo-btn-danger" id="settings-delete-project" style="padding: 8px 16px; font-size: 13px;">${t("delete")}</button>
+           <button class="todo-btn-primary" id="settings-save-project" style="padding: 8px 24px; font-size: 13px;">${t("save")}</button>
+        </div>
+      </div>
+
+      <!-- SETTINGS CONTENT -->
+      ${isAdmin ? `
+      <div class="settings-content overview-content-section" id="overview-settings-content">
+        <div class="settings-section">
+          <label class="settings-label" style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; display: block;">${t("project_label")}</label>
+          <input type="text" id="settings-project-name" class="settings-input" style="font-size: 14px; padding: 10px 16px;" value="${proj.name}" placeholder="${t("project_name_placeholder")}" />
+          <span class="todo-form-error" id="settings-project-name-error" style="display: block; margin-top: 4px;"></span>
+        </div>
+
+        <div class="settings-section">
+          <label class="settings-label">${t("manage_access")}</label>
+          
+          <div class="public-project-section">
+            <div class="toggle-info">
+              <span class="card-item-label">${t("public_project")}</span>
+              <p class="settings-desc" style="margin-bottom: 0;">${t("public_project_desc")}</p>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="settings-public-toggle" ${proj.isPublic ? "checked" : ""}>
+              <span class="slider round"></span>
+            </label>
+          </div>
+
+          <div class="member-management-card">
+            <div class="member-search-header">
+              <h3 class="added-members-title">${t("added_members")}</h3>
+              <button class="todo-btn-primary" id="open-add-member-modal">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                ${t("add_member") || "A'zo qo'shish"}
+              </button>
+            </div>
+
+            <div class="added-members-container" style="padding: 16px;">
+              <div id="settings-project-members-list" class="settings-members-list">
+                <!-- Members will be rendered here -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- STATS CONTENT -->
+      <div class="settings-content overview-content-section" id="overview-stats-content" style="${!isAdmin ? 'display:block;' : 'display:none;'}">
+        <div class="history-stats-grid">
+          <div class="history-stat-card">
+            <div class="stat-card-icon blue">
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="stat-card-info">
+              <span class="stat-card-num">${totalTasks}</span>
+              <span class="stat-card-label">${t("total_tasks") || "Jami vazifalar"}</span>
+            </div>
+          </div>
+          <div class="history-stat-card">
+            <div class="stat-card-icon purple">
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="stat-card-info">
+              <span class="stat-card-num">${todoTasks}</span>
+              <span class="stat-card-label">${t("status_todo") || "Bajarilishi kerak"}</span>
+            </div>
+          </div>
+          <div class="history-stat-card">
+            <div class="stat-card-icon amber">
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="stat-card-info">
+              <span class="stat-card-num">${progressTasks}</span>
+              <span class="stat-card-label">${t("status_progress") || "Jarayonda"}</span>
+            </div>
+          </div>
+          <div class="history-stat-card">
+            <div class="stat-card-icon green">
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="stat-card-info">
+              <span class="stat-card-num">${doneTasks}</span>
+              <span class="stat-card-label">${t("status_done") || "Bajarilgan"}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="history-stats-details-row">
+          <div class="details-card">
+            <h3 class="details-card-title">${t("priority_dist") || "Prioritet taqsimoti"}</h3>
+            <div class="priority-list">
+              <div class="priority-progress-item">
+                <div class="priority-progress-label">
+                  <span class="pri-badge urgent">${t("priority_urgent")}</span>
+                  <span>${priorityUrgent}</span>
+                </div>
+                <div class="priority-progress-bar"><div class="bar-fill urgent" style="width: ${totalTasks > 0 ? (priorityUrgent / totalTasks) * 100 : 0}%"></div></div>
+              </div>
+              <div class="priority-progress-item">
+                <div class="priority-progress-label">
+                  <span class="pri-badge high">${t("priority_high")}</span>
+                  <span>${priorityHigh}</span>
+                </div>
+                <div class="priority-progress-bar"><div class="bar-fill high" style="width: ${totalTasks > 0 ? (priorityHigh / totalTasks) * 100 : 0}%"></div></div>
+              </div>
+              <div class="priority-progress-item">
+                <div class="priority-progress-label">
+                  <span class="pri-badge medium">${t("priority_medium")}</span>
+                  <span>${priorityMedium}</span>
+                </div>
+                <div class="priority-progress-bar"><div class="bar-fill medium" style="width: ${totalTasks > 0 ? (priorityMedium / totalTasks) * 100 : 0}%"></div></div>
+              </div>
+              <div class="priority-progress-item">
+                <div class="priority-progress-label">
+                  <span class="pri-badge low">${t("priority_low")}</span>
+                  <span>${priorityLow}</span>
+                </div>
+                <div class="priority-progress-bar"><div class="bar-fill low" style="width: ${totalTasks > 0 ? (priorityLow / totalTasks) * 100 : 0}%"></div></div>
+              </div>
+              <div class="priority-progress-item">
+                <div class="priority-progress-label">
+                  <span class="pri-badge none">${t("priority_none")}</span>
+                  <span>${priorityNone}</span>
+                </div>
+                <div class="priority-progress-bar"><div class="bar-fill none" style="width: ${totalTasks > 0 ? (priorityNone / totalTasks) * 100 : 0}%"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="details-card">
+            <h3 class="details-card-title">${t("top_assignees") || "Ijrochilar"} <span class="assignee-count-badge">${Object.keys(assigneeWorkload).length}</span></h3>
+            <div class="assignee-workload-list">
+              ${Object.keys(assigneeWorkload).length > 0 
+                ? Object.entries(assigneeWorkload).map(([name, stat]) => `
+                    <div class="assignee-workload-item">
+                      <div class="assignee-workload-left">
+                        ${userAvatarHtml(stat.userObj, 36)}
+                        <div class="workload-user-info">
+                          <span class="workload-user-name">${name}</span>
+                          <span class="workload-user-tasks">${stat.done} / ${stat.total} ${t("tasks_done_lbl") || "vazifa bajarilgan"}</span>
+                        </div>
+                      </div>
+                      <div class="workload-user-progress">
+                        <div class="priority-progress-bar"><div class="bar-fill green" style="width: ${stat.total > 0 ? (stat.done / stat.total) * 100 : 0}%"></div></div>
+                      </div>
+                    </div>
+                  `).join("")
+                : `<div class="no-members-msg" style="padding: 30px 0;">${t("no_users_yet") || "Hozircha biriktirilgan ijrochilar yo'q"}</div>`
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTORY CONTENT -->
+      <div class="settings-content overview-content-section" id="overview-history-content" style="display: none;">
+        <div class="history-timeline">
+          ${history.length > 0
+            ? history.map(log => {
+                const logUser = log.user || { username: "System" };
+                const timeStr = new Date(log.timestamp).toLocaleString();
+                let iconClass = "created";
+                let iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+                let actionText = "";
+                let itemTitle = "";
+
+                if (log.action === "task_created") {
+                  iconClass = "created";
+                  itemTitle = log.details?.taskTitle || "Task";
+                  actionText = t("action_created") || "yaratildi";
+                } else if (log.action === "task_deleted") {
+                  iconClass = "deleted";
+                  iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+                  itemTitle = log.details?.taskTitle || "Task";
+                  actionText = t("action_deleted") || "o'chirildi";
+                } else if (log.action === "member_added") {
+                  iconClass = "status";
+                  iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+                  itemTitle = log.details?.memberUsername || "Foydalanuvchi";
+                  actionText = `loyihaga qo'shildi (${log.details?.newRole || "viewer"})`;
+                } else if (log.action === "member_removed") {
+                  iconClass = "deleted";
+                  iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+                  itemTitle = log.details?.memberUsername || "Foydalanuvchi";
+                  actionText = `loyihadan o'chirildi`;
+                } else if (log.action === "member_role_changed") {
+                  iconClass = "updated";
+                  iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+                  itemTitle = log.details?.memberUsername || "Foydalanuvchi";
+                  const oldR = log.details?.oldRole || "viewer";
+                  const newR = log.details?.newRole || "viewer";
+                  actionText = `roli o'zgartirildi (<span class="timeline-old-status">${oldR}</span> &rarr; <span class="timeline-new-status">${newR}</span>)`;
+                } else {
+                  itemTitle = "Tizim hodisasi";
+                  actionText = "bajarildi";
+                }
+
+                return `
+                  <div class="timeline-item animated-item">
+                    <div class="timeline-item-marker ${iconClass}">
+                      ${iconSvg}
+                    </div>
+                    <div class="timeline-item-content">
+                      <div class="timeline-item-header">
+                        <span class="timeline-task-title">${itemTitle}</span>
+                        <span class="timeline-time">${timeStr}</span>
+                      </div>
+                      <div class="timeline-item-body">
+                        <span class="timeline-user">${userAvatarHtml(logUser, 20)} <strong>${logUser.username || logUser.email || "System"}</strong></span>
+                        <span class="timeline-action-text">${actionText}</span>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join("")
+            : `<div class="no-members-msg" style="padding: 80px 0; text-align: center;">
+                 <svg width="48" height="48" fill="none" viewBox="0 0 24 24" style="color: #cbd5e1; margin-bottom: 12px;"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                 <p style="margin: 0; font-size: 14px; color: #64748b;">${t("no_history_yet") || "Tarixiy amallar hozircha mavjud emas"}</p>
+               </div>`
+          }
+        </div>
+      </div>
     </div>
-    <div class="todo-header-right">
-      <div class="todo-view-tabs">
-        <button class="todo-view-tab active" id="tab-list">
-          <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          <span id="tab-list-label">List</span>
-        </button>
-        <button class="todo-view-tab" id="tab-board">
-          <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>
-          <span id="tab-board-label">Board</span>
+  `;
+  // --- EVENTS ---
+  $("back-to-tasks-btn").onclick = () => {
+    viewMode = "tasks";
+    renderView();
+  };
+
+  const tabBtns = container.querySelectorAll(".overview-tabs .view-tab");
+  tabBtns.forEach(btn => {
+    btn.onclick = () => {
+      tabBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      container.querySelectorAll(".overview-content-section").forEach(sec => sec.style.display = "none");
+      const targetSec = $(`overview-${tab}-content`);
+      if (targetSec) targetSec.style.display = "block";
+    };
+  });
+
+  if (isAdmin) {
+    const nameInput = $("settings-project-name");
+    const nameError = $("settings-project-name-error");
+
+    if (nameInput) {
+      nameInput.oninput = () => {
+        nameInput.classList.remove("error");
+        nameError.classList.remove("visible");
+        nameError.textContent = "";
+      };
+    }
+
+    const saveBtn = $("settings-save-project");
+    if (saveBtn) {
+      saveBtn.onclick = async () => {
+        const newName = nameInput.value.trim();
+
+        if (newName.length < 3) {
+          nameInput.classList.add("error");
+          nameError.textContent = t("error_min_length_3") || "Kamida 3 ta belgi bo'lishi kerak";
+          nameError.classList.add("visible");
+          nameInput.focus();
+          return;
+        }
+
+        editingProjectId = currentProjectId;
+        saveBtn.classList.add("loading");
+
+        try {
+          const res = await fetch(`${BASE_URL}/api/projects/${currentProjectId}`, {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            credentials: "include",
+            body: JSON.stringify({
+              name: newName,
+              members: selectedProjectMembers.map((m) => {
+                if (typeof m === "string") return { user: m, role: "viewer" };
+                return m;
+              }),
+              isPublic: $("settings-public-toggle").checked,
+            }),
+          });
+
+          if (res.ok) {
+            const saved = await res.json();
+            projectsCache = projectsCache.map((p) => (String(p._id) === String(currentProjectId) ? saved : p));
+            showNotification("Muvaffaqiyatli saqlandi", "success");
+            viewMode = "tasks";
+            renderView();
+          }
+        } catch (e) {
+          showNotification("Xatolik yuz berdi", "error");
+        } finally {
+          saveBtn.classList.remove("loading");
+        }
+      };
+    }
+
+    const delBtn = $("settings-delete-project");
+    if (delBtn) {
+      delBtn.onclick = () => {
+        deleteTask(null); 
+      };
+    }
+
+    const addMemBtn = $("open-add-member-modal");
+    if (addMemBtn) {
+      addMemBtn.onclick = () => openAddMemberModal();
+    }
+
+    renderProjectMembersList("settings-project-members-list");
+  }
+};
+
+const openAddMemberModal = () => {
+  const modal = $("add-member-modal");
+  const input = $("add-member-search-input");
+  const results = $("add-member-results");
+  if (input) input.value = "";
+  if (results) {
+    results.style.display = "none";
+    results.innerHTML = "";
+  }
+  if (modal) modal.style.display = "flex";
+  if (input) {
+    input.focus();
+    let timeout;
+    input.oninput = (e) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => searchUsersForAddMember(e.target.value), 300);
+    };
+  }
+};
+
+const searchUsersForAddMember = async (query) => {
+  const resultsEl = $("add-member-results");
+  if (!query || query.length < 2) {
+    resultsEl.style.display = "none";
+    return;
+  }
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/users/search?query=${encodeURIComponent(query)}`, {
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
+    const users = await res.json();
+
+    if (users.length === 0) {
+      resultsEl.innerHTML = `<div class="search-no-results" style="padding: 12px; font-size: 13px;">${t("no_users_yet")}</div>`;
+    } else {
+      resultsEl.innerHTML = users
+        .map((u) => {
+          const uid = u.userId || u._id;
+          const alreadyAdded = selectedProjectMembers.some((m) => (typeof m === "string" ? m : m.user?._id || m.user) === uid);
+          return `
+          <div class="search-result-item-large animated-item ${alreadyAdded ? "added" : ""}" data-uid="${uid}" style="padding: 10px 16px; border-bottom: 1px solid #f1f5f9; cursor: ${alreadyAdded ? "default" : "pointer"};">
+             <div class="search-result-info" style="display: flex; align-items: center; gap: 10px;">
+                ${userAvatarHtml(u, 32)}
+                <div class="search-result-text" style="display: flex; flex-direction: column;">
+                  <span class="res-name" style="font-size: 13px; font-weight: 600;">${u.username || u.email}</span>
+                  <span class="res-email" style="font-size: 11px; color: #64748b;">${u.email || ""}</span>
+                </div>
+             </div>
+             ${
+               alreadyAdded
+                 ? `<span class="added-label-large" style="font-size: 11px; color: #10b981;">${t("added_label") || "Qo'shilgan"}</span>`
+                 : `<button class="add-member-action-btn-large" style="margin-left: auto; background: #5b6ef5; color: #fff; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px;">${t("add") || "Qo'shish"}</button>`
+             }
+          </div>
+        `;
+        })
+        .join("");
+
+      resultsEl.querySelectorAll(".search-result-item-large:not(.added)").forEach((item) => {
+        item.onclick = async () => {
+          const uid = String(item.dataset.uid);
+          selectedProjectMembers.push({ user: uid, role: "viewer" });
+          $("add-member-modal").style.display = "none";
+          await renderProjectMembersList("settings-project-members-list");
+          showNotification(t("member_added") || "A'zo qo'shildi", "success");
+        };
+      });
+    }
+    resultsEl.style.display = "block";
+  } catch (err) {
+    console.error("Search error:", err);
+  }
+};
+
+const renderAssigneePicker = async () => {
+  const container = $("tm-assignee-picker");
+  if (!container) return;
+
+  const proj = projectsCache.find((p) => p._id === currentProjectId);
+  if (!proj) return;
+
+  const members = proj.members || [];
+  if (members.length === 0) {
+    container.innerHTML = `<div class="no-members-info" style="font-size: 12px; color: #64748b;">${t("no_members_added")}</div>`;
+    return;
+  }
+
+  const membersData = await Promise.all(
+    members.map(async (m) => {
+      const uid = typeof m === "string" ? m : m.user?._id || m.user;
+      try {
+        const res = await fetch(`${BASE_URL}/api/users/${uid}`, { headers: getAuthHeaders(), credentials: "include" });
+        return await res.json();
+      } catch (e) {
+        return null;
+      }
+    }),
+  );
+
+  container.innerHTML = membersData
+    .filter((u) => u)
+    .map((u) => {
+      const uid = u.userId || u._id;
+      const isSelected = selectedAssignees.includes(uid);
+      return `
+      <div class="assignee-item ${isSelected ? "selected" : ""}" data-uid="${uid}" title="${u.username}">
+        ${userAvatarHtml(u, 32)}
+        <div class="assignee-check">✓</div>
+      </div>`;
+    })
+    .join("");
+
+  container.querySelectorAll(".assignee-item").forEach((item) => {
+    item.onclick = () => {
+      const uid = item.dataset.uid;
+      if (selectedAssignees.includes(uid)) {
+        selectedAssignees = selectedAssignees.filter((id) => id !== uid);
+        item.classList.remove("selected");
+      } else {
+        selectedAssignees.push(uid);
+        item.classList.add("selected");
+      }
+    };
+  });
+};
+
+
+const openProjectModal = (pid = null) => {
+  if (pid === null) {
+    if (!checkPermission(currentUserPermissions, "project_add_project")) {
+      showNotification(t("error_no_permission"), "error");
+      return;
+    }
+  } else {
+    const role = getProjectRole();
+    if (role !== "admin" && !checkPermission(currentUserPermissions, "project_edit_project")) {
+      showNotification(t("error_no_permission"), "error");
+      return;
+    }
+  }
+
+  editingProjectId = pid;
+  selectedProjectMembers = [];
+  const modal = $("project-modal");
+  const title = $("project-modal-title");
+  const nameInput = $("pm-name");
+  const delBtn = $("project-modal-delete");
+  const saveBtn = $("project-modal-save");
+  const membersSec = $("project-members-section");
+
+  if (nameInput) nameInput.classList.remove("error");
+  const nerr = $("pm-name-error");
+  if (nerr) nerr.classList.remove("visible");
+
+  const msi = $("member-search-input");
+  if (msi) msi.value = "";
+  const msr = $("member-search-results");
+  if (msr) msr.style.display = "none";
+
+  if (pid) {
+    const proj = projectsCache.find((p) => p._id === pid);
+    if (title) title.textContent = t("project_settings") || "Project Settings";
+    if (nameInput) nameInput.value = proj ? proj.name : "";
+    selectedProjectMembers = proj && proj.members ? [...proj.members] : [];
+    if (delBtn) delBtn.style.display = "block";
+    if (saveBtn) saveBtn.textContent = t("save_changes") || "Save Changes";
+    if (membersSec) membersSec.style.display = "block";
+  } else {
+    if (title) title.textContent = t("new_project") || "New Project";
+    if (nameInput) nameInput.value = "";
+    if (delBtn) delBtn.style.display = "none";
+    if (saveBtn) saveBtn.textContent = t("create") || "Create";
+    if (membersSec) membersSec.style.display = "none";
+  }
+
+  renderProjectMembersList();
+  if (modal) modal.style.display = "flex";
+  if (nameInput) setTimeout(() => nameInput.focus(), 100);
+};
+
+window.openProjectModal = openProjectModal;
+window.removeProjectMember = (uid) => {
+  selectedProjectMembers = selectedProjectMembers.filter((m) => {
+    const id = typeof m === "string" ? m : m.user?._id || m.user;
+    return String(id) !== String(uid);
+  });
+  if (viewMode === "settings") {
+    renderProjectMembersList("settings-project-members-list");
+  } else {
+    renderProjectMembersList("project-members-list");
+  }
+};
+
+const searchUsersForProject = async (query) => {
+  // Legacy function removed in favor of searchUsersForAddMember
+};
+
+const saveProject = async () => {
+  const nameInput = $("pm-name");
+  const nameError = $("pm-name-error");
+  if (!nameInput) return;
+  const name = nameInput.value.trim();
+
+  if (name.length < 3) {
+    nameInput.classList.add("error");
+    if (nameError) {
+      nameError.textContent = t("error_min_length_3") || "Kamida 3 ta belgi bo'lishi kerak";
+      nameError.classList.add("visible");
+    }
+    return;
+  }
+
+  const saveBtn = $("project-modal-save");
+  if (saveBtn) saveBtn.classList.add("loading");
+
+  try {
+    const isEdit = !!editingProjectId;
+    const url = isEdit ? `${API_URL}/projects/${editingProjectId}` : `${API_URL}/projects`;
+    const method = isEdit ? "PUT" : "POST";
+
+    const cu = getCurrent();
+    const res = await fetch(url, {
+      method,
+      headers: getAuthHeaders(),
+      credentials: "include",
+      body: JSON.stringify({
+        name,
+        createdBy: cu?._id || cu?.userId,
+        members: selectedProjectMembers.map((m) => (typeof m === "string" ? { user: m, role: "member" } : m)),
+      }),
+    });
+
+    if (res.ok) {
+      const savedProj = await res.json();
+      const modal = $("project-modal");
+      if (modal) modal.style.display = "none";
+      if (isEdit) {
+        projectsCache = projectsCache.map((p) => (String(p._id) === String(editingProjectId) ? savedProj : p));
+      } else {
+        if (!projectsCache) projectsCache = [];
+        projectsCache.push(savedProj);
+        currentProjectId = savedProj._id;
+        viewMode = "settings";
+      }
+      showNotification(isEdit ? t("project_updated") : t("project_created"), "success");
+      await renderView();
+    } else {
+      showNotification(t("error_saving_project"), "error");
+    }
+  } catch (err) {
+    showNotification(t("error_saving_project"), "error");
+  } finally {
+    if (saveBtn) saveBtn.classList.remove("loading");
+  }
+};
+
+export const TodoPage = () => `
+<div class="tasks-container">
+  <!-- ── PROJECT SIDEBAR ── -->
+  <aside class="projects-sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title-row">
+        <h2 class="sidebar-title">${t("projects") || "Projects"}</h2>
+        <button id="todo-add-project-btn" class="add-project-btn" data-perm="task_add_project" title="Add Project">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
         </button>
       </div>
-      <button class="todo-add-project-btn" id="todo-add-project-btn" data-perm="task_add_project">
-        <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-        <span id="todo-add-project-label">+ Project</span>
-      </button>
+      <div class="projects-search-wrap">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#8892a4" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#8892a4" stroke-width="2" stroke-linecap="round"/></svg>
+        <input type="text" id="project-search-input" placeholder="${t("search_projects") || "Search projects..."}" />
+      </div>
     </div>
+    <div class="projects-list" id="todo-project-list">
+      <!-- Projects will be rendered here -->
+    </div>
+  </aside>
+
+  <!-- ── MAIN CONTENT AREA ── -->
+  <main class="tasks-main">
+    <header class="tasks-header">
+      <div class="header-project-info">
+        <h1 id="todo-project-title">Select a Project</h1>
+        <button id="project-overview-btn" class="project-settings-btn" style="width: max-content; padding: 0 12px; gap: 6px; display: none;" title="Project Overview">
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="10 9 9 9 8 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span style="font-size: 14px; font-weight: 600;">Overview</span>
+        </button>
+      </div>
+
+      <div class="header-actions">
+        <div class="view-switch">
+          <button class="view-tab active" id="tab-list">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span>${t("list_view")}</span>
+          </button>
+          <button class="view-tab" id="tab-board">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>
+            <span>${t("board_view")}</span>
+          </button>
+        </div>
+        <button class="create-task-btn" id="todo-create-task-btn" data-perm="task_add_task">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+          <span>${t("add_task")}</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="tasks-toolbar">
+      <div class="tasks-search-wrap">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#8892a4" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#8892a4" stroke-width="2" stroke-linecap="round"/></svg>
+        <input type="text" id="todo-search" placeholder="Filter tasks..." />
+      </div>
+      <div class="tasks-filters">
+        <button class="filter-btn active" data-filter="all" id="filter-all">All</button>
+        <button class="filter-btn" data-filter="todo" id="filter-todo">Todo</button>
+        <button class="filter-btn" data-filter="progress" id="filter-progress">In Progress</button>
+        <button class="filter-btn" data-filter="done" id="filter-done">Done</button>
+      </div>
+    </div>
+
+    <div class="tasks-content">
+      <div id="todo-no-projects" class="empty-state" style="display:none">
+        <svg width="80" height="80" fill="none" viewBox="0 0 24 24">
+          <path d="M9 11l3 3L22 4" stroke="#5b6ef5" stroke-width="2"/>
+          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="#5b6ef5" stroke-width="2"/>
+        </svg>
+        <p id="no-projects-msg"></p>
+      </div>
+    <div id="todo-view-container" class="view-container"></div>
   </div>
-
-  <div class="todo-project-tabs" id="todo-project-tabs"></div>
-
-
-  <div class="todo-toolbar">
-    <div class="todo-search-wrap">
-      <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#aaa" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#aaa" stroke-width="2" stroke-linecap="round"/></svg>
-      <input type="text" id="todo-search" placeholder="Search..." />
-    </div>
-    <div class="todo-filters">
-      <button class="todo-filter-btn active" data-filter="all"      id="filter-all">All</button>
-      <button class="todo-filter-btn"        data-filter="todo"     id="filter-todo">To Do</button>
-      <button class="todo-filter-btn"        data-filter="progress" id="filter-progress">In Progress</button>
-      <button class="todo-filter-btn"        data-filter="done"     id="filter-done">Done</button>
-    </div>
-    <button class="todo-create-btn" id="todo-create-task-btn" data-perm="task_add_task">
-      <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-      <span id="todo-add-task-label">Add Task</span>
-    </button>
-  </div>
-
-
-  <div class="todo-content-area">
-    <div class="todo-no-projects" id="todo-no-projects" style="display:none">
-      <svg width="64" height="64" fill="none" viewBox="0 0 24 24" style="margin:0 auto 16px;display:block;opacity:.3">
-        <path d="M9 11l3 3L22 4" stroke="#5b6ef5" stroke-width="2"/>
-        <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="#5b6ef5" stroke-width="2"/>
-      </svg>
-      <p id="no-projects-msg" style="color:#8892a4;font-size:14px;text-align:center;margin:0"></p>
-    </div>
-    <div id="todo-view-container"></div>
-  </div>
+</main>
 </div>
 
 <!-- ══ TASK CREATE/EDIT MODAL ══ -->
@@ -282,9 +1103,19 @@ export const TodoPage = () => `
         <label class="todo-form-label" id="lbl-task-assignee">Assignees</label>
         <div class="todo-assignee-picker" id="tm-assignee-picker"></div>
       </div>
+      <div class="todo-form-row">
+        <div class="todo-form-group">
+          <label class="todo-form-label" id="lbl-task-startdate">${t("start_date_label")}</label>
+          <input class="todo-form-input" type="date" id="tm-startdate" />
+        </div>
+        <div class="todo-form-group">
+          <label class="todo-form-label" id="lbl-task-duedate">${t("duedate_label")}</label>
+          <input class="todo-form-input" type="date" id="tm-duedate" />
+        </div>
+      </div>
       <div class="todo-form-group">
-        <label class="todo-form-label" id="lbl-task-duedate">Due Date</label>
-        <input class="todo-form-input" type="date" id="tm-duedate" />
+        <label class="todo-form-label" id="lbl-task-estimated">${t("estimated_time_label")}</label>
+        <input class="todo-form-input" type="number" id="tm-estimated" min="0" placeholder="0" />
       </div>
     </div>
     <div class="todo-modal-footer">
@@ -296,7 +1127,7 @@ export const TodoPage = () => `
 
 <!-- ══ TASK DETAIL MODAL ══ -->
 <div id="task-detail-modal" class="todo-modal-overlay" style="display:none">
-  <div class="todo-detail-modal">
+  <div class="todo-detail-modal premium-modal">
     <div class="todo-detail-header">
       <div class="todo-detail-header-left">
         <span class="todo-detail-status-badge" id="td-status-badge"></span>
@@ -311,40 +1142,79 @@ export const TodoPage = () => `
     </div>
 
     <div class="todo-detail-body">
-      <!-- LEFT: main content -->
-      <div class="todo-detail-left">
+      <div class="todo-detail-main">
         <h2 class="todo-detail-title" id="td-title"></h2>
-
+        
         <div class="todo-detail-section">
           <p class="todo-detail-section-label" id="td-lbl-desc">Description</p>
           <p class="todo-detail-desc" id="td-desc"></p>
         </div>
+
+        <div class="todo-detail-time-tracking" id="td-time-section">
+            <div class="time-track-header">
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span id="td-lbl-time-track">${t("total_spent")}</span>
+            </div>
+            <div class="time-track-stats">
+                <div class="time-stat-box">
+                    <span class="time-stat-label">${t("estimated_time_label")}</span>
+                    <span class="time-stat-value"><span id="td-val-estimated">0</span> ${t("hours")}</span>
+                </div>
+                <div class="time-stat-box highlight">
+                    <span class="time-stat-label">${t("total_spent")}</span>
+                    <span class="time-stat-value"><span id="td-val-actual">0</span> ${t("hours")}</span>
+                </div>
+            </div>
+            
+            <div class="time-progress-bar">
+                <div class="time-progress-fill" id="td-time-progress"></div>
+            </div>
+
+            <div class="log-time-action" id="td-log-time-container" style="display:none">
+                <div class="todo-form-group" style="margin-top: 15px;">
+                    <label class="todo-form-label">${t("actual_time_label")}</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="number" id="td-log-input" class="todo-form-input" min="0" step="0.5" placeholder="0" style="flex: 1" />
+                        <button class="todo-btn-primary" id="td-log-btn" style="padding: 0 20px;">${t("log_time")}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
       </div>
 
-      <!-- RIGHT: meta info -->
-      <div class="todo-detail-right">
+      <div class="todo-detail-side">
         <p class="todo-detail-meta-heading" id="td-lbl-details">Details</p>
-
+        
         <div class="todo-detail-meta-row">
           <span class="todo-detail-meta-key" id="td-lbl-status">Status</span>
           <span id="td-meta-status"></span>
         </div>
+        
         <div class="todo-detail-meta-row">
           <span class="todo-detail-meta-key" id="td-lbl-priority">Priority</span>
           <span id="td-meta-priority"></span>
         </div>
+
+        <div class="todo-detail-meta-row">
+          <span class="todo-detail-meta-key" id="td-lbl-startdate">${t("start_date_label")}</span>
+          <span id="td-meta-startdate" class="todo-detail-meta-val"></span>
+        </div>
+        
         <div class="todo-detail-meta-row">
           <span class="todo-detail-meta-key" id="td-lbl-duedate">Due Date</span>
           <span id="td-meta-duedate"></span>
         </div>
+        
         <div class="todo-detail-meta-row">
           <span class="todo-detail-meta-key" id="td-lbl-assignees">Assignees</span>
           <div class="todo-detail-assignees" id="td-meta-assignees"></div>
         </div>
+        
         <div class="todo-detail-meta-row">
           <span class="todo-detail-meta-key" id="td-lbl-created">Created</span>
           <span class="todo-detail-meta-val" id="td-meta-created"></span>
         </div>
+        
         <div class="todo-detail-meta-row">
           <span class="todo-detail-meta-key" id="td-lbl-createdby">Author</span>
           <span class="todo-detail-meta-val" id="td-meta-createdby"></span>
@@ -358,9 +1228,7 @@ export const TodoPage = () => `
 <div id="no-project-modal" class="todo-modal-overlay" style="display:none">
   <div class="todo-modal" style="max-width:460px;text-align:center;padding:20px">
     <div class="todo-del-icon-wrap" style="background:#fff3cd;border-color:#fcd34d">
-      <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-        <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
-      </svg>
+      <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/></svg>
     </div>
     <h3 class="todo-del-title" id="noproj-title"></h3>
     <p  class="todo-del-desc"  id="noproj-desc"></p>
@@ -370,12 +1238,28 @@ export const TodoPage = () => `
     </div>
   </div>
 </div>
+<!-- ══ ADD MEMBER MODAL ══ -->
+<div id="add-member-modal" class="todo-modal-overlay" style="display:none">
+  <div class="todo-modal" style="max-width:500px;">
+    <div class="todo-modal-header">
+      <h3>${t("add_member") || "Add Member"}</h3>
+      <button class="todo-modal-close" id="add-member-modal-close">✕</button>
+    </div>
+    <div class="todo-modal-body" style="padding: 20px;">
+      <div class="member-search-box-large" style="margin-bottom: 12px;">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#8892a4" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#8892a4" stroke-width="2" stroke-linecap="round"/></svg>
+        <input type="text" id="add-member-search-input" placeholder="${t("search_users_placeholder")}" />
+      </div>
+      <div id="add-member-results" class="member-results-dropdown-inline" style="display:none; max-height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;"></div>
+    </div>
+  </div>
+</div>
 
 <!-- ══ PROJECT MODAL ══ -->
 <div id="project-modal" class="todo-modal-overlay" style="display:none">
-  <div class="todo-modal" style="max-width:400px">
+  <div class="todo-modal" style="max-width:500px">
     <div class="todo-modal-header">
-      <h3 id="project-modal-title">${t("new_project")}</h3>
+      <h3 id="project-modal-title">Project Settings</h3>
       <button class="todo-modal-close" id="project-modal-close">✕</button>
     </div>
     <div class="todo-modal-body">
@@ -384,10 +1268,21 @@ export const TodoPage = () => `
         <input class="todo-form-input" id="pm-name" placeholder="Enter project name..." />
         <span class="todo-form-error" id="pm-name-error"></span>
       </div>
+      <div id="project-members-section" style="margin-top: 24px; display: none;">
+        <label class="todo-form-label">Manage Members</label>
+        <div class="member-search-container">
+          <div class="member-search-box">
+             <input type="text" id="member-search-input" placeholder="Search by username or email..." />
+          </div>
+          <div id="member-search-results" class="member-results-dropdown" style="display:none"></div>
+        </div>
+        <div id="project-members-list" class="project-members-list"></div>
+      </div>
     </div>
     <div class="todo-modal-footer">
+      <button class="todo-btn-danger" id="project-modal-delete" style="display:none; margin-right: auto;">Delete Project</button>
       <button class="todo-btn-secondary" id="project-modal-cancel">Cancel</button>
-      <button class="todo-btn-primary"   id="project-modal-save">Create</button>
+      <button class="todo-btn-primary"   id="project-modal-save">Save Changes</button>
     </div>
   </div>
 </div>
@@ -396,9 +1291,7 @@ export const TodoPage = () => `
 <div id="todo-del-modal" class="todo-modal-overlay" style="display:none">
   <div class="todo-modal" style="max-width:460px;text-align:center;padding:20px">
     <div class="todo-del-icon-wrap">
-      <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-        <path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
-      </svg>
+      <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/></svg>
     </div>
     <h3 class="todo-del-title" id="del-modal-title"></h3>
     <p  class="todo-del-desc"  id="del-modal-desc"></p>
@@ -410,80 +1303,90 @@ export const TodoPage = () => `
 </div>
 `;
 
-// ─── STATE ────────────────────────────────────────────────────
-let currentView = "list";
-let currentProjectId = null;
-let currentFilter = "all";
-let searchQuery = "";
-let editingTaskId = null;
-let deleteCallback = null;
-let dragSrcTask = null;
-let selectedAssignees = []; // multi-select state for modal
+// ─── PROJECT SIDEBAR ──────────────────────────────────────────
+const renderProjectSidebar = async () => {
+  const projects = await fetchProjects();
+  const listEl = $("todo-project-list");
+  if (!listEl) return;
 
-const $ = (id) => document.getElementById(id);
+  const filtered = projects.filter((p) => p.name.toLowerCase().includes(projectSearchQuery.toLowerCase()));
 
-// ─── ASSIGNEE PICKER ──────────────────────────────────────────
-const renderAssigneePicker = async () => {
-  const picker = $("tm-assignee-picker");
-  if (!picker) return;
-  const users = await fetchUsers();
-
-  if (!users.length) {
-    picker.innerHTML = `<p style="color:#8892a4;font-size:12px;padding:8px 0">${t("no_users_yet") || "No users"}</p>`;
+  if (filtered.length === 0) {
+    listEl.innerHTML = `
+      <div class="sidebar-empty">
+        <svg width="40" height="40" fill="none" viewBox="0 0 24 24">
+          <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>${t("no_projects_found") || "No projects found"}</span>
+      </div>`;
     return;
   }
 
-  picker.innerHTML = users
-    .map((u) => {
-      const uId = u._id;
-      const sel = selectedAssignees.includes(uId);
-      return `<div class="todo-assignee-option ${sel ? "PicSelected" : ""}" data-uid="${uId}">
-            ${userAvatarHtml(u, 26)}
-            <span>${u.username}</span>
-        </div>`;
-    })
-    .join("");
-
-  picker.querySelectorAll(".todo-assignee-option").forEach((div) => {
-    div.addEventListener("click", () => {
-      const val = div.dataset.uid;
-      if (selectedAssignees.includes(val)) {
-        selectedAssignees = selectedAssignees.filter((v) => v !== val);
-      } else {
-        selectedAssignees.push(val);
-      }
-      renderAssigneePicker();
-    });
-  });
-};
-
-// ─── PROJECT TABS ─────────────────────────────────────────────
-const renderProjectTabs = async () => {
-  const projects = await fetchProjects();
-  const el = $("todo-project-tabs");
-  if (!el) return;
-  el.innerHTML = projects
+  listEl.innerHTML = filtered
     .map(
       (p) => `
-        <div class="todo-project-tab ${p._id === currentProjectId ? "active" : ""}" data-pid="${p._id}">
-            <span>${p.name}</span>
+      <div class="project-item ${p._id === currentProjectId ? "active" : ""}" data-pid="${p._id}">
+        <div class="project-icon-box">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
+        <span class="project-name">${p.name}</span>
+        <div class="project-item-actions">
+           <span class="task-count-badge">...</span>
+        </div>
+      </div>
     `,
     )
     .join("");
 
-  el.querySelectorAll(".todo-project-tab").forEach((tab) => {
-    tab.addEventListener("click", (e) => {
-      currentProjectId = tab.dataset.pid;
-      renderProjectTabs();
+  listEl.querySelectorAll(".project-item").forEach((item) => {
+    item.addEventListener("click", () => {
+      currentProjectId = item.dataset.pid;
+      viewMode = "tasks";
+      renderProjectSidebar();
       renderView();
     });
   });
+
+  filtered.forEach(async (p) => {
+    const tasks = await fetchTasks(p._id);
+    const badge = listEl.querySelector(`.project-item[data-pid="${p._id}"] .task-count-badge`);
+    if (badge) badge.textContent = tasks.length;
+  });
 };
 
-const showLoader = () => {
+const initProjectSidebarEvents = () => {
+  const searchInput = $("project-search-input");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      projectSearchQuery = e.target.value;
+      renderProjectSidebar();
+    });
+  }
+
+  const addBtn = $("todo-add-project-btn");
+  if (addBtn) {
+    addBtn.onclick = () => openProjectModal();
+  }
+
+  const addBtnEmpty = $("todo-add-project-btn-empty");
+  if (addBtnEmpty) {
+    addBtnEmpty.onclick = () => openProjectModal();
+  }
+
+  const overviewBtn = $("project-overview-btn");
+  if (overviewBtn) {
+    overviewBtn.onclick = () => {
+      if (currentProjectId) {
+        viewMode = "overview";
+        renderView();
+      }
+    };
+  }
+};
+
+const showLoader = (force = false) => {
   const container = $("todo-view-container");
-  if (container) {
+  if (container && (force || container.innerHTML.trim() === "")) {
     container.innerHTML = `
       <div class="todo-loader-container">
         <div class="todo-spinner"></div>
@@ -491,26 +1394,20 @@ const showLoader = () => {
   }
 };
 
-// ─── RENDER VIEW ──────────────────────────────────────────────
 const renderView = async (forceRefresh = false) => {
   const container = document.getElementById("todo-view-container");
   if (!container) return;
 
   const cu = getCurrent();
+  if (viewMode === "overview") {
+    const overviewBtn = $("project-overview-btn");
+    if (overviewBtn) overviewBtn.style.display = "none";
+  }
   if (cu) {
     currentUserPermissions = await getPermissions(cu.userId || cu._id);
   }
 
-  showLoader();
-  
-  // Loyiha tablari uchun ham yuklanish holati
-  const tabsEl = $("todo-project-tabs");
-  if (tabsEl && (!projectsCache || forceRefresh)) {
-    tabsEl.innerHTML = `
-      <div class="todo-tabs-loader">
-        <div class="todo-spinner" style="width:18px; height:18px; border-width:2px;"></div>
-      </div>`;
-  }
+  showLoader(forceRefresh);
 
   const projects = (await fetchProjects(forceRefresh)) || [];
 
@@ -520,50 +1417,86 @@ const renderView = async (forceRefresh = false) => {
     }
   }
 
-  // Loyiha tablarini ham yangilaymiz
-  await renderProjectTabs();
+  await renderProjectSidebar();
 
   const noProj = $("todo-no-projects");
-  const delProjBtn = $("todo-delete-project-btn");
+  const settingsBtn = $("project-settings-btn");
+  const tasksToolbar = document.querySelector(".tasks-toolbar");
+  const tasksContent = document.querySelector(".tasks-content");
 
   if (projects.length === 0) {
     if (noProj) {
       noProj.style.display = "flex";
       $("no-projects-msg").textContent = t("no_projects");
     }
-    if (delProjBtn) delProjBtn.style.display = "none";
+    const viewContainer = $("todo-view-container");
+    if (viewContainer) viewContainer.style.display = "none";
+    if (settingsBtn) settingsBtn.style.display = "none";
+    if (tasksToolbar) tasksToolbar.style.display = "none";
     container.innerHTML = "";
     if ($("todo-project-title")) $("todo-project-title").textContent = t("todo_title");
     return;
   }
 
+  const viewContainer = $("todo-view-container");
+  if (viewContainer) viewContainer.style.display = "block";
+
   if (noProj) noProj.style.display = "none";
-  if (delProjBtn) {
-    const cu = getCurrent();
-    if (cu) applyPermissions(cu.userId || cu._id);
-    delProjBtn.style.display = "flex";
+  const overviewBtn = $("project-overview-btn");
+  if (overviewBtn) overviewBtn.style.display = (viewMode === "overview" || viewMode === "task-detail" || viewMode === "task-history") ? "none" : "flex";
+
+  const proj = projects.find((p) => String(p._id) === String(currentProjectId));
+  if ($("todo-project-title")) $("todo-project-title").textContent = proj ? proj.name : "Select Project";
+
+  if (viewMode === "overview" || viewMode === "task-detail" || viewMode === "task-history") {
+    if (tasksToolbar) tasksToolbar.style.display = "none";
+    if (tasksContent) tasksContent.classList.add("settings-mode");
+
+    // Disable header buttons in settings/history/task-detail
+    [$("tab-list"), $("tab-board"), $("todo-create-task-btn")].forEach((btn) => {
+      if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = "0.5";
+        btn.style.pointerEvents = "none";
+      }
+    });
+
+    if (viewMode === "overview") {
+      await renderProjectOverviewView();
+    } else if (viewMode === "task-detail") {
+      await renderTaskDetailView();
+    } else if (viewMode === "task-history") {
+      await renderTaskHistoryView();
+    }
+  } else {
+    if (tasksToolbar) tasksToolbar.style.display = "flex";
+    if (tasksContent) tasksContent.classList.remove("settings-mode");
+
+    // Re-enable header buttons
+    [$("tab-list"), $("tab-board"), $("todo-create-task-btn")].forEach((btn) => {
+      if (btn) {
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        btn.style.pointerEvents = "auto";
+      }
+    });
+
+    const allTasks = await fetchTasks(currentProjectId, forceRefresh);
+
+    let tasks = allTasks;
+    if (currentFilter !== "all") tasks = tasks.filter((t) => getVisibleStatus(t) === currentFilter);
+    if (searchQuery) tasks = tasks.filter((t) => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.description || "").toLowerCase().includes(searchQuery.toLowerCase()));
+
+    if (currentView === "list") renderListView(tasks);
+    else renderBoardView(tasks);
   }
-
-  const proj = projects.find((p) => p._id === currentProjectId);
-  if ($("todo-project-title")) $("todo-project-title").textContent = proj.name;
-
-  // Vazifalarni keshdan yoki serverdan olish
-  const allTasks = await fetchTasks(currentProjectId, forceRefresh);
-
-  // Filter tasks locally
-  let tasks = allTasks;
-  if (currentFilter !== "all") tasks = tasks.filter((t) => getVisibleStatus(t) === currentFilter);
-  if (searchQuery) tasks = tasks.filter((t) => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.description || "").toLowerCase().includes(searchQuery.toLowerCase()));
-
-  if (currentView === "list") renderListView(tasks);
-  else renderBoardView(tasks);
 
   if (cu) {
     applyPermissions(cu.userId || cu._id);
+    applyProjectPermissions();
   }
 };
 
-// ─── LIST VIEW ────────────────────────────────────────────────
 const renderListView = (tasks) => {
   const container = $("todo-view-container");
   if (!container) return;
@@ -589,9 +1522,10 @@ const renderListView = (tasks) => {
             </div>
             <button class="todo-add-in-section" data-status="${status}" data-perm="task_add_task">+ ${t("add_task")}</button>
           </div>
-          <div class="todo-list-section-body" id="list-section-${status}">
+           <div class="todo-list-section-body" id="list-section-${status}">
             <div class="todo-list-table-header">
               <span class="todo-col-name">${t("task_name_col")}</span>
+              <span class="todo-col-center">${t("status_label")}</span>
               <span class="todo-col-center">${t("assignee")}</span>
               <span class="todo-col-center">${t("due_date")}</span>
               <span class="todo-col-center">${t("priority")}</span>
@@ -612,7 +1546,6 @@ const renderListRow = (task) => {
   const canDel = owner;
   const myStatus = getVisibleStatus(task);
   const myDone = myStatus === "done";
-  const canChangeStatus = checkPermission(currentUserPermissions, "task_change_status");
 
   return `
     <div class="todo-list-row todo-row-clickable" data-tid="${task._id}">
@@ -621,6 +1554,27 @@ const renderListRow = (task) => {
           ${myDone ? `<svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/></svg>` : ""}
         </button>
         <span class="todo-row-title ${myDone ? "done-text" : ""}">${task.title}</span>
+      </div>
+      <div class="todo-row-center-cell">
+        <div class="todo-list-status-custom-select s-${myStatus}" data-tid="${task._id}" data-action="change-status-custom">
+          <div class="status-selected">
+            <span>${myStatus === "todo" ? t("status_todo") : myStatus === "progress" ? t("status_progress") : t("status_done")}</span>
+            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+          <ul class="status-options">
+            <li data-value="todo" class="${myStatus === "todo" ? "active" : ""}">
+              <span>${t("status_todo")}</span>
+            </li>
+            <li data-value="progress" class="${myStatus === "progress" ? "active" : ""}">
+              <span>${t("status_progress")}</span>
+            </li>
+            <li data-value="done" class="${myStatus === "done" ? "active" : ""}">
+              <span>${t("status_done")}</span>
+            </li>
+          </ul>
+        </div>
       </div>
       <div class="todo-row-center-cell">${assigneeStackHtml(task, 26)}</div>
       <div class="todo-row-center-cell">${dueDateHtml(task.dueDate)}</div>
@@ -665,7 +1619,84 @@ const attachListEvents = (container) => {
       openTaskModal(null, btn.dataset.status);
     });
   });
-  // Row click → detail modal (if not action button)
+
+  container.querySelectorAll(".todo-list-status-custom-select").forEach((select) => {
+    const selected = select.querySelector(".status-selected");
+    const options = select.querySelector(".status-options");
+    const items = select.querySelectorAll(".status-options li");
+
+    selected.addEventListener("click", (e) => {
+      e.stopPropagation();
+      
+      // Close all other open status dropdowns
+      document.querySelectorAll(".todo-list-status-custom-select").forEach((otherSelect) => {
+        if (otherSelect !== select) {
+          otherSelect.classList.remove("open");
+          const otherOptions = otherSelect.querySelector(".status-options");
+          if (otherOptions) otherOptions.style.display = "none";
+          const otherChevron = otherSelect.querySelector(".chevron-icon");
+          if (otherChevron) otherChevron.style.transform = "rotate(0deg)";
+        }
+      });
+
+      const isOpen = options.style.display === "block";
+      options.style.display = isOpen ? "none" : "block";
+      select.classList.toggle("open", !isOpen);
+      const chevron = selected.querySelector(".chevron-icon");
+      if (chevron) chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
+    });
+
+    items.forEach((item) => {
+      item.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        options.style.display = "none";
+        select.classList.remove("open");
+        const chevron = selected.querySelector(".chevron-icon");
+        if (chevron) chevron.style.transform = "rotate(0deg)";
+
+        const taskId = select.dataset.tid;
+        const nextStatus = item.dataset.value;
+        if (!taskId || !nextStatus) return;
+
+        const role = getProjectRole();
+        if (role === "viewer" || !checkPermission(currentUserPermissions, "task_change_status")) {
+          showNotification(t("error_no_permission"), "error");
+          renderView(true);
+          return;
+        }
+
+        try {
+          let url = `${API_URL}/${taskId}/status`;
+          let body = { status: nextStatus };
+
+          const myId = String(getCurrent()?.userId || getCurrent()?._id || "");
+          updateLocalTaskCache({ _id: taskId, status: nextStatus, userStatus: { [myId]: nextStatus } }, currentProjectId);
+          renderView();
+
+          const res = await fetch(url, {
+            method: "PATCH",
+            headers: getAuthHeaders(),
+            credentials: "include",
+            body: JSON.stringify(body),
+          });
+
+          if (res.ok) {
+            const updated = await res.json();
+            updateLocalTaskCache(updated, currentProjectId);
+            renderView();
+            showNotification(t("status_updated") || "Status updated", "success");
+          } else {
+            throw new Error("Update failed");
+          }
+        } catch (err) {
+          console.error("Change status error:", err);
+          showNotification(t("error_updating_task") || "Error updating task", "error");
+          renderView(true);
+        }
+      });
+    });
+  });
+
   container.querySelectorAll(".todo-row-clickable").forEach((row) => {
     row.addEventListener("click", (e) => {
       const action = e.target.closest("[data-action]");
@@ -684,7 +1715,6 @@ const attachListEvents = (container) => {
   });
 };
 
-// ─── BOARD VIEW ───────────────────────────────────────────────
 const renderBoardView = (tasks) => {
   const container = $("todo-view-container");
   if (!container) return;
@@ -775,7 +1805,6 @@ const renderBoardCard = (task) => {
     </div>`;
 };
 
-// ─── DRAG & DROP ──────────────────────────────────────────────
 const initDragDrop = () => {
   document.querySelectorAll(".todo-board-card[draggable='true']").forEach((card) => {
     card.addEventListener("dragstart", (e) => {
@@ -820,47 +1849,59 @@ const initDragDrop = () => {
       const cu = getCurrent();
       if (!cu) return;
 
-      if (!checkPermission(currentUserPermissions, "task_change_status")) {
+      const role = getProjectRole();
+      if (role === "viewer" || !checkPermission(currentUserPermissions, "task_change_status")) {
         showNotification(t("error_no_permission"), "error");
         renderView(true);
         return;
       }
-
-      const cuId = String(cu.userId || cu._id || "");
 
       try {
         const tasks = tasksCache[currentProjectId] || [];
         const task = tasks.find((t) => String(t._id) === String(taskId));
         if (!task) return;
 
-        const ids = (task.assignees || []).map((u) => String(u._id || u || ""));
+        const cuId = cu?.userId || cu?._id;
+        const isAssignee = task.assignees.some((a) => String(a._id || a) === String(cuId));
+        const role = getProjectRole();
 
-        let url = `${API_URL}/${taskId}`;
+        // Agar assignee "done" ustuniga sursa yoki undan chiqarsa, toggleUserDone mantiqini ishlatamiz
+        if (isAssignee && (newCol === "done" || task.userStatus?.[cuId] === "done")) {
+          const currentMyDone = task.userStatus?.[cuId] === "done";
+          const draggingToDone = newCol === "done";
+
+          // Faqat status haqiqatdan o'zgarganda (masalan progressdan done-ga yoki aksincha)
+          if (currentMyDone !== draggingToDone) {
+            toggleDone(taskId);
+            return;
+          }
+        }
+
+        let url = `${API_URL}/${taskId}/status`;
         let body = { status: newCol };
 
-        updateLocalTaskCache({ _id: taskId, status: newCol }, currentProjectId);
+        const myId = String(cu?.userId || cu?._id || "");
+        updateLocalTaskCache({ _id: taskId, status: newCol, userStatus: { [myId]: newCol } }, currentProjectId);
+        renderView();
 
-        renderView(); // UI darhol o'zgaradi
-
-        // Fonda serverga so'rov
         fetch(url, {
-          method: "PUT",
+          method: "PATCH",
           headers: getAuthHeaders(),
           credentials: "include",
           body: JSON.stringify(body),
         })
           .then((res) => {
             if (res.ok) return res.json();
-            throw new Error("Drop update failed");
+            throw new Error("Update failed");
           })
           .then((updated) => {
-            updateLocalTaskCache(updated);
+            updateLocalTaskCache(updated, currentProjectId);
             showNotification(t("status_updated") || "Status updated", "success");
           })
           .catch((err) => {
             console.error("Drop error:", err);
             showNotification(t("error_updating_task") || "Error updating task", "error");
-            renderView(true); // Xato bo'lsa serverdan qayta tiklash
+            renderView(true);
           });
       } catch (err) {
         console.error("Drop handling error:", err);
@@ -886,41 +1927,50 @@ function getDragAfterElement(container, y) {
   ).element;
 }
 
-const toggleDone = async (tid) => {
-  const tasks = tasksCache[currentProjectId] || [];
-  const task = tasks.find((t) => t._id === tid);
-  if (!task) return;
-
-  let url = `${API_URL}/${tid}`;
-  let body = {};
-  const cu = getCurrent();
-  const cuId = cu.userId || cu._id;
-  const ids = (task.assignees || []).map((u) => u._id || u);
-
-  if (!checkPermission(currentUserPermissions, "task_change_status")) {
+const toggleDone = (tid) => {
+  const role = getProjectRole();
+  if (role === "viewer") {
     showNotification(t("error_no_permission"), "error");
     return;
   }
 
-  if (ids.length === 0 || ids.includes(cuId) || isOwner(task)) {
-    const nextStatus = task.status === "done" ? "todo" : "done";
-    body = { status: nextStatus };
-    updateLocalTaskCache({ _id: tid, status: nextStatus }, currentProjectId);
-  } else {
-    return;
-  }
+  const tasks = tasksCache[currentProjectId] || [];
+  const task = tasks.find((t) => t._id === tid);
+  if (!task) return;
 
+  const cu = getCurrent();
+  const cuId = cu?.userId || cu?._id;
+  const isAssignee = task.assignees.some((a) => String(a._id || a) === String(cuId));
+
+  // Agar user assignee bo'lsa, /toggle-user-done chaqiramiz
+  // Aks holda (Admin/Owner) statusni global o'zgartiradi
+  const url = isAssignee ? `${API_URL}/${tid}/toggle-user-done` : `${API_URL}/${tid}/status`;
+  const method = isAssignee ? "PATCH" : "PATCH"; // Ikkala holatda ham PATCH
+
+  const nextStatus = task.status === "done" ? "todo" : "done";
+  const body = isAssignee ? {} : { status: nextStatus };
+
+  // Optimistik yangilash: Serverdan javob kelishini kutmasdan UI-ni yangilaymiz
+  if (isAssignee) {
+    if (!task.userStatus) task.userStatus = {};
+    task.userStatus[cuId] = task.userStatus[cuId] === "done" ? "progress" : "done";
+  } else {
+    task.status = nextStatus;
+  }
+  updateLocalTaskCache(task, currentProjectId);
   renderView();
 
   fetch(url, {
-    method: "PUT",
+    method: "PATCH",
     headers: getAuthHeaders(),
     credentials: "include",
     body: JSON.stringify(body),
   })
     .then((res) => {
       if (res.ok) return res.json();
-      throw new Error("Update failed");
+      return res.json().then((err) => {
+        throw new Error(err.message || "Update failed");
+      });
     })
     .then((updated) => {
       updateLocalTaskCache(updated, currentProjectId);
@@ -928,7 +1978,7 @@ const toggleDone = async (tid) => {
     })
     .catch((err) => {
       console.error("Toggle error:", err);
-      showNotification(t("error_updating_status") || "Error updating status", "error");
+      showNotification(err.message || t("error_updating_status"), "error");
       renderView(true);
     });
 };
@@ -943,23 +1993,59 @@ const showNoProjectModal = () => {
 };
 
 const deleteTask = (tid) => {
-  showDeleteConfirm(t("confirm_delete_task"), async () => {
-    const res = await fetch(`${API_URL}/${tid}`, {
+  const isProject = tid === null;
+  const role = getProjectRole();
+  const perm = isProject ? "project_delete_project" : "task_delete_task";
+
+  if (role !== "admin" && !checkPermission(currentUserPermissions, perm)) {
+    showNotification(t("error_no_permission"), "error");
+    return;
+  }
+  const idToDelete = isProject ? currentProjectId : tid;
+  const msg = isProject ? t("confirm_delete_project") || "Loyihani va uning barcha vazifalarini o'chirib tashlamoqchimisiz?" : t("confirm_delete_task") || "Ushbu vazifani o'chirib tashlamoqchimisiz?";
+
+  showDeleteConfirm(msg, async () => {
+    const url = isProject ? `${API_URL}/projects/${idToDelete}` : `${API_URL}/${idToDelete}`;
+    const res = await fetch(url, {
       method: "DELETE",
       headers: getAuthHeaders(),
       credentials: "include",
     });
+
     if (res.ok) {
-      showNotification(t("task_deleted") || "Task deleted", "success");
+      if (isProject) {
+        if (projectsCache) {
+          projectsCache = projectsCache.filter((p) => p._id !== idToDelete);
+        }
+        currentProjectId = null;
+        viewMode = "tasks";
+        $("project-modal").style.display = "none";
+        showNotification(t("project_deleted") || "Loyiha o'chirildi", "success");
+      } else {
+        showNotification(t("task_deleted") || "Vazifa o'chirildi", "success");
+      }
       await renderView(true);
     } else {
-      showNotification(t("error_deleting_task") || "Error deleting task", "error");
+      showNotification(t("error_deleting") || "O'chirishda xatolik yuz berdi", "error");
     }
   });
 };
 
 // ─── TASK CREATE / EDIT MODAL ─────────────────────────────────
 const openTaskModal = async (taskId, defaultStatus = "todo") => {
+  if (taskId === null) {
+    if (!checkPermission(currentUserPermissions, "task_add_task")) {
+      showNotification(t("error_no_permission"), "error");
+      return;
+    }
+  } else {
+    const role = getProjectRole();
+    if (role !== "admin" && !checkPermission(currentUserPermissions, "task_edit_task")) {
+      showNotification(t("error_no_permission"), "error");
+      return;
+    }
+  }
+
   editingTaskId = taskId || null;
   const tasks = await fetchTasks(currentProjectId);
   const task = taskId ? tasks.find((t) => t._id === taskId) : null;
@@ -990,10 +2076,12 @@ const openTaskModal = async (taskId, defaultStatus = "todo") => {
   renderAssigneePicker();
 
   $("tm-title").value = task?.title || "";
-  $("tm-desc").value = task?.desc || "";
+  $("tm-desc").value = task?.description || "";
   $("tm-status").value = task?.status || defaultStatus;
   $("tm-priority").value = task?.priority || "none";
+  $("tm-startdate").value = task?.startDate ? task.startDate.split("T")[0] : "";
   $("tm-duedate").value = task?.dueDate ? task.dueDate.split("T")[0] : "";
+  $("tm-estimated").value = task?.estimatedTime || 0;
 
   $("tm-title").placeholder = t("task_title_placeholder");
   $("tm-desc").placeholder = t("task_desc_placeholder");
@@ -1008,6 +2096,11 @@ const openTaskModal = async (taskId, defaultStatus = "todo") => {
 };
 
 const saveTask = async () => {
+  const role = getProjectRole();
+  if (role !== "admin") {
+    showNotification(t("error_no_permission"), "error");
+    return;
+  }
   const titleInput = $("tm-title");
   const titleError = $("tm-title-error");
   const title = titleInput.value.trim();
@@ -1042,7 +2135,9 @@ const saveTask = async () => {
     status: $("tm-status").value,
     priority: $("tm-priority").value,
     assignees: [...selectedAssignees],
+    startDate: $("tm-startdate").value || null,
     dueDate: $("tm-duedate").value || null,
+    estimatedTime: Number($("tm-estimated").value) || 0,
     project: currentProjectId,
     createdBy: cu?._id || cu?.userId,
   };
@@ -1084,64 +2179,434 @@ const saveTask = async () => {
 
 // ─── TASK DETAIL MODAL ────────────────────────────────────────
 const openDetailModal = async (tid) => {
+  activeDetailTaskId = tid;
+  viewMode = "task-detail";
+  await renderView();
+};
+
+const renderTaskHistoryView = async () => {
+  const container = $("todo-view-container");
+  if (!container) return;
+
   const allTasks = await fetchTasks(currentProjectId);
-  const task = allTasks.find((t) => t._id === tid);
-  if (!task) return;
+  const task = allTasks.find((t) => t._id === activeDetailTaskId);
+  if (!task) {
+    viewMode = "tasks";
+    renderView();
+    return;
+  }
+
+  const taskHistoryData = await fetchTaskHistory(activeDetailTaskId);
+  const lang = getCurrentLang();
+
+  // Task History timeline html
+  let taskHistoryHtml = "";
+  if (taskHistoryData && taskHistoryData.length > 0) {
+    taskHistoryHtml = `
+      <div class="history-timeline">
+        ${taskHistoryData.map(log => {
+          const logUser = log.user || { username: "System" };
+          const timeStr = new Date(log.timestamp).toLocaleString();
+          let actionText = "";
+          let iconClass = "created";
+          let iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+          let itemTitle = task.title || "Task";
+          
+          if (log.action === "created") {
+            actionText = lang === "uz" ? "yaratdi" : lang === "ru" ? "создал(а)" : "created";
+            iconClass = "created";
+          } else if (log.action === "deleted") {
+            actionText = lang === "uz" ? "o'chirdi" : lang === "ru" ? "удалил(а)" : "deleted";
+            iconClass = "deleted";
+            iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+          } else if (log.action === "status_changed") {
+            const oldStatusVal = log.details && log.details.oldStatus ? log.details.oldStatus : "todo";
+            const newStatusVal = log.details && log.details.newStatus ? log.details.newStatus : "done";
+            const oldLbl = t("status_" + oldStatusVal) || oldStatusVal;
+            const newLbl = t("status_" + newStatusVal) || newStatusVal;
+            actionText = lang === "uz" ? `statusni o'zgartirdi (<span class="timeline-old-status">${oldLbl}</span> &rarr; <span class="timeline-new-status">${newLbl}</span>)` : lang === "ru" ? `изменил(а) статус (<span class="timeline-old-status">${oldLbl}</span> &rarr; <span class="timeline-new-status">${newLbl}</span>)` : `changed status (<span class="timeline-old-status">${oldLbl}</span> &rarr; <span class="timeline-new-status">${newLbl}</span>)`;
+            iconClass = "status";
+            iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+          } else if (log.action === "updated") {
+            actionText = lang === "uz" ? "yangiladi" : lang === "ru" ? "обновил(а)" : "updated";
+            iconClass = "updated";
+            iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+          }
+
+          return `
+            <div class="timeline-item animated-item">
+              <div class="timeline-item-marker ${iconClass}">
+                ${iconSvg}
+              </div>
+              <div class="timeline-item-content">
+                <div class="timeline-item-header">
+                  <span class="timeline-task-title">${itemTitle}</span>
+                  <span class="timeline-time">${timeStr}</span>
+                </div>
+                <div class="timeline-item-body">
+                  <span class="timeline-user">${userAvatarHtml(logUser, 20)} <strong>${logUser.username || logUser.email || "System"}</strong></span>
+                  <span class="timeline-action-text">${actionText}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  } else {
+    taskHistoryHtml = `
+      <div class="no-members-msg" style="padding: 80px 0; text-align: center;">
+        <svg width="48" height="48" fill="none" viewBox="0 0 24 24" style="color: #cbd5e1; margin-bottom: 12px;"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <p style="margin: 0; font-size: 14px; color: #64748b;">${t("no_history_yet") || "Tarixiy amallar hozircha mavjud emas"}</p>
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    <div class="project-settings-view animated-view project-history-view">
+      <div class="settings-header">
+        <div class="settings-title-box">
+          <button class="back-to-tasks" id="th-back-btn">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M19 12H5m0 0l7 7m-7-7l7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0;">${task.title} - ${lang === "uz" ? "Tarix" : lang === "ru" ? "История" : "History"}</h2>
+        </div>
+      </div>
+      <div class="settings-content stats-section-content" style="padding: 24px; overflow-y: auto; display: block; height: calc(100% - 65px);">
+        ${taskHistoryHtml}
+      </div>
+    </div>
+  `;
+
+  $("th-back-btn").onclick = () => {
+    viewMode = "task-detail";
+    renderView();
+  };
+};
+
+const renderTaskDetailView = async () => {
+  const container = $("todo-view-container");
+  if (!container) return;
+
+  const allTasks = await fetchTasks(currentProjectId);
+  const task = allTasks.find((t) => t._id === activeDetailTaskId);
+  if (!task) {
+    viewMode = "tasks";
+    renderView();
+    return;
+  }
+
+  const taskHistoryData = await fetchTaskHistory(activeDetailTaskId);
 
   const owner = isOwner(task);
-  const cfg = statusConfig[task.status] || statusConfig.todo;
-  const pcfg = priorityConfig[task.priority] || priorityConfig.none;
+  const myStatus = getVisibleStatus(task);
+  const cfg = statusConfig[myStatus] || statusConfig.todo;
+  const lang = getCurrentLang();
   const assignees = task.assignees || [];
   const cu = getCurrent();
   const cuId = cu?.userId || cu?._id;
-  const lang = getCurrentLang();
 
-  $("td-status-badge").className = `todo-detail-status-badge s-${task.status}`;
-  $("td-status-badge").textContent = cfg.label();
-  $("td-title").textContent = task.title;
-  $("td-desc").textContent = task.description || (lang === "uz" ? "Tavsif yo'q" : lang === "ru" ? "Нет описания" : "No description");
+  // Time Tracking calculations
+  const est = task.estimatedTime || 0;
+  const actualMap = task.actualTimeSpent || {};
+  let totalActual = 0;
+  if (task.actualTimeSpent) {
+    const values = typeof task.actualTimeSpent.values === "function" ? Array.from(task.actualTimeSpent.values()) : Object.values(task.actualTimeSpent);
+    totalActual = values.reduce((a, b) => a + (Number(b) || 0), 0);
+  }
+  const myActual = typeof actualMap.get === "function" ? (actualMap.get(cuId) || 0) : (actualMap[cuId] || 0);
 
-  // Labels
-  $("td-lbl-desc").textContent = t("description_label");
-  $("td-lbl-details").textContent = lang === "uz" ? "Ma'lumotlar" : lang === "ru" ? "Сведения" : "Details";
-  $("td-lbl-status").textContent = t("status_label");
-  $("td-lbl-priority").textContent = t("priority_label");
-  $("td-lbl-duedate").textContent = t("duedate_label");
-  $("td-lbl-assignees").textContent = t("assignee_label");
-  $("td-lbl-created").textContent = t("create_time");
-  $("td-lbl-createdby").textContent = lang === "uz" ? "Muallif" : lang === "ru" ? "Автор" : "Author";
-  $("td-edit-label").textContent = t("edit");
+  // Time progress bar width/color
+  const progress = est > 0 ? Math.min((totalActual / est) * 100, 100) : 0;
+  const progressColor = totalActual > est && est > 0 ? "#ef4444" : "#22c55e";
 
-  // Meta
-  $("td-meta-status").innerHTML = `<span class="todo-detail-status-badge s-${task.status}">${cfg.label()}</span>`;
-  $("td-meta-priority").innerHTML = getPriorityBadge(task.priority || "none");
-  $("td-meta-duedate").innerHTML = dueDateHtml(task.dueDate);
-  $("td-meta-created").textContent = task.createdAt ? new Date(task.createdAt).toLocaleString() : "—";
-  $("td-meta-createdby").textContent = task.createdBy?.username || "—";
+  // Time breakdown HTML
+  let assigneesWithTime = [];
+  assignees.forEach(u => {
+    const uId = u._id || u;
+    const spent = typeof actualMap.get === "function" ? actualMap.get(uId) : (actualMap[uId] || 0);
+    assigneesWithTime.push({ user: u, spent: Number(spent) || 0 });
+  });
 
-  // Assignees — har birining completion holati ko'rsatiladi
-  $("td-meta-assignees").innerHTML = assignees.length
+  const userListHtml = assigneesWithTime.map(item => {
+    const uId = item.user._id || item.user;
+    const isDone = task.userStatus && task.userStatus[uId] === "done";
+    return `
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 6px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          ${userAvatarHtml(item.user, 28, isDone)}
+          <span style="font-size: 13px; font-weight: 600; color: #1a1d2e;">${item.user.username || item.user.email || "User"}</span>
+        </div>
+        <div style="font-size: 13px; font-weight: 700; color: ${item.spent > 0 ? '#10b981' : '#64748b'};">
+          ${item.spent} ${t("hours")}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  const isUserAssignee = isAssignee(task);
+
+  // Assignee completion list
+  const assigneeListHtml = assignees.length
     ? assignees
         .map((u) => {
-          const uId = u._id;
+          const uId = u._id || u;
+          const isDone = task.userStatus && task.userStatus[uId] === "done";
+          const spent = task.actualTimeSpent ? (typeof task.actualTimeSpent.get === "function" ? task.actualTimeSpent.get(uId) : task.actualTimeSpent[uId]) : 0;
           return `
-            <div class="todo-detail-assignee-item" data-uid="${uId}">
-              ${userAvatarHtml(u, 26)}
-              <span class="assignee-name">${u?.username || "User"}</span>
+            <div class="todo-detail-assignee-item ${isDone ? "finished" : ""}" data-uid="${uId}">
+              ${userAvatarHtml(u, 30, isDone)}
+              <div class="assignee-detail-info">
+                <span class="assignee-name">${u?.username || "User"}</span>
+                ${spent > 0 ? `<span class="assignee-spent">${spent} ${t("hours")}</span>` : ""}
+              </div>
+              <span class="assignee-status-badge">${isDone ? t("status_done") || "Done" : t("status_todo") || "Todo"}</span>
             </div>`;
         })
         .join("")
     : `<span style="color:#8892a4;font-size:12px">—</span>`;
 
-  // Edit button visibility
-  const editBtn = $("td-edit-btn");
-  editBtn.style.display = owner ? "flex" : "none";
-  editBtn.onclick = () => {
-    $("task-detail-modal").style.display = "none";
-    openTaskModal(tid);
+  // Time logs timeline html
+  const logs = task.timeLogs || [];
+  let logsHtml = "";
+  if (logs.length > 0) {
+    const sortedLogs = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+    logsHtml = `
+      <div class="time-logs-history" style="margin-top: 14px; border-top: 1px solid #f1f3fa; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; width: 100%;">
+        <p style="font-size: 11px; font-weight: 700; color: #8892a4; text-transform: uppercase; margin: 0 0 4px 0;">
+          ${lang === "uz" ? "Ish vaqti tarixi" : lang === "ru" ? "История работы" : "Time Log History"}
+        </p>
+        <div class="time-logs-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow-y: auto; padding-right: 4px;">
+          ${sortedLogs.map(log => {
+            const d = log.date ? new Date(log.date).toLocaleDateString() : "—";
+            return `
+              <div class="time-log-item" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px;">
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                  <span style="font-weight: 600; color: #1a1d2e;">${log.username || "User"}</span>
+                  ${log.comment ? `<span style="font-size: 11px; color: #64748b; font-style: italic;">"${log.comment}"</span>` : ""}
+                </div>
+                <div style="text-align: right; display: flex; flex-direction: column; gap: 2px;">
+                  <span style="font-weight: 700; color: #10b981;">+${log.hours} ${t("hours")}</span>
+                  <span style="font-size: 10px; color: #94a3b8;">${d}</span>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+  container.innerHTML = `
+    <div class="project-settings-view animated-view todo-task-detail-panel">
+      <div class="settings-header">
+        <div class="settings-title-box">
+          <button class="back-to-tasks" id="back-to-tasks-btn">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M19 12H5m0 0l7 7m-7-7l7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0;">${task.title}</h2>
+        </div>
+        <div class="settings-actions" style="gap: 8px; display: flex;">
+           <button class="todo-detail-history-btn" id="td-history-btn" style="align-items: center; display: flex; gap: 6px; padding: 8px 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; color: #5a6279; transition: all 0.2s;">
+             <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+             <span>${lang === "uz" ? "Tarix" : lang === "ru" ? "История" : "History"}</span>
+           </button>
+           <button class="todo-detail-edit-btn" id="td-edit-btn" style="display: ${owner ? 'flex' : 'none'}; align-items: center; gap: 6px; padding: 8px 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; color: #5a6279; transition: all 0.2s;">
+             <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+             <span id="td-edit-label">${t("edit")}</span>
+           </button>
+        </div>
+      </div>
+
+      <div class="todo-detail-body" id="td-main-body">
+        <div class="todo-detail-main">
+          
+          <div class="todo-detail-section">
+            <p class="todo-detail-section-label" id="td-lbl-desc">${t("description_label")}</p>
+            <p class="todo-detail-desc" id="td-desc">
+              ${task.description || (lang === "uz" ? "Tavsif yo'q" : lang === "ru" ? "Нет описания" : "No description")}
+            </p>
+          </div>
+
+          <div class="todo-detail-time-tracking" id="td-time-section">
+              <div class="time-track-header" style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: #1a1d2e;">
+                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" style="color: #5b6ef5;"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span id="td-lbl-time-track">${owner ? t("time_by_users") : t("total_spent")}</span>
+              </div>
+              
+              <div class="time-track-stats" style="display: flex; flex-direction: column; gap: 12px;">
+                  <div style="display: flex; gap: 12px;">
+                      <div class="time-stat-box" style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 4px;">
+                          <span class="time-stat-label" style="font-size: 11px; font-weight: 600; color: #8892a4; text-transform: uppercase;">${t("estimated_time_label") || "Plan (Hours)"}</span>
+                          <span class="time-stat-value" style="font-size: 16px; font-weight: 700; color: #1a1d2e;">${est} ${t("hours")}</span>
+                      </div>
+                  </div>
+                  
+                  ${assigneesWithTime.length > 0 ? `
+                  <div class="time-track-user-list" style="margin-top: 4px; border-top: 1px solid #f1f3fa; padding-top: 12px;">
+                    <p style="font-size: 11px; font-weight: 700; color: #8892a4; text-transform: uppercase; margin: 0 0 8px 0;">
+                      ${lang === "uz" ? "Foydalanuvchilar kesimida" : lang === "ru" ? "По пользователям" : "Time by Users"}
+                    </p>
+                    ${userListHtml}
+                  </div>
+                  ` : ""}
+              </div>
+              
+
+
+              <div class="log-time-action" id="td-log-time-container" style="display: ${isUserAssignee ? "block" : "none"}; margin-top: 8px; border-top: 1px solid #f1f3fa; padding-top: 12px;">
+                  <p style="font-size: 11px; font-weight: 700; color: #8892a4; text-transform: uppercase; margin-bottom: 8px;">${t("log_time")}</p>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                      <div style="display: flex; gap: 8px;">
+                          <input type="date" id="td-log-date" class="todo-form-input" style="flex: 1.2; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px;" />
+                          <input type="number" id="td-log-input" class="todo-form-input" min="0" step="0.5" placeholder="${lang === "uz" ? "Soat" : lang === "ru" ? "Часы" : "Hours"}" style="flex: 0.8; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px;" />
+                      </div>
+                      <div style="display: flex; gap: 8px;">
+                          <input type="text" id="td-log-comment" class="todo-form-input" placeholder="${lang === "uz" ? "Izoh (ixtiyoriy)..." : lang === "ru" ? "Комментарий (опционально)..." : "Comment (optional)..."}" style="flex: 1; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px;" />
+                          <button class="todo-btn-primary" id="td-log-btn" style="padding: 6px 14px; border-radius: 8px; font-size: 12px;">${t("log_time")}</button>
+                      </div>
+                  </div>
+              </div>
+              
+              ${logsHtml}
+          </div>
+        </div>
+
+        <div class="todo-detail-side">
+          <p class="todo-detail-meta-heading" id="td-lbl-details">
+            ${lang === "uz" ? "Ma'lumotlar" : lang === "ru" ? "Сведения" : "Details"}
+          </p>
+          
+          <div class="todo-detail-meta-row">
+            <span class="todo-detail-meta-key">${t("status_label")}</span>
+            <span id="td-meta-status"><span class="todo-detail-status-badge s-${myStatus}">${cfg.label()}</span></span>
+          </div>
+          
+          <div class="todo-detail-meta-row">
+            <span class="todo-detail-meta-key">${t("priority_label")}</span>
+            <span id="td-meta-priority">${getPriorityBadge(task.priority || "none")}</span>
+          </div>
+
+          <div class="todo-detail-meta-row">
+            <span class="todo-detail-meta-key">${t("start_date_label")}</span>
+            <span id="td-meta-startdate">${task.startDate ? new Date(task.startDate).toLocaleDateString() : "—"}</span>
+          </div>
+          
+          <div class="todo-detail-meta-row">
+            <span class="todo-detail-meta-key">${t("duedate_label")}</span>
+            <span id="td-meta-duedate">${dueDateHtml(task.dueDate)}</span>
+          </div>
+          
+          <div class="todo-detail-meta-row">
+            <span class="todo-detail-meta-key">${t("create_time")}</span>
+            <span id="td-meta-created">${task.createdAt ? new Date(task.createdAt).toLocaleDateString() : "—"}</span>
+          </div>
+          
+          <div class="todo-detail-meta-row">
+            <span class="todo-detail-meta-key">${lang === "uz" ? "Muallif" : lang === "ru" ? "Автор" : "Author"}</span>
+            <span id="td-meta-createdby">${task.createdBy?.username || "—"}</span>
+          </div>
+
+          <div class="todo-detail-meta-row last-row">
+            <span class="todo-detail-meta-key">${t("assignee_label")}</span>
+            <div class="todo-detail-assignees" id="td-meta-assignees">
+              ${assigneeListHtml}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Attach event handlers
+  $("back-to-tasks-btn").onclick = () => {
+    viewMode = "tasks";
+    renderView();
   };
 
-  $("task-detail-modal").style.display = "flex";
+  const editBtn = $("td-edit-btn");
+  if (editBtn) {
+    editBtn.onclick = () => {
+      openTaskModal(activeDetailTaskId);
+    };
+  }
+
+  const historyBtn = $("td-history-btn");
+  if (historyBtn) {
+    historyBtn.onclick = () => {
+      viewMode = "task-history";
+      renderView();
+    };
+  }
+
+  // Handle Log Time
+  if (isUserAssignee) {
+    const logBtn = $("td-log-btn");
+    const logInput = $("td-log-input");
+    const logDateInput = $("td-log-date");
+    const logCommentInput = $("td-log-comment");
+    
+    if (logDateInput) {
+      logDateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    if (logBtn && logInput && logDateInput && logCommentInput) {
+      logBtn.onclick = async () => {
+        const hours = Number(logInput.value);
+        if (isNaN(hours) || hours <= 0) return;
+
+        const dateVal = logDateInput.value || new Date().toISOString().split('T')[0];
+        const commentVal = logCommentInput.value || "";
+
+        logBtn.disabled = true;
+        logBtn.textContent = "...";
+
+        try {
+          const logsList = task.timeLogs || [];
+          const newEntry = {
+            userId: cuId,
+            username: cu?.username || cu?.email || "User",
+            date: new Date(dateVal),
+            hours: hours,
+            comment: commentVal
+          };
+          logsList.push(newEntry);
+
+          const currentActualMap = task.actualTimeSpent || {};
+          const newActual = typeof currentActualMap.get === "function" 
+            ? { ...Object.fromEntries(currentActualMap) } 
+            : { ...currentActualMap };
+          
+          const myTotalHours = logsList
+            .filter(log => String(log.userId) === String(cuId))
+            .reduce((sum, log) => sum + Number(log.hours), 0);
+          
+          newActual[cuId] = myTotalHours;
+
+          const res = await fetch(`${API_URL}/${activeDetailTaskId}`, {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            credentials: "include",
+            body: JSON.stringify({ 
+              actualTimeSpent: newActual,
+              timeLogs: logsList
+            }),
+          });
+
+          if (res.ok) {
+            const updatedTask = await res.json();
+            updateLocalTaskCache(updatedTask, currentProjectId);
+            await renderTaskDetailView(); // Refresh the detail view!
+            showNotification(t("status_updated") || "Muvaffaqiyatli saqlandi", "success");
+          }
+        } catch (err) {
+          console.error("Log time error:", err);
+        } finally {
+          logBtn.disabled = false;
+          logBtn.textContent = t("log_time");
+        }
+      };
+    }
+  }
 };
 
 // ─── DELETE CONFIRM ───────────────────────────────────────────
@@ -1188,23 +2653,24 @@ const translateUI = () => {
 };
 
 // ─── INIT ─────────────────────────────────────────────────────
+let isInitialized = false;
+
 export const initTodoLogic = async () => {
   const lang = getCurrentLang();
   translateUI();
 
-  const hr = document.querySelector(".todo-header-right");
-  if (hr) {
-    const btn = createTaskAnalyticsBtn(lang);
-    if (!hr.querySelector(".todo-analytics-btn")) {
-      hr.insertAdjacentHTML("afterbegin", btn);
+  await renderView();
+
+  // Guard against duplicate event listeners on the same DOM elements
+  const container = document.querySelector(".tasks-container");
+  if (container) {
+    if (container.dataset.eventsAttached) {
+      return;
     }
+    container.dataset.eventsAttached = "true";
   }
 
-  // Sahifaga kirganda keshni tozalaymiz, shunda renderView o'zi 1 martadan yangi ma'lumot oladi
-  projectsCache = null;
-  tasksCache = {};
-
-  await renderView();
+  initProjectSidebarEvents();
 
   const cu = getCurrent();
   if (cu) applyPermissions(cu.userId || cu._id);
@@ -1218,31 +2684,27 @@ export const initTodoLogic = async () => {
     $("tab-list")?.classList.remove("active");
   }
 
-  // View tabs
-  $("tab-list")?.addEventListener("click", () => {
-    currentView = "list";
-    $("tab-list").classList.add("active");
-    $("tab-board").classList.remove("active");
-    renderView();
-  });
-  $("tab-board")?.addEventListener("click", () => {
-    currentView = "board";
-    $("tab-board").classList.add("active");
-    $("tab-list").classList.remove("active");
-    renderView();
-  });
-
-  // Filters
-  document.querySelectorAll(".todo-filter-btn").forEach((btn) => {
+  // View tabs (List/Board switch)
+  document.querySelectorAll(".view-tab").forEach((btn) => {
     btn.addEventListener("click", () => {
-      currentFilter = btn.dataset.filter;
-      document.querySelectorAll(".todo-filter-btn").forEach((b) => b.classList.remove("active"));
+      currentView = btn.id === "tab-list" ? "list" : "board";
+      document.querySelectorAll(".view-tab").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       renderView();
     });
   });
 
-  // Search
+  // Filters (Todo/Progress/Done)
+  document.querySelectorAll(".filter-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      currentFilter = btn.dataset.filter;
+      document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderView();
+    });
+  });
+
+  // Search tasks
   $("todo-search")?.addEventListener("input", (e) => {
     searchQuery = e.target.value;
     renderView();
@@ -1272,7 +2734,6 @@ export const initTodoLogic = async () => {
     }
   });
   $("tm-desc")?.addEventListener("keydown", (e) => {
-    // Description textarea'da Ctrl+Enter or Cmd+Enter bilan yuborish
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       $("task-modal-save")?.click();
@@ -1288,164 +2749,94 @@ export const initTodoLogic = async () => {
     openTaskModal(null);
   });
 
-  // Delete project
-  $("todo-delete-project-btn")?.addEventListener("click", () => {
-    if (!currentProjectId) return;
-    showDeleteConfirm(t("confirm_delete_project"), async () => {
-      const res = await fetch(`${API_URL}/projects/${currentProjectId}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-        credentials: "include",
-      });
-
-      if (res.ok) {
-        // Loyihani keshdan ham olib tashlaymiz (Optimistic)
-        if (projectsCache) {
-          projectsCache = projectsCache.filter((p) => p._id !== currentProjectId);
-        }
-        currentProjectId = null;
-        showNotification(t("project_deleted") || "Project deleted", "success");
-        await renderView(true); // Faqat bir marta shu yerda chaqiramiz
-      } else {
-        showNotification(t("error_deleting_project") || "Error deleting project", "error");
-      }
-    });
+  // Project modal events
+  $("project-modal-save")?.addEventListener("click", saveProject);
+  $("project-modal-delete")?.addEventListener("click", () => {
+    if (editingProjectId) deleteTask(null);
   });
-
-  // Add project
-  $("todo-add-project-btn")?.addEventListener("click", () => {
-    $("pm-name").value = "";
-    $("pm-name").placeholder = t("project_name_placeholder");
-
-    // Clear error states
-    $("pm-name").classList.remove("error");
-    $("pm-name-error").classList.remove("visible");
-    $("pm-name-error").textContent = "";
-
-    $("project-modal").style.display = "flex";
-    setTimeout(() => $("pm-name").focus(), 100);
-  });
-
-  $("project-modal-save")?.addEventListener("click", async () => {
-    const nameInput = $("pm-name");
-    const nameError = $("pm-name-error");
-    const name = nameInput.value.trim();
-
-    // Reset error state
-    nameInput.classList.remove("error");
-    nameError.classList.remove("visible");
-    nameError.textContent = "";
-
-    if (name.length < 3) {
-      nameInput.classList.add("error");
-      nameError.textContent = t("error_min_length_3") || "Kamida 3 ta belgi bo'lishi kerak";
-      nameError.classList.add("visible");
-      nameInput.focus();
-      return;
-    }
-    if (name.length > 20) {
-      nameInput.classList.add("error");
-      nameError.textContent = t("error_max_length_20") || "Maksimal 20 ta belgi bo'lishi kerak";
-      nameError.classList.add("visible");
-      nameInput.focus();
-      return;
-    }
-
-    const cu = getCurrent();
-    const saveBtn = $("project-modal-save");
-    saveBtn.classList.add("loading");
-
-    try {
-      const res = await fetch(`${API_URL}/projects`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        credentials: "include",
-        body: JSON.stringify({ name, createdBy: cu?._id || cu?.userId }),
-      });
-
-      if (res.ok) {
-        const newProj = await res.json();
-        $("project-modal").style.display = "none";
-        $("pm-name").value = "";
-
-        // Loyihalar keshini qo'lda yangilaymiz (serverdan qayta so'ramaslik uchun)
-        if (projectsCache) {
-          projectsCache.push(newProj);
-        } else {
-          projectsCache = [newProj];
-        }
-
-        currentProjectId = newProj._id;
-        showNotification(t("project_created") || "Project created", "success");
-        await renderView(); // renderView(true) emas, oddiy renderView chaqiramiz
-      } else {
-        showNotification(t("error_creating_project") || "Error creating project", "error");
-      }
-    } catch (err) {
-      console.error("Create project error:", err);
-      showNotification(t("error_creating_project") || "Error creating project", "error");
-    } finally {
-      saveBtn.classList.remove("loading");
-    }
-  });
-
   const closeProjModal = () => ($("project-modal").style.display = "none");
   $("project-modal-cancel")?.addEventListener("click", closeProjModal);
   $("project-modal-close")?.addEventListener("click", closeProjModal);
 
-  // Task modal
+  // Add Member modal events
+  $("add-member-modal-close")?.addEventListener("click", () => ($("add-member-modal").style.display = "none"));
+
+  // Task modal events
   $("task-modal-save")?.addEventListener("click", saveTask);
   const closeTaskModal = () => ($("task-modal").style.display = "none");
   $("task-modal-cancel")?.addEventListener("click", closeTaskModal);
   $("task-modal-close")?.addEventListener("click", closeTaskModal);
 
-  // Detail modal
+  // Detail modal events
   const closeDetailModal = () => ($("task-detail-modal").style.display = "none");
   $("task-detail-close")?.addEventListener("click", closeDetailModal);
 
-  // Delete modal
-  $("del-modal-confirm").addEventListener("click", async () => {
+  // Confirmation modal (Delete)
+  $("del-modal-confirm")?.addEventListener("click", async () => {
     if (deleteCallback) {
       const btn = $("del-modal-confirm");
-      btn.classList.add("loading");
+      btn?.classList.add("loading");
       try {
         await deleteCallback();
         deleteCallback = null;
-        $("todo-del-modal").style.display = "none";
+        const modal = $("todo-del-modal");
+        if (modal) modal.style.display = "none";
       } finally {
-        btn.classList.remove("loading");
+        btn?.classList.remove("loading");
       }
     }
   });
+  $("del-modal-cancel")?.addEventListener("click", () => ($("todo-del-modal").style.display = "none"));
 
   // No-project modal
   $("noproj-cancel-btn")?.addEventListener("click", () => ($("no-project-modal").style.display = "none"));
   $("noproj-create-btn")?.addEventListener("click", () => {
+    if (!checkPermission(currentUserPermissions, "project_add_project")) {
+      showNotification(t("error_no_permission"), "error");
+      return;
+    }
     $("no-project-modal").style.display = "none";
-    $("pm-name").value = "";
-    $("project-modal").style.display = "flex";
-    setTimeout(() => $("pm-name").focus(), 100);
+    openProjectModal();
   });
-  $("del-modal-cancel")?.addEventListener("click", () => ($("todo-del-modal").style.display = "none"));
 
-  // Global Enter key for delete modal
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const delModal = $("todo-del-modal");
-      if (delModal && delModal.style.display === "flex") {
-        e.preventDefault();
-        $("del-modal-confirm")?.click();
+  // Global Key Events - Only attach once
+  if (!isInitialized) {
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const delModal = $("todo-del-modal");
+        if (delModal && delModal.style.display === "flex") {
+          e.preventDefault();
+          $("del-modal-confirm")?.click();
+        }
       }
-    }
-    if (e.key === "Escape") {
-      // Escape orqali modallarni yopish
-      $("task-modal").style.display = "none";
-      $("project-modal").style.display = "none";
-      $("todo-del-modal").style.display = "none";
-      $("task-detail-modal").style.display = "none";
-      $("no-project-modal").style.display = "none";
-    }
-  });
+      if (e.key === "Escape") {
+        $("task-modal").style.display = "none";
+        $("project-modal").style.display = "none";
+        $("todo-del-modal").style.display = "none";
+        $("task-detail-modal").style.display = "none";
+        $("no-project-modal").style.display = "none";
+      }
+    });
 
-  initTaskAnalytics(lang);
+    document.addEventListener(LANGUAGE_CHANGED_EVENT, () => {
+      renderView();
+    });
+
+    document.addEventListener("click", (e) => {
+      document.querySelectorAll(".todo-list-status-custom-select").forEach((select) => {
+        if (!select.contains(e.target)) {
+          select.classList.remove("open");
+          const options = select.querySelector(".status-options");
+          if (options) options.style.display = "none";
+          const chevron = select.querySelector(".chevron-icon");
+          if (chevron) chevron.style.transform = "rotate(0deg)";
+        }
+      });
+    });
+
+    initTaskAnalytics(lang);
+    isInitialized = true;
+  }
+
+  console.log("Tasks logic initialized.");
 };

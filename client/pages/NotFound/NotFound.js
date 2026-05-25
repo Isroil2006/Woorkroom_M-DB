@@ -122,7 +122,7 @@ export const initNotFoundLogic = () => {
   const btn = document.getElementById("nf-go-home");
   if (btn) {
     btn.onclick = () => {
-      window.history.pushState({}, "", "/tasks");
+      window.history.pushState({}, "", "/calendar");
       window.dispatchEvent(new PopStateEvent("popstate"));
     };
   }

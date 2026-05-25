@@ -14,6 +14,8 @@ const saveToLocal = () => {
   localStorage.setItem("currentTab", currentTab);
 };
 
+let isInitialized = false;
+
 const t = createTranslationHelper(translations);
 
 // 1. DASHBOARD VA ASOSIY STRUKTURA
@@ -609,6 +611,14 @@ const cloneTest = (container, index) => {
 // 6. ASOSIY LOGIKA
 export const initDashboardLogic = () => {
   const container = document.querySelector(".content");
+
+  if (!isInitialized) {
+    document.addEventListener(LANGUAGE_CHANGED_EVENT, () => {
+      if (currentView === "dashboard") initDashboardLogic();
+      else if (currentView === "detail" && currentTestId !== null) renderDetailView(container, currentTestId);
+    });
+    isInitialized = true;
+  }
 
   // ✅ Result view
   if (currentView === "result") {

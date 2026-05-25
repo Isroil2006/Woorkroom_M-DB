@@ -64,6 +64,8 @@ router.get("/projects", auth, checkPermission(), taskController.getProjects);
  *         description: Loyiha yaratish uchun ruxsat yo'q
  */
 router.post("/projects", auth, checkPermission(), taskController.createProject);
+router.put("/projects/:id", auth, checkPermission(), taskController.updateProject);
+router.get("/projects/:projectId/history", auth, checkPermission(), taskController.getProjectHistory);
 
 /**
  * @swagger
@@ -100,6 +102,7 @@ router.delete("/projects/:id", auth, checkPermission(), taskController.deletePro
  *       200:
  *         description: Vazifalar ro'yxati
  */
+router.get("/all", auth, checkPermission(), taskController.getAllTasks);
 router.get("/", auth, checkPermission(), taskController.getTasks);
 
 /**
@@ -166,6 +169,30 @@ router.put("/:id", auth, checkPermission(), taskController.updateTask);
  *         description: Sizda ushbu vazifani o'chirish huquqi yo'q
  */
 router.delete("/:id", auth, checkPermission(), taskController.deleteTask);
+
+// Task history
+router.get("/:id/history", auth, checkPermission(), taskController.getTaskHistory);
+
+/**
+ * @swagger
+ * /api/tasks/{id}/toggle-user-done:
+ *   patch:
+ *     summary: Foydalanuvchi uchun vazifani bajarilgan deb belgilash
+ *     tags: [Tasks]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Status yangilandi
+ */
+router.patch("/:id/toggle-user-done", auth, checkPermission(), taskController.toggleUserDone);
+
+// Status update (used by todo-check-btn or similar logic)
+router.patch("/:id/status", auth, checkPermission(), taskController.updateTask);
 
 
 

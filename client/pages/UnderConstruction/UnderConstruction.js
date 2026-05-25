@@ -112,7 +112,7 @@ export const initUnderConstructionLogic = () => {
   const btn = document.getElementById("uc-back-home");
   if (btn) {
     btn.onclick = () => {
-      window.history.pushState({}, "", "/tasks");
+      window.history.pushState({}, "", "/calendar");
       window.dispatchEvent(new PopStateEvent("popstate"));
     };
   }

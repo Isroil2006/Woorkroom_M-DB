@@ -19,11 +19,57 @@ const UNDER_CONSTRUCTION = {
   Payments: true,
   Vacations: true,
   Messenger: true,
-  Infoportal: true,
+  Infoportal: false,
 };
+
+// ─── STATE MANAGEMENT ──────────────────────────────────────────────
+let isCollapsed = true;
+let isLocked = false;
+let hoverTimer = null;
 
 const navigationWrapper = document.querySelector(".navigation-wrapper");
 const contentArea = document.querySelector(".content");
+
+// ─── HELPER FUNCTIONS ──────────────────────────────────────────────
+const updateSidebarUI = () => {
+  navigationWrapper.classList.add("transitioning");
+  
+  if (isCollapsed) {
+    navigationWrapper.classList.add("collapsed");
+  } else {
+    navigationWrapper.classList.remove("collapsed");
+  }
+
+  // Remove transitioning class after animation finishes (0.6s)
+  setTimeout(() => {
+    navigationWrapper.classList.remove("transitioning");
+  }, 600);
+};
+
+const attachHoverEvents = () => {
+  navigationWrapper.addEventListener("mouseenter", () => {
+    if (isLocked) return;
+    
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => {
+      isCollapsed = false;
+      updateSidebarUI();
+    }, 200);
+  });
+
+  navigationWrapper.addEventListener("mouseleave", () => {
+    clearTimeout(hoverTimer);
+    isCollapsed = true;
+    isLocked = false; // Reset lock when leaving
+    updateSidebarUI();
+
+    // Auto-close profile dropdown when leaving navigation
+    const dropdown = document.querySelector(".profile-dropdown");
+    const chevron = document.querySelector(".sidebar-profile .chevron-icon");
+    if (dropdown) dropdown.style.display = "none";
+    if (chevron) chevron.style.transform = "rotate(0deg)";
+  });
+};
 
 let userAvatar = "/assets/images/User-avatar.png";
 let userName = getCurrentLang() === "uz" ? "Foydalanuvchi" : "User";
@@ -83,12 +129,12 @@ const NAV_PERM_MAP = {
 };
 
 const ROUTES = {
-  "/": "Tasks",
+  "/": "Infoportal",
   "/tests": "Tests",
   "/payments": "Payments",
   "/tasks": "Tasks",
-  "/index.html": "Tasks",
-  "/index": "Tasks",
+  "/index.html": "Infoportal",
+  "/index": "Infoportal",
   "/vacations": "Vacations",
   "/employees": "Employees",
   "/messenger": "Messenger",
@@ -109,15 +155,15 @@ const PATH_MAP = {
 // ─── NAV HTML ─────────────────────────────────────────────────────
 const renderNavigation = () => {
   const lang = getCurrentLang();
-  const currentPageName = ROUTES[window.location.pathname] || "Tasks";
+  const currentNavPage = ROUTES[window.location.pathname] || "Infoportal";
   const cu = getCurrentUser();
 
   const displayAvatar = cu?.avatar || (cu?.gender === "Male" ? "/assets/images/user-avatar-male.png" : cu?.gender === "Female" ? "/assets/images/user-avatar-female.png" : userAvatar);
   const displayName = cu?.username || (lang === "uz" ? "Foydalanuvchi" : "User");
 
   navigationWrapper.innerHTML = `
-    <div class="nav-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-        <a href="/tasks" id="nav-logo-link"><img src="/assets/images/logo-blue.svg" alt="" /></a>
+    <div class="nav-header">
+        <a href="/" id="nav-logo-link"><img src="/assets/images/logo-blue.svg" alt="" /></a>
         
         <div class="custom-select" id="nav-language-selector">
             <div class="selected">
@@ -126,7 +172,7 @@ const renderNavigation = () => {
                     <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
             </div>
-            <ul class="options" style="display: none;">
+            <ul class="options">
                 <li data-value="uz">
                     <img src="/assets/images/uzb-flag.png" alt="" />
                     UZ
@@ -144,58 +190,58 @@ const renderNavigation = () => {
     </div>
 
     <ul class="nav-menu">
-        <li data-page="Tasks" data-perm="nav_tasks" class="${currentPageName === "Tasks" ? "active" : ""} loading">
+        <li data-page="Infoportal" data-perm="nav_infoportal" class="${currentNavPage === "Infoportal" ? "active" : ""} loading">
             <a href="#calendar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-days-icon lucide-calendar-days"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+                <span>${t("nav_infoportal")}</span>
+            </a>
+        </li>
+
+        <li data-page="Tasks" data-perm="nav_tasks" class="${currentNavPage === "Tasks" ? "active" : ""} loading">
+            <a href="#tasks">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-check-icon lucide-clipboard-check"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>
                 <span>${t("nav_calendar")}</span>
             </a>
         </li>
 
-        <li data-page="Tests" data-perm="nav_dashboard" class="${currentPageName === "Tests" ? "active" : ""} loading">
+        <li data-page="Tests" data-perm="nav_dashboard" class="${currentNavPage === "Tests" ? "active" : ""} loading">
             <a href="#tests">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-square-check-big-icon lucide-square-check-big"><path d="M21 10.656V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.344"/><path d="m9 11 3 3L22 4"/></svg>
                 <span>${t("nav_tests")}</span>
             </a>
         </li>
 
-        <li data-page="Payments" data-perm="nav_payments" class="${currentPageName === "Payments" ? "active" : ""} loading">
+        <li data-page="Payments" data-perm="nav_payments" class="${currentNavPage === "Payments" ? "active" : ""} loading">
             <a href="#payments">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wallet-icon lucide-wallet"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
                 <span>${t("nav_payments")}</span>
             </a>
         </li>
 
-        <li data-page="Vacations" data-perm="nav_vacations" class="${currentPageName === "Vacations" ? "active" : ""} loading">
+        <li data-page="Vacations" data-perm="nav_vacations" class="${currentNavPage === "Vacations" ? "active" : ""} loading">
             <a href="#vacations">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-tickets-plane-icon lucide-tickets-plane"><path d="M10.5 17h1.227a2 2 0 0 0 1.345-.52L18 12"/><path d="m12 13.5 3.794.506"/><path d="m3.173 8.18 11-5a2 2 0 0 1 2.647.993L18.56 8"/><path d="M6 10V8"/><path d="M6 14v1"/><path d="M6 19v2"/><rect x="2" y="8" width="20" height="13" rx="2"/></svg>
                 <span>${t("nav_vacations")}</span>
             </a>
         </li>
 
-        <li data-page="Employees" data-perm="nav_employees" class="${currentPageName === "Employees" ? "active" : ""} loading">
+        <li data-page="Employees" data-perm="nav_employees" class="${currentNavPage === "Employees" ? "active" : ""} loading">
             <a href="#employees">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users-icon lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg>
                 <span>${t("nav_employees")}</span>
             </a>
         </li>
 
-        <li data-page="Messenger" data-perm="nav_messenger" class="${currentPageName === "Messenger" ? "active" : ""} loading">
+        <li data-page="Messenger" data-perm="nav_messenger" class="${currentNavPage === "Messenger" ? "active" : ""} loading">
             <a href="#messenger">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-messages-square-icon lucide-messages-square"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg>
                 <span>${t("nav_messenger")}</span>
             </a>
         </li>
-
-        <li data-page="Infoportal" data-perm="nav_infoportal" class="${currentPageName === "Infoportal" ? "active" : ""} loading">
-            <a href="#calendar">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-days-icon lucide-calendar-days"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
-                <span>${t("nav_infoportal")}</span>
-            </a>
-        </li>
     </ul>
 
     <div class="profile-menu-container">
-        <div class="profile-dropdown" style="display: none;">
+        <div class="profile-dropdown">
             <div class="dropdown-item" id="go-to-profile">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"></path>
@@ -231,6 +277,11 @@ const renderNavigation = () => {
   attachNavClickEvents();
   attachProfileEvents();
   attachLogoEvent();
+
+  // Apply permissions to new elements
+  if (cu) {
+    applyPermissions(cu.userId || cu._id);
+  }
 };
 
 const initNavLanguage = () => {
@@ -277,6 +328,12 @@ const attachNavClickEvents = () => {
       e.preventDefault();
       const pageID = link.getAttribute("data-page");
       const targetPath = PATH_MAP[pageID] || "/";
+      
+      // Collapse and lock sidebar on click
+      isCollapsed = true;
+      isLocked = true;
+      updateSidebarUI();
+
       const cu = getCurrentUser();
       if (cu) {
         const permKey = NAV_PERM_MAP[pageID];
@@ -307,6 +364,12 @@ const attachProfileEvents = () => {
   document.getElementById("go-to-profile").onclick = () => {
     dropdown.style.display = "none";
     chevron.style.transform = "rotate(0deg)";
+    
+    // Collapse and lock sidebar on click
+    isCollapsed = true;
+    isLocked = true;
+    updateSidebarUI();
+
     navigateTo("/profile");
   };
 
@@ -328,12 +391,23 @@ const attachLogoEvent = () => {
   if (logoLink) {
     logoLink.onclick = (e) => {
       e.preventDefault();
-      navigateTo("/tasks");
+
+      // Collapse and lock sidebar on click
+      isCollapsed = true;
+      isLocked = true;
+      updateSidebarUI();
+
+      navigateTo("/");
     };
   }
 };
 
-const renderPage = (pageName) => {
+let currentPageName = "";
+
+const renderPage = (pageName, force = false) => {
+  const isSamePage = (currentPageName === pageName);
+  currentPageName = pageName;
+
   // 1. Ishlab chiqilmoqda (Maintenance) tekshiruvi
   if (UNDER_CONSTRUCTION[pageName]) {
     contentArea.innerHTML = UnderConstructionPage();
@@ -341,30 +415,48 @@ const renderPage = (pageName) => {
     return;
   }
 
-  // 2. Oddiy sahifalar renderi
+  // Agar bir xil sahifa bo'lsa, faqat mantiqni (tilni) yangilaymiz, innerHTML ni emas
+  const skipRender = !force && isSamePage && ["Tasks", "Tests", "Employees", "Infoportal", "Messenger", "Vacations"].includes(pageName);
   if (pageName === "Tests") {
-    contentArea.innerHTML = DashboardPage();
-    initDashboardLogic();
+    if (!skipRender) {
+      contentArea.innerHTML = DashboardPage();
+      initDashboardLogic();
+    }
   } else if (pageName === "Payments") {
-    contentArea.innerHTML = BusinessPage();
-    initBusinessLogic();
+    if (!skipRender) {
+      contentArea.innerHTML = BusinessPage();
+      initBusinessLogic();
+    }
   } else if (pageName === "Tasks") {
-    contentArea.innerHTML = TodoPage();
-    initTodoLogic();
+    if (!skipRender) {
+      contentArea.innerHTML = TodoPage();
+      initTodoLogic();
+    }
   } else if (pageName === "Vacations") {
-    contentArea.innerHTML = '<div class="vac-wrap"></div>';
+    if (!skipRender) {
+      contentArea.innerHTML = '<div class="vac-wrap"></div>';
+      initVacationsLogic();
+    }
   } else if (pageName === "Employees") {
-    contentArea.innerHTML = EmployeesPage();
-    initEmployeesPage();
+    if (!skipRender) {
+      contentArea.innerHTML = EmployeesPage();
+      initEmployeesPage();
+    }
   } else if (pageName === "Messenger") {
-    contentArea.innerHTML = MassangerPage();
-    initMessengerLogic();
+    if (!skipRender) {
+      contentArea.innerHTML = MassangerPage();
+      initMessengerLogic();
+    }
   } else if (pageName === "Infoportal") {
-    contentArea.innerHTML = InfoPortalPage();
-    initInfoPortalLogic();
+    if (!skipRender) {
+      contentArea.innerHTML = InfoPortalPage();
+      initInfoPortalLogic();
+    }
   } else if (pageName === "Unauthorized") {
-    contentArea.innerHTML = UnauthorizedPage();
-    initUnauthorizedLogic();
+    if (!skipRender) {
+      contentArea.innerHTML = UnauthorizedPage();
+      initUnauthorizedLogic();
+    }
   } else if (pageName === "user-profile") {
     userProfileRender();
   } else if (pageName === "NotFound") {
@@ -415,7 +507,11 @@ window.addEventListener("popstate", (e) => {
 });
 
 const initNavigation = async () => {
-  // 1. Foydalanuvchini yuklash (lekin bloklamaslik uchun paralellikka harakat qilamiz)
+  // 0. Initialize sidebar state and events
+  updateSidebarUI();
+  attachHoverEvents();
+
+  // 1. Foydalanuvchini yuklash
   const cu = await fetchCurrentUser();
 
   // 2. Navigatsiyani chizish (Rasm yuklanmagan bo'lsa skeleton chiqadi)
@@ -457,7 +553,7 @@ const handleLanguageChange = () => {
   renderNavigation();
   const currentPath = window.location.pathname;
   const pageName = ROUTES[currentPath] || "NotFound";
-  renderPage(pageName);
+  renderPage(pageName, false);
 };
 
 document.addEventListener(LANGUAGE_CHANGED_EVENT, handleLanguageChange);

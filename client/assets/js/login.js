@@ -115,6 +115,8 @@ function attachEvents() {
       }
       if (hasError) return;
 
+      signupbtn.classList.add("loading");
+
       const bodyData = {
         username,
         tel,
@@ -144,7 +146,10 @@ function attachEvents() {
             alert("Serverda xatolik yuz berdi. Iltimos keyinroq qayta urinib ko'ring.");
           }
         })
-        .catch((err) => console.error("Register xatosi:", err));
+        .catch((err) => console.error("Register xatosi:", err))
+        .finally(() => {
+          signupbtn.classList.remove("loading");
+        });
     };
   }
 
@@ -160,6 +165,8 @@ function attachEvents() {
         showError("password", "Parolni kiriting");
         return;
       }
+
+      signinbtn.classList.add("loading");
 
       fetch(`${API_URL}/api/users/login`, {
         method: "POST",
@@ -186,7 +193,10 @@ function attachEvents() {
             alert("Tizimga kirishda xatolik yuz berdi. Iltimos keyinroq qayta urinib ko'ring.");
           }
         })
-        .catch((err) => console.error("Login xatosi:", err));
+        .catch((err) => console.error("Login xatosi:", err))
+        .finally(() => {
+          signinbtn.classList.remove("loading");
+        });
     };
   }
 

@@ -103,6 +103,7 @@ router.get("/me", auth, userController.getMe);
  *       200:
  *         description: Foydalanuvchilar ro'yxati
  */
+router.get("/search", auth, userController.searchUsers);
 router.get("/", auth, checkPermission(), userController.getAllUsers);
 
 /**

@@ -221,3 +221,25 @@ exports.getUserById = async (req, res) => {
     res.status(500).json({ message: "Xatolik yuz berdi", error: error.message });
   }
 };
+// Search Users (for adding to projects)
+exports.searchUsers = async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query || query.length < 2) {
+      return res.status(200).json([]);
+    }
+
+    const users = await User.find({
+      $or: [
+        { username: { $regex: query, $options: "i" } },
+        { email: { $regex: query, $options: "i" } },
+      ],
+    })
+    .limit(10)
+    .select("username email userId avatar");
+
+    res.status(200).json(users);
+  } catch (error) {
+    res.status(500).json({ message: "Qidiruvda xatolik", error: error.message });
+  }
+};

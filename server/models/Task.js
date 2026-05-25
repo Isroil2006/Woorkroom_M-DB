@@ -20,6 +20,16 @@ const taskSchema = new mongoose.Schema({
     default: "none",
   },
   dueDate: { type: Date },
+  startDate: { type: Date },
+  estimatedTime: { type: Number, default: 0 }, // Soatda
+  actualTimeSpent: { type: Map, of: Number, default: {} }, // userId -> hours
+  timeLogs: [{
+    userId: { type: String, required: true },
+    username: { type: String },
+    date: { type: Date, default: Date.now },
+    hours: { type: Number, required: true },
+    comment: { type: String }
+  }],
   project: { type: String, ref: "Project", required: true },
   assignees: [{ type: String, ref: "User" }],
   createdBy: { type: String, ref: "User" },

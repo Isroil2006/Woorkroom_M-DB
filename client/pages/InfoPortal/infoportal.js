@@ -1,10 +1,12 @@
 import { SAMPLE_TOURS } from "../Vacations/card-default-data.js";
-import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
+import { getCurrentLang, createTranslationHelper, LANGUAGE_CHANGED_EVENT } from "../../assets/js/i18n.js";
+import { API_URL as BASE_URL, getAuthHeaders, getCurrentUser } from "../../assets/js/api.js";
+
+const API_URL = `${BASE_URL}/api/tasks`;
 
 const getUsers = () => JSON.parse(localStorage.getItem("users")) || [];
-const getCurrent = () => JSON.parse(localStorage.getItem("currentUser"));
-const getProjects = () =>
-  JSON.parse(localStorage.getItem("todo_projects")) || [];
+const getCurrent = () => getCurrentUser();
+const getProjects = () => JSON.parse(localStorage.getItem("todo_projects")) || [];
 const getMyTests = () => JSON.parse(localStorage.getItem("myTests")) || [];
 
 const EVENT_TYPES = {
@@ -54,39 +56,18 @@ const eventIcons = {
   [EVENT_TYPES.TASK_DUE]: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-list-icon lucide-clipboard-list"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>`,
 };
 
-
 const translations = {
   uz: {
     title: "Kalendar",
     today: "Bugun",
-    monthNames: [
-      "Yanvar",
-      "Fevral",
-      "Mart",
-      "Aprel",
-      "May",
-      "Iyun",
-      "Iyul",
-      "Avgust",
-      "Sentabr",
-      "Oktabr",
-      "Noyabr",
-      "Dekabr",
-    ],
+    monthNames: ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"],
     dayNames: ["Dush", "Sesh", "Chor", "Pay", "Jum", "Shan", "Yak"],
-    dayNamesFull: [
-      "Dushanba",
-      "Seshanba",
-      "Chorshanba",
-      "Payshanba",
-      "Juma",
-      "Shanba",
-      "Yakshanba",
-    ],
+    dayNamesFull: ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"],
     noEvents: "Bu kunda voqealar yo'q",
     month: "Oy",
     week: "Hafta",
     day: "Kun",
+    horizontal: "(Horizontal)",
     paymentSent: "O'tkazma",
     paymentReceived: "To'lov",
     testCompleted: "Test",
@@ -102,38 +83,29 @@ const translations = {
     city: "Shahar",
     nature: "Tabiat",
     ball: "ball",
+    priority: "Muhimlik",
+    status: "Holat",
+    more: "yana",
+    task: "Vazifa",
+    todo: "Kutilmoqda",
+    progress: "Jarayonda",
+    done: "Bajarildi",
+    cancelled: "Bekor qilindi",
+    high: "Yuqori",
+    medium: "O'rta",
+    low: "Past",
   },
   ru: {
     title: "Календарь",
     today: "Сегодня",
-    monthNames: [
-      "Январь",
-      "Февраль",
-      "Март",
-      "Апрель",
-      "Май",
-      "Июнь",
-      "Июль",
-      "Август",
-      "Сентябрь",
-      "Октябрь",
-      "Ноябрь",
-      "Декабрь",
-    ],
+    monthNames: ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"],
     dayNames: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вск"],
-    dayNamesFull: [
-      "Понедельник",
-      "Вторник",
-      "Среда",
-      "Четверг",
-      "Пятница",
-      "Суббота",
-      "Воскресенье",
-    ],
+    dayNamesFull: ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"],
     noEvents: "Нет событий",
     month: "Месяц",
     week: "Неделя",
     day: "День",
+    horizontal: "(Горизонтальный)",
     paymentSent: "Перевод",
     paymentReceived: "Оплата",
     testCompleted: "Тест",
@@ -149,38 +121,29 @@ const translations = {
     city: "Город",
     nature: "Природа",
     ball: "баллов",
+    priority: "Приоритет",
+    status: "Статус",
+    more: "еще",
+    task: "Задача",
+    todo: "В ожидании",
+    progress: "В процессе",
+    done: "Готово",
+    cancelled: "Отменено",
+    high: "Высокий",
+    medium: "Средний",
+    low: "Низкий",
   },
   en: {
     title: "Calendar",
     today: "Today",
-    monthNames: [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ],
+    monthNames: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
     dayNames: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    dayNamesFull: [
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-      "Sunday",
-    ],
+    dayNamesFull: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
     noEvents: "No events",
     month: "Month",
     week: "Week",
     day: "Day",
+    horizontal: "(Horizontal)",
     paymentSent: "Transfer",
     paymentReceived: "Payment",
     testCompleted: "Test",
@@ -196,6 +159,17 @@ const translations = {
     city: "City",
     nature: "Nature",
     ball: "ball",
+    priority: "Priority",
+    status: "Status",
+    more: "more",
+    task: "Task",
+    todo: "To Do",
+    progress: "In Progress",
+    done: "Done",
+    cancelled: "Cancelled",
+    high: "High",
+    medium: "Medium",
+    low: "Low",
   },
 };
 
@@ -230,149 +204,45 @@ const dateToString = (date) => {
   return `${day}.${month}.${year}`;
 };
 
-const collectAllEvents = () => {
+const collectAllEvents = async () => {
   const events = [];
   const currentLangLocal = getCurrentLang();
-  const tLocal = (key) =>
-    translations[currentLangLocal]?.[key] ?? translations.uz[key] ?? key;
-  const currentUser = getCurrent();
-  if (!currentUser) return events;
 
-  const users = getUsers();
-  const myUser = users.find((u) => u.username === currentUser.username);
-
-  if (myUser?.payments) {
-    myUser.payments.forEach((payment) => {
-      const date = parseDate(payment.date);
-      if (date) {
-        events.push({
-          id: `payment_${payment.docNumber || payment.date}_${Math.random()}`,
-          type: payment.isIncoming
-            ? EVENT_TYPES.PAYMENT_RECEIVED
-            : EVENT_TYPES.PAYMENT_SENT,
-          title:
-            payment.desc ||
-            (payment.isIncoming
-              ? tLocal("paymentReceived")
-              : tLocal("paymentSent")),
-          date: dateToString(date),
-          dateObj: date,
-          timeStr: payment.time || "12:00",
-          amount: payment.amount,
-          status: payment.status,
-        });
-      }
+  try {
+    const res = await fetch(`${API_URL}/all`, {
+      headers: getAuthHeaders(),
+      credentials: "include",
     });
-  }
+    const tasks = await res.json();
 
-  if (myUser?.results) {
-    myUser.results.forEach((result) => {
-      const date = parseDate(result.date);
-      if (date) {
-        events.push({
-          id: `test_${result.testName}_${result.date}_${Math.random()}`,
-          type: EVENT_TYPES.TEST_COMPLETED,
-          title: result.testName,
-          date: dateToString(date),
-          dateObj: date,
-          timeStr: result.time || "12:00",
-          score: result.score,
-        });
-      }
-    });
-  }
+    if (Array.isArray(tasks)) {
+      tasks.forEach((task) => {
+        const dueDate = parseDate(task.dueDate);
+        const startDate = parseDate(task.startDate) || dueDate;
 
-  const bookings = JSON.parse(localStorage.getItem("vac_bookings") || "[]");
-  const allTours = [
-    ...SAMPLE_TOURS,
-    ...JSON.parse(localStorage.getItem("vac_tours_v2") || "[]"),
-  ];
-
-  bookings.forEach((booking) => {
-    if (booking.username === currentUser.username) {
-      const startDate = parseDate(booking.bookedAt);
-      if (startDate) {
-        const duration = booking.tourDays || 7;
-        const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + duration - 1);
-
-        let tourTitle = tLocal("vacationBooked");
-        let tourCity = "";
-
-        if (booking.tourId) {
-          const tour = allTours.find((t) => t.id === booking.tourId);
-          if (tour) {
-            if (tour.name && typeof tour.name === "object") {
-              tourTitle =
-                tour.name[currentLangLocal] ||
-                tour.name.uz ||
-                Object.values(tour.name)[0];
-            } else if (tour.name) {
-              tourTitle = tour.name;
-            }
-            if (tour.city && typeof tour.city === "object") {
-              tourCity = tour.city[currentLangLocal] || tour.city.uz || "";
-            } else if (tour.city) {
-              tourCity = tour.city;
-            }
-          }
-        } else if (booking.tourName) {
-          if (typeof booking.tourName === "object") {
-            tourTitle =
-              booking.tourName[currentLangLocal] ||
-              booking.tourName.uz ||
-              Object.values(booking.tourName)[0];
-          } else {
-            tourTitle = booking.tourName;
-          }
-        }
-
-        for (
-          let d = new Date(startDate);
-          d <= endDate;
-          d.setDate(d.getDate() + 1)
-        ) {
-          const dayDate = new Date(d);
+        if (dueDate) {
           events.push({
-            id: `vacation_${booking.id}_${dayDate.getTime()}`,
-            type: EVENT_TYPES.VACATION_BOOKED,
-            title: tourTitle + (tourCity ? ` (${tourCity})` : ""),
-            date: dateToString(dayDate),
-            dateObj: dayDate,
-            timeStr: "09:00",
-            duration: duration,
-            price: booking.totalCost,
+            id: `task_${task._id}`,
+            type: EVENT_TYPES.TASK_DUE,
+            title: task.title,
+            startDate: startDate,
+            endDate: dueDate,
+            date: dateToString(dueDate),
+            dateObj: dueDate,
+            timeStr: task.time || "",
+            status: task.status,
+            userStatus: task.userStatus || {},
+            createdBy: task.createdBy?._id || task.createdBy,
+            priority: task.priority,
+            project: task.project?.name || "No Project",
+            assignees: task.assignees || [],
           });
-        }
-      }
-    }
-  });
-
-  const projects = getProjects();
-  const cu = getCurrent();
-  projects.forEach((project) => {
-    if (project.tasks) {
-      project.tasks.forEach((task) => {
-        const ids =
-          task.assigneeIds || (task.assigneeId ? [task.assigneeId] : []);
-        if (ids.includes(cu?.username) || !ids.length) {
-          const dueDate = parseDate(task.dueDate);
-          if (dueDate) {
-            events.push({
-              id: `task_${task.id}`,
-              type: EVENT_TYPES.TASK_DUE,
-              title: task.title,
-              date: dateToString(dueDate),
-              dateObj: dueDate,
-              timeStr: task.time || "10:00",
-              status: task.status,
-              priority: task.priority,
-            });
-          }
         }
       });
     }
-  });
+  } catch (err) {
+    console.error("Failed to fetch calendar tasks:", err);
+  }
 
   return events;
 };
@@ -431,6 +301,7 @@ export const InfoPortalPage = () => `
                     <button class="cal-view-option active" data-view="month">${t("month")}</button>
                     <button class="cal-view-option" data-view="week">${t("week")}</button>
                     <button class="cal-view-option" data-view="day">${t("day")}</button>
+                    <button class="cal-view-option" data-view="horizontal">${t("horizontal")}</button>
                 </div>
             </div>
         </div>
@@ -462,6 +333,7 @@ export const InfoPortalPage = () => `
         </div>
         <div class="cal-events-list" id="cal-events-list"></div>
     </div>
+    <div class="cal-panel-overlay" id="cal-panel-overlay"></div>
 </div>
 `;
 
@@ -469,10 +341,11 @@ let viewDate = new Date();
 let currentView = "month";
 let selectedDate = null;
 let cachedEvents = null;
+let expandedDate = null; // Google style popover date
 
-const getCachedEvents = () => {
+const getCachedEvents = async () => {
   if (!cachedEvents) {
-    cachedEvents = collectAllEvents();
+    cachedEvents = await collectAllEvents();
   }
   return cachedEvents;
 };
@@ -481,31 +354,41 @@ const invalidateCache = () => {
   cachedEvents = null;
 };
 
-const getEventsForDate = (dateStr) => {
-  const allEvents = getCachedEvents();
+const getEventsForDate = async (dateStr) => {
+  const allEvents = await getCachedEvents();
   const targetDate = parseDate(dateStr);
   return allEvents.filter((e) => {
-    const eventDate = e.dateObj || parseDate(e.date);
-    if (!eventDate || !targetDate) return false;
-    return eventDate.toDateString() === targetDate.toDateString();
+    const start = e.startDate || e.dateObj || parseDate(e.date);
+    const end = e.endDate || e.dateObj || parseDate(e.date);
+    if (!start || !end || !targetDate) return false;
+
+    // Normalize dates to midnight for comparison
+    const s = new Date(start).setHours(0, 0, 0, 0);
+    const e_date = new Date(end).setHours(0, 0, 0, 0);
+    const t_date = new Date(targetDate).setHours(0, 0, 0, 0);
+
+    return t_date >= s && t_date <= e_date;
   });
 };
 
-const renderCalendar = () => {
+const renderCalendar = async () => {
   invalidateCache();
   switch (currentView) {
     case "week":
-      renderWeekView();
+      await renderWeekView();
       break;
     case "day":
-      renderDayView();
+      await renderDayView();
+      break;
+    case "horizontal":
+      await renderHorizontalView();
       break;
     default:
-      renderMonthView();
+      await renderMonthView();
   }
 };
 
-const renderMonthView = () => {
+const renderMonthView = async () => {
   const grid = document.getElementById("cal-grid");
   const weekdays = document.getElementById("cal-weekdays");
   const monthLabel = document.getElementById("cal-current-month");
@@ -532,6 +415,7 @@ const renderMonthView = () => {
   const today = new Date();
   const todayStr = dateToString(today);
 
+  const totalCells = startDay + daysInMonth;
   let html = "";
 
   for (let i = 0; i < startDay; i++) {
@@ -544,37 +428,121 @@ const renderMonthView = () => {
     const isToday = dateStr === todayStr;
     const isSelected = selectedDate === dateStr;
 
-    const dayEvents = getEventsForDate(dateStr);
+    const dayEvents = await getEventsForDate(dateStr);
 
+    const isExpanded = expandedDate === dateStr;
     const dayClasses = [
       "cal-day",
       isToday ? "cal-day-today" : "",
       isSelected ? "cal-day-selected" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
+      isExpanded ? "is-expanded" : ""
+    ].filter(Boolean).join(" ");
 
-    let iconsHtml = "";
+    let barsHtml = "";
     if (dayEvents.length > 0) {
-      const prioritized = getPrioritizedEvents(dayEvents, 5);
-      iconsHtml = prioritized
-        .map((e) => {
-          const color =
-            eventColors[e.type] || eventColors[EVENT_TYPES.TASK_DUE];
-          return `<span class="cal-event-icon" style="color: ${color.text}" title="${e.title}">${eventIcons[e.type] || eventIcons[EVENT_TYPES.TASK_DUE]}</span>`;
-        })
-        .join("");
+      const sortedEvents = dayEvents.sort((a, b) => {
+        // Done tasks go to the bottom
+        if (a.status === "done" && b.status !== "done") return 1;
+        if (a.status !== "done" && b.status === "done") return -1;
+
+        const aLen = a.endDate - a.startDate || 0;
+        const bLen = b.endDate - b.startDate || 0;
+        return bLen - aLen;
+      });
+
+      // Show tasks on all days between start and end
+      const filteredEvents = sortedEvents;
+
+      if (filteredEvents.length > 0) {
+        const maxVisible = 2;
+        const visible = filteredEvents.slice(0, maxVisible);
+        const moreCount = filteredEvents.length - maxVisible;
+
+        const renderBar = (e) => {
+          const start = new Date(e.startDate).setHours(0, 0, 0, 0);
+          const end = new Date(e.endDate).setHours(0, 0, 0, 0);
+          const curr = date.getTime();
+          const isEnd = curr === end;
+
+          const statusColors = {
+            todo: { bg: "#f0f3ff", border: "#dbe4ff", text: "#313b5e" },
+            progress: { bg: "#e0f2fe", border: "#bae6fd", text: "#0369a1" },
+            done: { bg: "#f0fdf4", border: "#bbf7d0", text: "#15803d" },
+            cancelled: { bg: "#fef2f2", border: "#fecaca", text: "#b91c1c" },
+          };
+
+          const cu = getCurrent();
+          const cuId = String(cu?.userId || cu?._id || "");
+          const isAuthor = String(e.createdBy || "") === cuId;
+          
+          let visibleStatus = e.status;
+          if (isAuthor) {
+            visibleStatus = e.status;
+          } else if (e.userStatus && e.userStatus[cuId] === "done") {
+            visibleStatus = "done";
+          }
+
+          let cfg = statusColors[visibleStatus] || statusColors.todo;
+          if (isEnd) cfg = { bg: "#fff5f5", border: "#fecaca", text: "#991b1b" };
+
+          const isDone = visibleStatus === "done";
+          const classes = ["cal-task-bar", isEnd ? "is-deadline" : "", isDone ? "is-done" : ""].join(" ");
+
+          let icon = isEnd
+            ? `<svg class="cal-bar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13V2l8 4-8 4"/><path d="M20.561 10.222a9 9 0 1 1-12.55-5.29"/><path d="M8.002 9.997a5 5 0 1 0 8.9 2.02"/></svg>`
+            : `<svg class="cal-bar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/></svg>`;
+
+          if (isDone) {
+            icon = `<svg class="cal-bar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>`;
+          }
+
+          const label = isEnd ? `${t("taskDue")}: ${e.title}` : e.title;
+
+          return `
+            <div class="${classes}" style="background-color: ${cfg.bg}; color: ${cfg.text}; border: 1px solid ${cfg.border}" title="${e.title} (${e.project})">
+              ${icon} <span class="cal-task-text">${label}</span>
+            </div>
+          `;
+        };
+        const cellIndex = startDay + day;
+        const totalRows = Math.ceil(totalCells / 7);
+        const currentRow = Math.ceil(cellIndex / 7);
+        const openUp = currentRow > totalRows / 2;
+
+        barsHtml = `
+          <div class="cal-day-content">
+            <div class="cal-bars-list">
+              ${visible.map(renderBar).join("")}
+              ${moreCount > 0 ? `<button class="cal-more-btn" data-date="${dateStr}">+${moreCount} ${t("more") || "yana"}</button>` : ""}
+            </div>
+            
+            ${isExpanded ? `
+              <div class="cal-day-popover active ${openUp ? "open-up" : ""}">
+                <div class="popover-header">
+                  <div class="popover-date-info">
+                     <span class="popover-day-name">${t("dayNamesFull")[date.getDay() === 0 ? 6 : date.getDay() - 1]}</span>
+                     <span class="popover-day-num">${day}</span>
+                  </div>
+                  <button class="popover-close" data-date="${dateStr}">&times;</button>
+                </div>
+                <div class="popover-body">
+                  ${filteredEvents.map(renderBar).join("")}
+                </div>
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
     }
 
     html += `
             <div class="${dayClasses}" data-date="${dateStr}">
                 <span class="cal-day-number">${day}</span>
-                <div class="cal-day-icons">${iconsHtml}</div>
+                <div class="cal-day-tasks">${barsHtml}</div>
             </div>
         `;
   }
 
-  const totalCells = startDay + daysInMonth;
   const remainingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
   for (let i = 0; i < remainingCells; i++) {
     html += `<div class="cal-day cal-day-empty"></div>`;
@@ -584,7 +552,7 @@ const renderMonthView = () => {
   attachCalendarEvents();
 };
 
-const renderWeekView = () => {
+const renderWeekView = async () => {
   const grid = document.getElementById("cal-grid");
   const weekdays = document.getElementById("cal-weekdays");
   const monthLabel = document.getElementById("cal-current-month");
@@ -641,17 +609,12 @@ const renderWeekView = () => {
       const isToday = d.toDateString() === today.toDateString();
 
       let cellContent = "";
-      const dayEvents = getEventsForDate(dateStr);
-      const hourEvents = dayEvents.filter(
-        (e) => getEventHour(e.timeStr) === hour,
-      );
+      const dayEvents = await getEventsForDate(dateStr);
+      const hourEvents = dayEvents.filter((e) => getEventHour(e.timeStr) === hour);
       if (hourEvents.length > 0) {
         const prioritized = getPrioritizedEvents(hourEvents, 5);
         cellContent = prioritized
-          .map(
-            (e) =>
-              `<span class="cal-event-icon" style="color: ${eventColors[e.type]?.text || "#666"}" title="${e.title}">${eventIcons[e.type] || eventIcons[EVENT_TYPES.TASK_DUE]}</span>`,
-          )
+          .map((e) => `<span class="cal-event-icon" style="color: ${eventColors[e.type]?.text || "#666"}" title="${e.title}">${eventIcons[e.type] || eventIcons[EVENT_TYPES.TASK_DUE]}</span>`)
           .join("");
       }
 
@@ -666,7 +629,7 @@ const renderWeekView = () => {
   attachCalendarEvents();
 };
 
-const renderDayView = () => {
+const renderDayView = async () => {
   const grid = document.getElementById("cal-grid");
   const weekdays = document.getElementById("cal-weekdays");
   const monthLabel = document.getElementById("cal-current-month");
@@ -690,21 +653,16 @@ const renderDayView = () => {
     </div>`;
 
   const dateStr = dateToString(viewDate);
-  const dayEvents = getEventsForDate(dateStr);
+  const dayEvents = await getEventsForDate(dateStr);
 
   let html = "";
   for (let hour = 0; hour < 24; hour++) {
     let cellContent = "";
-    const hourEvents = dayEvents.filter(
-      (e) => getEventHour(e.timeStr) === hour,
-    );
+    const hourEvents = dayEvents.filter((e) => getEventHour(e.timeStr) === hour);
     if (hourEvents.length > 0) {
       const prioritized = getPrioritizedEvents(hourEvents, 5);
       cellContent = prioritized
-        .map(
-          (e) =>
-            `<span class="cal-event-icon" style="color: ${eventColors[e.type]?.text || "#666"}" title="${e.title}">${eventIcons[e.type] || eventIcons[EVENT_TYPES.TASK_DUE]}</span>`,
-        )
+        .map((e) => `<span class="cal-event-icon" style="color: ${eventColors[e.type]?.text || "#666"}" title="${e.title}">${eventIcons[e.type] || eventIcons[EVENT_TYPES.TASK_DUE]}</span>`)
         .join("");
     }
     html += `<div class="cal-time-row">
@@ -719,10 +677,159 @@ const renderDayView = () => {
   attachCalendarEvents();
 };
 
-const showEventDetails = (dateStr) => {
+const renderHorizontalView = async () => {
+  const grid = document.getElementById("cal-grid");
+  const weekdays = document.getElementById("cal-weekdays");
+  const monthLabel = document.getElementById("cal-current-month");
+  const gridWrapper = document.getElementById("cal-grid-wrapper");
+  if (!grid || !monthLabel || !weekdays) return;
+
+  gridWrapper.className = "cal-grid-wrapper gantt-view";
+  grid.className = "cal-grid gantt-grid";
+  weekdays.innerHTML = ""; // Clear normal weekdays
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  monthLabel.textContent = `${t("monthNames")[month]} ${year}`;
+
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+
+  const allEvents = await getCachedEvents();
+  
+  const projects = {};
+  const oneDayTasksSet = new Set();
+  
+  allEvents.forEach(e => {
+      const start = e.startDate || e.dateObj || parseDate(e.date);
+      const end = e.endDate || e.dateObj || parseDate(e.date);
+      if (!start || !end) return;
+
+      const eStart = new Date(start).setHours(0,0,0,0);
+      const eEnd = new Date(end).setHours(0,0,0,0);
+      const mStart = firstDay.getTime();
+      const mEnd = lastDay.getTime();
+
+      if (eStart <= mEnd && eEnd >= mStart) {
+          const projName = e.project || "No Project";
+          if (!projects[projName]) projects[projName] = [];
+          projects[projName].push(e);
+
+          let sDay = new Date(start).getFullYear() === year && new Date(start).getMonth() === month ? new Date(start).getDate() : 1;
+          let eDay = new Date(end).getFullYear() === year && new Date(end).getMonth() === month ? new Date(end).getDate() : daysInMonth;
+          sDay = Math.max(1, Math.min(daysInMonth, sDay));
+          eDay = Math.max(1, Math.min(daysInMonth, eDay));
+          if (sDay === eDay) {
+              oneDayTasksSet.add(sDay);
+          }
+      }
+  });
+
+  let gridColumnsStr = "200px";
+  for (let d = 1; d <= daysInMonth; d++) {
+      if (oneDayTasksSet.has(d)) {
+          gridColumnsStr += " minmax(100px, 1fr)";
+      } else {
+          gridColumnsStr += " minmax(40px, 1fr)";
+      }
+  }
+
+  let html = `<div class="gantt-header-row" style="grid-template-columns: ${gridColumnsStr};">
+      <div class="gantt-proj-col">Project / Task</div>`;
+      
+  const today = new Date();
+  for (let d = 1; d <= daysInMonth; d++) {
+      const isToday = (today.getFullYear() === year && today.getMonth() === month && today.getDate() === d);
+      html += `<div class="gantt-day-header ${isToday ? 'gantt-today' : ''}">${d}</div>`;
+  }
+  html += `</div>`;
+  
+  const cu = getCurrent();
+  const cuId = String(cu?.userId || cu?._id || "");
+
+  Object.keys(projects).sort().forEach(projName => {
+      html += `<div class="gantt-project-row" style="grid-template-columns: ${gridColumnsStr};">
+          <div class="gantt-project-title">${projName}</div>`;
+      for(let d=1; d<=daysInMonth; d++) {
+          html += `<div class="gantt-cell"></div>`;
+      }
+      html += `</div>`;
+
+      const tasks = projects[projName].sort((a,b) => new Date(a.startDate) - new Date(b.startDate));
+      
+      tasks.forEach(task => {
+          const start = new Date(task.startDate || task.dateObj);
+          const end = new Date(task.endDate || task.dateObj);
+          
+          let sDay = start.getFullYear() === year && start.getMonth() === month ? start.getDate() : 1;
+          let eDay = end.getFullYear() === year && end.getMonth() === month ? end.getDate() : daysInMonth;
+          
+          if (start.getTime() > lastDay.getTime() || end.getTime() < firstDay.getTime()) return;
+          
+          sDay = Math.max(1, Math.min(daysInMonth, sDay));
+          eDay = Math.max(1, Math.min(daysInMonth, eDay));
+          let span = Math.max(1, (eDay - sDay) + 1);
+
+          const isAuthor = String(task.createdBy || "") === cuId;
+          let visibleStatus = task.status;
+          if (isAuthor) {
+            visibleStatus = task.status;
+          } else if (task.userStatus && task.userStatus[cuId] === "done") {
+            visibleStatus = "done";
+          }
+          const isDone = visibleStatus === "done";
+          
+          const statusColors = {
+            todo: { bg: "#f0f3ff", border: "#dbe4ff", text: "#313b5e" },
+            progress: { bg: "#e0f2fe", border: "#bae6fd", text: "#0369a1" },
+            done: { bg: "#f0fdf4", border: "#bbf7d0", text: "#15803d" },
+            cancelled: { bg: "#fef2f2", border: "#fecaca", text: "#b91c1c" },
+          };
+          const cfg = statusColors[visibleStatus] || statusColors.todo;
+
+          html += `<div class="gantt-task-row" style="grid-template-columns: ${gridColumnsStr};">
+              <div class="gantt-task-title" title="${task.title}">
+                  ${isDone ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>'}
+                  <span>${task.title}</span>
+              </div>`;
+              
+          for(let d=1; d<=daysInMonth; d++) {
+             if (d === sDay) {
+                 html += `<div class="gantt-bar-container" style="grid-column: span ${span};">
+                     <div class="gantt-task-bar ${isDone?'is-done':''}" style="background-color: ${cfg.bg}; color: ${cfg.text}; border: 1px solid ${cfg.border}" data-date="${dateToString(end)}">
+                        <span class="gantt-bar-label">${task.title}</span>
+                     </div>
+                 </div>`;
+                 d += span - 1;
+             } else {
+                 html += `<div class="gantt-cell"></div>`;
+             }
+          }
+          html += `</div>`;
+      });
+  });
+
+  if (Object.keys(projects).length === 0) {
+      html += `<div class="cal-no-events" style="padding: 2rem; text-align: center;">${t("noEvents")}</div>`;
+  }
+
+  grid.innerHTML = html;
+  
+  // Custom click handler for gantt bars to open panel
+  grid.querySelectorAll('.gantt-task-bar').forEach(bar => {
+      bar.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const d = e.currentTarget.getAttribute('data-date');
+          if (d) showEventDetails(d);
+      });
+  });
+};
+
+const showEventDetails = async (dateStr) => {
   const currentLang = getCurrentLang();
   invalidateCache();
-  const events = getEventsForDate(dateStr);
+  const events = await getEventsForDate(dateStr);
   const panel = document.getElementById("cal-events-panel");
   const dateHeader = document.getElementById("cal-events-date");
   const eventsList = document.getElementById("cal-events-list");
@@ -735,30 +842,74 @@ const showEventDetails = (dateStr) => {
   if (events.length === 0) {
     eventsList.innerHTML = `<div class="cal-no-events"><p>${t("noEvents")}</p></div>`;
   } else {
-    eventsList.innerHTML = events
+    const sortedEvents = events.sort((a, b) => {
+      if (a.status === "done" && b.status !== "done") return 1;
+      if (a.status !== "done" && b.status === "done") return -1;
+      return 0;
+    });
+
+    eventsList.innerHTML = sortedEvents
       .map((e) => {
         const color = eventColors[e.type] || eventColors[EVENT_TYPES.TASK_DUE];
+        const isTask = e.type === EVENT_TYPES.TASK_DUE || e.type === EVENT_TYPES.TASK_ASSIGNED;
 
-        // To'lov turi uchun belgi (+/-)
-        let amountSign = "";
-        if (e.type === EVENT_TYPES.PAYMENT_RECEIVED) amountSign = "+";
-        else if (e.type === EVENT_TYPES.PAYMENT_SENT) amountSign = "-";
+        // Assignee avatars
+        const allUsers = getUsers();
+        const assigneeAvatars = (e.assignees || []).map(id => {
+            const u = allUsers.find(user => user._id === id);
+            if (!u) return "";
+            const photo = u.photo ? (u.photo.startsWith("http") ? u.photo : `${BASE_URL}/${u.photo}`) : "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+            return `<img src="${photo}" class="cal-event-avatar" title="${u.name}">`;
+        }).join("");
+
+        const cu = getCurrent();
+        const cuId = String(cu?.userId || cu?._id || "");
+        const isAuthor = String(e.createdBy || "") === cuId;
+        
+        let visibleStatus = e.status;
+        if (isAuthor) {
+          visibleStatus = e.status;
+        } else if (e.userStatus && e.userStatus[cuId] === "done") {
+          visibleStatus = "done";
+        }
+
+        const isDone = visibleStatus === "done";
+
+        const priorityColors = {
+            high: { bg: "#fee2e2", text: "#ef4444" },
+            medium: { bg: "#fef3c7", text: "#f59e0b" },
+            low: { bg: "#dcfce7", text: "#22c55e" }
+        };
+        const pColor = priorityColors[e.priority?.toLowerCase()] || { bg: "#f1f5f9", text: "#64748b" };
+
+        const borderColor = isDone ? "#22c55e" : color.border;
+        const badgeColors = isDone ? { bg: "#dcfce7", text: "#16a34a" } : color;
 
         return `
-                <div class="cal-event-card" style="background: ${color.bg}; border-left: 4px solid ${color.border}">
-                    <span class="cal-event-icon-large" style="color: ${color.text}">${eventIcons[e.type] || eventIcons[EVENT_TYPES.TASK_DUE]}</span>
-                    <div class="cal-event-info">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                            <div class="cal-event-title" style="color: ${color.text}">${e.title}</div>
-                            <div style="font-size: 11px; color: ${color.text}; opacity: 0.8; font-weight: 600;">${e.timeStr || ""}</div>
+                <div class="cal-event-item ${isDone ? "is-done" : ""}">
+                    <div class="cal-event-item-top">
+                        <div class="cal-event-type-badge" style="background: ${badgeColors.bg}; color: ${badgeColors.text}">
+                             ${eventIcons[e.type] || eventIcons[EVENT_TYPES.TASK_DUE]}
+                             <span>${t("task")}</span>
                         </div>
-                        <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
-                            ${e.amount ? `<div class="cal-event-meta" style="color: ${color.text}; font-weight: 800; font-size: 14px;">${amountSign}$${e.amount}</div>` : ""}
-                            ${e.score !== undefined ? `<div class="cal-event-meta" style="color: ${color.text}; font-weight: 700;">${t("result")}: ${e.score} ${t("ball")}</div>` : ""}
-                            ${e.price ? `<div class="cal-event-meta" style="color: ${color.text}; font-weight: 700;">${t("price")}: $${e.price}</div>` : ""}
-                            ${e.priority ? `<span style="font-size: 10px; opacity: 0.7;">• ${e.priority}</span>` : ""}
+                        <div class="cal-event-time">${e.timeStr || ""}</div>
+                    </div>
+
+                    <h4 class="cal-event-item-title">${e.title}</h4>
+                    
+                    <div class="cal-event-item-project">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="M3 9V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4"/></svg>
+                        <span>${e.project || "No Project"}</span>
+                    </div>
+
+                    <div class="cal-event-item-footer">
+                        <div class="cal-event-meta-group">
+                            ${e.priority ? `<span class="cal-priority-tag" style="background: ${pColor.bg}; color: ${pColor.text}" title="${t("priority")}">${t("priority")}: ${t(e.priority.toLowerCase())}</span>` : ""}
+                            ${e.status ? `<span class="cal-status-tag" title="${t("status")}">${t("status")}: ${t(e.status.toLowerCase())}</span>` : ""}
                         </div>
-                        ${e.duration ? `<div class="cal-event-meta" style="color: ${color.text}; font-size: 11px;">${t("duration")}: ${e.duration} ${t("days")}</div>` : ""}
+                        <div class="cal-event-assignees">
+                            ${assigneeAvatars}
+                        </div>
                     </div>
                 </div>
             `;
@@ -767,11 +918,12 @@ const showEventDetails = (dateStr) => {
   }
 
   panel.classList.add("active");
+  document.getElementById("cal-panel-overlay")?.classList.add("active");
   renderCalendar();
 };
 
-export const initInfoPortalLogic = () => {
-  renderCalendar();
+export const initInfoPortalLogic = async () => {
+  await renderCalendar();
 
   const savedDate = localStorage.getItem("cal_selected_date");
   if (savedDate) {
@@ -783,6 +935,22 @@ export const initInfoPortalLogic = () => {
 
   const handleLanguageChange = () => {
     invalidateCache();
+
+    const titleEl = document.querySelector('.cal-title');
+    if (titleEl) titleEl.textContent = t("title");
+
+    const todayBtn = document.getElementById("cal-today-btn");
+    if (todayBtn) todayBtn.textContent = t("today");
+
+    const viewLabel = document.getElementById("cal-view-label");
+    if (viewLabel) viewLabel.textContent = t(currentView);
+
+    document.querySelectorAll(".cal-view-option").forEach((opt) => {
+      if (opt.dataset.view) {
+        opt.textContent = t(opt.dataset.view);
+      }
+    });
+
     renderCalendar();
     if (selectedDate) {
       showEventDetails(selectedDate);
@@ -799,15 +967,11 @@ export const initInfoPortalLogic = () => {
     viewMenu?.classList.toggle("active");
   });
 
-  document.addEventListener("click", () =>
-    viewMenu?.classList.remove("active"),
-  );
+  document.addEventListener("click", () => viewMenu?.classList.remove("active"));
 
   document.querySelectorAll(".cal-view-option").forEach((opt) => {
     opt.addEventListener("click", () => {
-      document
-        .querySelectorAll(".cal-view-option")
-        .forEach((o) => o.classList.remove("active"));
+      document.querySelectorAll(".cal-view-option").forEach((o) => o.classList.remove("active"));
       opt.classList.add("active");
       currentView = opt.dataset.view;
       document.getElementById("cal-view-label").textContent = t(currentView);
@@ -845,18 +1009,57 @@ export const initInfoPortalLogic = () => {
 
   document.getElementById("cal-panel-close")?.addEventListener("click", () => {
     document.getElementById("cal-events-panel")?.classList.remove("active");
+    document.getElementById("cal-panel-overlay")?.classList.remove("active");
+    selectedDate = null;
+    renderCalendar();
+  });
+
+  document.getElementById("cal-panel-overlay")?.addEventListener("click", () => {
+    document.getElementById("cal-events-panel")?.classList.remove("active");
+    document.getElementById("cal-panel-overlay")?.classList.remove("active");
     selectedDate = null;
     renderCalendar();
   });
 };
 
 const attachCalendarEvents = () => {
-  document
-    .querySelectorAll(".cal-day:not(.cal-day-empty), .cal-time-cell")
-    .forEach((el) => {
-      el.addEventListener("click", () => {
-        const dateStr = el.dataset.date;
-        if (dateStr) showEventDetails(dateStr);
-      });
+  document.querySelectorAll(".cal-day:not(.cal-day-empty), .cal-time-cell").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      // Prevent detail modal if more btn or popover clicked
+      if (e.target.closest(".cal-more-btn") || e.target.closest(".cal-day-popover")) return;
+      
+      const dateStr = el.dataset.date;
+      if (dateStr) showEventDetails(dateStr);
     });
+  });
+
+  // More button
+  document.querySelectorAll(".cal-more-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      expandedDate = btn.dataset.date;
+      renderMonthView(); // Just re-render month view to show popover
+    });
+  });
+
+  // Popover close
+  document.querySelectorAll(".popover-close").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      expandedDate = null;
+      renderMonthView();
+    });
+  });
+
+  // Global click to close popover
+  const handleGlobalClick = (e) => {
+    if (expandedDate && !e.target.closest(".cal-day-popover") && !e.target.closest(".cal-more-btn")) {
+      expandedDate = null;
+      renderMonthView();
+      document.removeEventListener("click", handleGlobalClick);
+    }
+  };
+  if (expandedDate) {
+    document.addEventListener("click", handleGlobalClick);
+  }
 };
