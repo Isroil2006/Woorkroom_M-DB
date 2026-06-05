@@ -154,6 +154,31 @@ exports.updateProject = async (req, res) => {
               }
             });
             await history.save();
+            
+            // Remove user from all task assignees in this project and recalculate status
+            const tasksToUpdate = await Task.find({ project: saved._id, assignees: oldM.user });
+            for (const t of tasksToUpdate) {
+              t.assignees = t.assignees.filter(a => String(a) !== String(oldM.user));
+              
+              if (t.userStatus && t.userStatus.has(String(oldM.user))) {
+                t.userStatus.delete(String(oldM.user));
+                t.markModified("userStatus");
+              }
+
+              if (t.assignees.length > 0) {
+                const allDone = t.assignees.every(aId => t.userStatus && t.userStatus.get(String(aId)) === "done");
+                const anyProgressOrDone = t.assignees.some(aId => t.userStatus && ["progress", "done"].includes(t.userStatus.get(String(aId))));
+
+                if (allDone) {
+                  t.status = "done";
+                } else if (anyProgressOrDone) {
+                  t.status = "progress";
+                } else {
+                  t.status = "todo";
+                }
+              }
+              await t.save();
+            }
           }
         }
       } catch (historyErr) {
@@ -170,6 +195,15 @@ exports.updateProject = async (req, res) => {
 exports.deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.userId;
+
+    const project = await Project.findById(id);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    if (String(project.createdBy) !== String(userId)) {
+      return res.status(403).json({ message: "Faqat loyiha egasi o'chira oladi" });
+    }
+
     await Project.findByIdAndDelete(id);
     // Also delete all tasks in that project
     await Task.deleteMany({ project: id });
@@ -292,6 +326,8 @@ exports.updateTask = async (req, res) => {
     }
 
     const oldStatus = task.status;
+    let statusWasRequested = !!req.body.status;
+    let requestedStatusVal = req.body.status;
 
     let updatedGlobalStatus = false;
 
@@ -330,6 +366,23 @@ exports.updateTask = async (req, res) => {
 
     // 3. Yangilash
     Object.assign(task, req.body);
+    
+    // Assignees o'zgargan bo'lsa, statusni qayta hisoblash
+    if (req.body.assignees !== undefined && !statusWasRequested) {
+      if (task.assignees.length > 0) {
+        const allDone = task.assignees.every(aId => task.userStatus && task.userStatus.get(String(aId)) === "done");
+        const anyProgressOrDone = task.assignees.some(aId => task.userStatus && ["progress", "done"].includes(task.userStatus.get(String(aId))));
+
+        if (allDone) {
+          task.status = "done";
+        } else if (anyProgressOrDone) {
+          task.status = "progress";
+        } else {
+          task.status = "todo";
+        }
+      }
+    }
+
     const updated = await task.save();
     
     // Populate qaytarish (frontend kutayotgan formatda)
@@ -339,8 +392,7 @@ exports.updateTask = async (req, res) => {
 
     // Log history
     try {
-      const isStatusChange = req.body.status && req.body.status !== oldStatus;
-      if (isStatusChange) {
+      if (statusWasRequested) {
         const history = new TaskHistory({
           action: "status_changed",
           taskId: populated._id,
@@ -349,7 +401,7 @@ exports.updateTask = async (req, res) => {
           user: userId,
           details: {
             oldStatus: oldStatus,
-            newStatus: populated.status,
+            newStatus: populated.status !== oldStatus ? populated.status : requestedStatusVal,
           }
         });
         await history.save();
@@ -452,7 +504,7 @@ exports.toggleUserDone = async (req, res) => {
         user: userId,
         details: {
           oldStatus: oldStatus,
-          newStatus: populated.status,
+          newStatus: populated.status !== oldStatus ? populated.status : nextStatus,
         }
       });
       await history.save();
@@ -473,7 +525,14 @@ exports.getAllTasks = async (req, res) => {
     const projects = await Project.find({
       $or: [
         { createdBy: userId },
-        { "members.user": userId }
+        { 
+          members: { 
+            $elemMatch: { 
+              user: userId, 
+              role: { $in: ["member", "admin"] } 
+            } 
+          } 
+        }
       ]
     });
     const projectIds = projects.map(p => p._id);

@@ -12,3 +12,6 @@ import "./Business/business.js";
 
 // todo js
 import "./Tasks/tasks.js";
+
+// super settings
+import "./SuperSettings/supersettings.js";

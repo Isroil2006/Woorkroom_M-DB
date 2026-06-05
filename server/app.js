@@ -112,13 +112,17 @@ app.use("/api/users", require("./routes/user.routes"));
 app.use("/api/user-photos", require("./routes/file.routes"));
 app.use("/api/permissions", require("./routes/permission.routes"));
 app.use("/api/tasks", require("./routes/task.routes"));
+app.use("/api/super-settings", require("./routes/super-setting.routes"));
+app.use("/api/tests", require("./routes/test.routes"));
+app.use("/api/test-photos", require("./routes/testPhoto.routes"));
+app.use("/api/messenger", require("./routes/messenger.routes"));
 
 // Sahifalar uchun backend himoyasi (Manual URL terilganda ishlaydi)
 const auth = require("./middleware/auth.middleware");
 const checkPermission = require("./middleware/permission.middleware");
 
 // Har qanday frontend sahifa yo'li kelganda auth va ruxsatni tekshiramiz
-app.get(["/employees", "/tasks", "/calendar", "/messenger", "/payments", "/vacations"], auth, checkPermission(), (req, res) => {
+app.get(["/employees", "/tasks", "/calendar", "/messenger", "/payments", "/vacations", "/tests"], auth, checkPermission(), (req, res) => {
   res.sendFile(path.join(__dirname, "../client/index.html"));
 });
 

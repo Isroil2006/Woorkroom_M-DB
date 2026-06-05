@@ -283,6 +283,10 @@ const initMemberRoleTabs = (container) => {
     const tabs = group.querySelectorAll(".role-tab");
     tabs.forEach(tab => {
       tab.onclick = () => {
+        if (getProjectRole() !== "admin") {
+          showNotification(t("error_no_permission") || "Sizda bunday amalni bajarish uchun ruxsat yo'q", "error");
+          return;
+        }
         tabs.forEach(t => t.classList.remove("active"));
         tab.classList.add("active");
         const newRole = tab.dataset.value;
@@ -334,11 +338,11 @@ const renderProjectMembersList = async (targetId = "project-members-list") => {
           </div>
           <div class="member-card-actions">
             <div class="member-role-tabs" data-uid="${uid}">
-              <button class="role-tab ${role === "viewer" ? "active" : ""}" data-value="viewer">${t("role_viewer")}</button>
-              <button class="role-tab ${role === "member" ? "active" : ""}" data-value="member">${t("role_member")}</button>
-              <button class="role-tab ${role === "admin" ? "active" : ""}" data-value="admin">${t("role_admin")}</button>
+              <button class="role-tab ${role === "viewer" ? "active" : ""}" data-value="viewer" ${getProjectRole() !== "admin" ? "disabled" : ""}>${t("role_viewer")}</button>
+              <button class="role-tab ${role === "member" ? "active" : ""}" data-value="member" ${getProjectRole() !== "admin" ? "disabled" : ""}>${t("role_member")}</button>
+              <button class="role-tab ${role === "admin" ? "active" : ""}" data-value="admin" ${getProjectRole() !== "admin" ? "disabled" : ""}>${t("role_admin")}</button>
             </div>
-            <button class="member-delete-btn" onclick="removeProjectMember('${uid}')" title="${t("delete")}">
+            <button class="member-delete-btn" onclick="removeProjectMember('${uid}')" title="${t("delete")}" ${getProjectRole() !== "admin" ? "disabled" : ""}>
               <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
@@ -400,6 +404,7 @@ const renderProjectOverviewView = async () => {
   const history = await fetchProjectHistory(currentProjectId);
   const tasks = await fetchTasks(currentProjectId);
   const users = await fetchUsers();
+  const lang = getCurrentLang();
   
   // Calculate statistics
   const totalTasks = tasks.length;
@@ -430,12 +435,12 @@ const renderProjectOverviewView = async () => {
     });
   });
 
-  const settingsTabHtml = isAdmin ? `
+  const settingsTabHtml = `
     <button class="view-tab active" data-tab="settings">
       <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/></svg>
-      <span>${t("settings") || "Settings"}</span>
+      <span>${t("project_settings") || "Settings"}</span>
     </button>
-  ` : '';
+  `;
 
   container.innerHTML = `
     <div class="project-settings-view animated-view project-overview-view">
@@ -447,7 +452,7 @@ const renderProjectOverviewView = async () => {
           
           <div class="view-switch overview-tabs" style="margin: 0;">
             ${settingsTabHtml}
-            <button class="view-tab ${!isAdmin ? 'active' : ''}" data-tab="stats">
+            <button class="view-tab" data-tab="stats">
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               <span>${t("statistika") || "Statistic"}</span>
             </button>
@@ -458,18 +463,17 @@ const renderProjectOverviewView = async () => {
           </div>
         </div>
 
-        <div class="settings-actions" style="gap: 8px; ${isAdmin ? 'display:flex;' : 'display:none;'}">
-           <button class="todo-btn-danger" id="settings-delete-project" style="padding: 8px 16px; font-size: 13px;">${t("delete")}</button>
-           <button class="todo-btn-primary" id="settings-save-project" style="padding: 8px 24px; font-size: 13px;">${t("save")}</button>
+        <div class="settings-actions" style="gap: 8px; display:flex;">
+           <button class="todo-btn-danger" id="settings-delete-project" style="padding: 8px 16px; font-size: 13px;" ${!isAdmin ? "disabled" : ""}>${t("delete")}</button>
+           <button class="todo-btn-primary" id="settings-save-project" style="padding: 8px 24px; font-size: 13px;" ${!isAdmin ? "disabled" : ""}>${t("save")}</button>
         </div>
       </div>
 
       <!-- SETTINGS CONTENT -->
-      ${isAdmin ? `
       <div class="settings-content overview-content-section" id="overview-settings-content">
         <div class="settings-section">
           <label class="settings-label" style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; display: block;">${t("project_label")}</label>
-          <input type="text" id="settings-project-name" class="settings-input" style="font-size: 14px; padding: 10px 16px;" value="${proj.name}" placeholder="${t("project_name_placeholder")}" />
+          <input type="text" id="settings-project-name" class="settings-input" style="font-size: 14px; padding: 10px 16px;" value="${proj.name}" placeholder="${t("project_name_placeholder")}" ${!isAdmin ? "disabled" : ""} />
           <span class="todo-form-error" id="settings-project-name-error" style="display: block; margin-top: 4px;"></span>
         </div>
 
@@ -482,7 +486,7 @@ const renderProjectOverviewView = async () => {
               <p class="settings-desc" style="margin-bottom: 0;">${t("public_project_desc")}</p>
             </div>
             <label class="switch">
-              <input type="checkbox" id="settings-public-toggle" ${proj.isPublic ? "checked" : ""}>
+              <input type="checkbox" id="settings-public-toggle" ${proj.isPublic ? "checked" : ""} ${!isAdmin ? "disabled" : ""}>
               <span class="slider round"></span>
             </label>
           </div>
@@ -490,7 +494,7 @@ const renderProjectOverviewView = async () => {
           <div class="member-management-card">
             <div class="member-search-header">
               <h3 class="added-members-title">${t("added_members")}</h3>
-              <button class="todo-btn-primary" id="open-add-member-modal">
+              <button class="todo-btn-primary" id="open-add-member-modal" ${!isAdmin ? "disabled" : ""}>
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
                 ${t("add_member") || "A'zo qo'shish"}
               </button>
@@ -504,10 +508,9 @@ const renderProjectOverviewView = async () => {
           </div>
         </div>
       </div>
-      ` : ''}
 
       <!-- STATS CONTENT -->
-      <div class="settings-content overview-content-section" id="overview-stats-content" style="${!isAdmin ? 'display:block;' : 'display:none;'}">
+      <div class="settings-content overview-content-section" id="overview-stats-content" style="display:none;">
         <div class="history-stats-grid">
           <div class="history-stat-card">
             <div class="stat-card-icon blue">
@@ -628,34 +631,40 @@ const renderProjectOverviewView = async () => {
 
                 if (log.action === "task_created") {
                   iconClass = "created";
-                  itemTitle = log.details?.taskTitle || "Task";
-                  actionText = t("action_created") || "yaratildi";
+                  itemTitle = log.details?.taskTitle || (lang === "uz" ? "Vazifa" : lang === "ru" ? "Задача" : "Task");
+                  actionText = lang === "uz" ? "yaratildi" : lang === "ru" ? "создал(а) задачу" : "created the task";
                 } else if (log.action === "task_deleted") {
                   iconClass = "deleted";
                   iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-                  itemTitle = log.details?.taskTitle || "Task";
-                  actionText = t("action_deleted") || "o'chirildi";
+                  itemTitle = log.details?.taskTitle || (lang === "uz" ? "Vazifa" : lang === "ru" ? "Задача" : "Task");
+                  actionText = lang === "uz" ? "o'chirildi" : lang === "ru" ? "удалил(а) задачу" : "deleted the task";
                 } else if (log.action === "member_added") {
                   iconClass = "status";
                   iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-                  itemTitle = log.details?.memberUsername || "Foydalanuvchi";
-                  actionText = `loyihaga qo'shildi (${log.details?.newRole || "viewer"})`;
+                  itemTitle = log.details?.memberUsername || (lang === "uz" ? "Foydalanuvchi" : lang === "ru" ? "Пользователь" : "User");
+                  const r = log.details?.newRole || "viewer";
+                  const roleStr = t("role_" + r) || r;
+                  actionText = lang === "uz" ? `loyihaga qo'shildi (${roleStr})` : lang === "ru" ? `добавил(а) в проект (${roleStr})` : `added to project (${roleStr})`;
                 } else if (log.action === "member_removed") {
                   iconClass = "deleted";
                   iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-                  itemTitle = log.details?.memberUsername || "Foydalanuvchi";
-                  actionText = `loyihadan o'chirildi`;
+                  itemTitle = log.details?.memberUsername || (lang === "uz" ? "Foydalanuvchi" : lang === "ru" ? "Пользователь" : "User");
+                  actionText = lang === "uz" ? `loyihadan o'chirildi` : lang === "ru" ? `удалил(а) из проекта` : `removed from project`;
                 } else if (log.action === "member_role_changed") {
                   iconClass = "updated";
                   iconSvg = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-                  itemTitle = log.details?.memberUsername || "Foydalanuvchi";
+                  itemTitle = log.details?.memberUsername || (lang === "uz" ? "Foydalanuvchi" : lang === "ru" ? "Пользователь" : "User");
                   const oldR = log.details?.oldRole || "viewer";
                   const newR = log.details?.newRole || "viewer";
-                  actionText = `roli o'zgartirildi (<span class="timeline-old-status">${oldR}</span> &rarr; <span class="timeline-new-status">${newR}</span>)`;
+                  const oldRoleStr = t("role_" + oldR) || oldR;
+                  const newRoleStr = t("role_" + newR) || newR;
+                  actionText = lang === "uz" ? `roli o'zgartirildi (<span class="timeline-old-status">${oldRoleStr}</span> &rarr; <span class="timeline-new-status">${newRoleStr}</span>)` : lang === "ru" ? `изменил(а) роль (<span class="timeline-old-status">${oldRoleStr}</span> &rarr; <span class="timeline-new-status">${newRoleStr}</span>)` : `changed role (<span class="timeline-old-status">${oldRoleStr}</span> &rarr; <span class="timeline-new-status">${newRoleStr}</span>)`;
                 } else {
-                  itemTitle = "Tizim hodisasi";
-                  actionText = "bajarildi";
+                  itemTitle = lang === "uz" ? "Tizim hodisasi" : lang === "ru" ? "Системное событие" : "System event";
+                  actionText = lang === "uz" ? "bajarildi" : lang === "ru" ? "выполнено" : "executed";
                 }
+                
+                const userSuffix = lang === "uz" ? " tomonidan" : "";
 
                 return `
                   <div class="timeline-item animated-item">
@@ -668,7 +677,7 @@ const renderProjectOverviewView = async () => {
                         <span class="timeline-time">${timeStr}</span>
                       </div>
                       <div class="timeline-item-body">
-                        <span class="timeline-user">${userAvatarHtml(logUser, 20)} <strong>${logUser.username || logUser.email || "System"}</strong></span>
+                        <span class="timeline-user">${userAvatarHtml(logUser, 20)} <strong>${logUser.username || logUser.email || "System"}</strong>${userSuffix}</span>
                         <span class="timeline-action-text">${actionText}</span>
                       </div>
                     </div>
@@ -702,7 +711,7 @@ const renderProjectOverviewView = async () => {
     };
   });
 
-  if (isAdmin) {
+  // settings logic for all roles (checks applied inside handlers)
     const nameInput = $("settings-project-name");
     const nameError = $("settings-project-name-error");
 
@@ -717,6 +726,11 @@ const renderProjectOverviewView = async () => {
     const saveBtn = $("settings-save-project");
     if (saveBtn) {
       saveBtn.onclick = async () => {
+        if (getProjectRole() !== "admin") {
+          showNotification(t("error_no_permission") || "Sizda bunday amalni bajarish uchun ruxsat yo'q", "error");
+          return;
+        }
+        const nameInput = $("settings-project-name");
         const newName = nameInput.value.trim();
 
         if (newName.length < 3) {
@@ -748,15 +762,15 @@ const renderProjectOverviewView = async () => {
           if (res.ok) {
             const saved = await res.json();
             projectsCache = projectsCache.map((p) => (String(p._id) === String(currentProjectId) ? saved : p));
-            showNotification("Muvaffaqiyatli saqlandi", "success");
+            showNotification(t("project_updated") || "Muvaffaqiyatli saqlandi", "success");
             viewMode = "tasks";
-            renderView();
+            renderView(true);
           } else {
             const errData = await res.json();
-            showNotification(errData.message || "Saqlashda xatolik", "error");
+            showNotification(errData.message || t("error_saving_project") || "Saqlashda xatolik", "error");
           }
         } catch (e) {
-          showNotification("Xatolik yuz berdi", "error");
+          showNotification(t("error_occurred") || "Xatolik yuz berdi", "error");
         } finally {
           saveBtn.classList.remove("loading");
         }
@@ -766,17 +780,26 @@ const renderProjectOverviewView = async () => {
     const delBtn = $("settings-delete-project");
     if (delBtn) {
       delBtn.onclick = () => {
+        if (getProjectRole() !== "admin") {
+          showNotification(t("error_no_permission") || "Sizda bunday amalni bajarish uchun ruxsat yo'q", "error");
+          return;
+        }
         deleteTask(null); 
       };
     }
 
     const addMemBtn = $("open-add-member-modal");
     if (addMemBtn) {
-      addMemBtn.onclick = () => openAddMemberModal();
+      addMemBtn.onclick = () => {
+        if (getProjectRole() !== "admin") {
+          showNotification(t("error_no_permission") || "Sizda bunday amalni bajarish uchun ruxsat yo'q", "error");
+          return;
+        }
+        openAddMemberModal();
+      };
     }
 
     renderProjectMembersList("settings-project-members-list");
-  }
 };
 
 const openAddMemberModal = () => {
@@ -845,7 +868,6 @@ const searchUsersForAddMember = async (query) => {
           selectedProjectMembers.push({ user: uid, role: "viewer" });
           $("add-member-modal").style.display = "none";
           await renderProjectMembersList("settings-project-members-list");
-          showNotification(t("member_added") || "A'zo qo'shildi", "success");
         };
       });
     }
@@ -887,8 +909,8 @@ const renderAssigneePicker = async () => {
       const isSelected = selectedAssignees.includes(uid);
       return `
       <div class="assignee-item ${isSelected ? "selected" : ""}" data-uid="${uid}" title="${u.username}">
-        ${userAvatarHtml(u, 32)}
-        <div class="assignee-check">✓</div>
+        ${userAvatarHtml(u, 20)}
+        <span class="assignee-name">${u.username || u.email || "User"}</span>
       </div>`;
     })
     .join("");
@@ -963,15 +985,16 @@ const openProjectModal = (pid = null) => {
 
 window.openProjectModal = openProjectModal;
 window.removeProjectMember = (uid) => {
+  if (getProjectRole() !== "admin") {
+    showNotification(t("error_no_permission") || "Sizda bunday amalni bajarish uchun ruxsat yo'q", "error");
+    return;
+  }
   selectedProjectMembers = selectedProjectMembers.filter((m) => {
     const id = typeof m === "string" ? m : m.user?._id || m.user;
     return String(id) !== String(uid);
   });
-  if (viewMode === "settings") {
-    renderProjectMembersList("settings-project-members-list");
-  } else {
-    renderProjectMembersList("project-members-list");
-  }
+  renderProjectMembersList("settings-project-members-list");
+  renderProjectMembersList("project-members-list");
 };
 
 const searchUsersForProject = async (query) => {
@@ -1026,7 +1049,7 @@ const saveProject = async () => {
         viewMode = "settings";
       }
       showNotification(isEdit ? t("project_updated") : t("project_created"), "success");
-      await renderView();
+      await renderView(true);
     } else {
       showNotification(t("error_saving_project"), "error");
     }
@@ -1063,9 +1086,9 @@ export const TodoPage = () => `
     <header class="tasks-header">
       <div class="header-project-info">
         <h1 id="todo-project-title">Select a Project</h1>
-        <button id="project-overview-btn" class="project-settings-btn" style="width: max-content; padding: 0 12px; gap: 6px; display: none;" title="Project Overview">
+        <button id="project-overview-btn" class="project-settings-btn" style="width: max-content; padding: 0 12px; gap: 6px; display: none;" title="${t('project_overview')}">
           <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="10 9 9 9 8 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          <span style="font-size: 14px; font-weight: 600;">Overview</span>
+          <span style="font-size: 14px; font-weight: 600;">${t("project_overview")}</span>
         </button>
       </div>
 
@@ -1090,13 +1113,13 @@ export const TodoPage = () => `
     <div class="tasks-toolbar">
       <div class="tasks-search-wrap">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#8892a4" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#8892a4" stroke-width="2" stroke-linecap="round"/></svg>
-        <input type="text" id="todo-search" placeholder="Filter tasks..." />
+        <input type="text" id="todo-search" placeholder="${t("search_tasks") || "Filter tasks..."}" />
       </div>
       <div class="tasks-filters">
-        <button class="filter-btn active" data-filter="all" id="filter-all">All</button>
-        <button class="filter-btn" data-filter="todo" id="filter-todo">Todo</button>
-        <button class="filter-btn" data-filter="progress" id="filter-progress">In Progress</button>
-        <button class="filter-btn" data-filter="done" id="filter-done">Done</button>
+        <button class="filter-btn active" data-filter="all" id="filter-all">${t("filter_all") || "All"}</button>
+        <button class="filter-btn" data-filter="todo" id="filter-todo">${t("filter_todo") || "Todo"}</button>
+        <button class="filter-btn" data-filter="progress" id="filter-progress">${t("filter_progress") || "In Progress"}</button>
+        <button class="filter-btn" data-filter="done" id="filter-done">${t("filter_done") || "Done"}</button>
       </div>
     </div>
 
@@ -1489,6 +1512,9 @@ const renderView = async (forceRefresh = false) => {
   const proj = projects.find((p) => String(p._id) === String(currentProjectId));
   if ($("todo-project-title")) $("todo-project-title").textContent = proj ? proj.name : "Select Project";
 
+  // Har qanday viewMode'da (list, board, task-detail) tasklarni chaqirib olish yoki keshdan olish
+  const allTasks = await fetchTasks(currentProjectId, forceRefresh);
+
   if (viewMode === "overview" || viewMode === "task-detail" || viewMode === "task-history") {
     if (tasksToolbar) tasksToolbar.style.display = "none";
     if (tasksContent) tasksContent.classList.add("settings-mode");
@@ -1521,8 +1547,6 @@ const renderView = async (forceRefresh = false) => {
         btn.style.pointerEvents = "auto";
       }
     });
-
-    const allTasks = await fetchTasks(currentProjectId, forceRefresh);
 
     let tasks = allTasks;
     if (currentFilter !== "all") tasks = tasks.filter((t) => getVisibleStatus(t) === currentFilter);
@@ -1604,7 +1628,7 @@ const renderListRow = (task) => {
       </div>
       <div class="todo-row-center-cell">
         <div class="todo-list-status-custom-select s-${myStatus} ${canChangeStatus ? "" : "disabled"}" data-tid="${task._id}" data-action="change-status-custom" style="${canChangeStatus ? "" : "pointer-events:none;"}">
-          <div class="status-selected">
+          <div style="width:max-content;" class="status-selected">
             <span>${myStatus === "todo" ? t("status_todo") : myStatus === "progress" ? t("status_progress") : t("status_done")}</span>
             <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="6 9 12 15 18 9"></polyline>
@@ -1687,6 +1711,16 @@ const attachListEvents = (container) => {
       });
 
       const isOpen = options.style.display === "block";
+      
+      if (!isOpen) {
+        const rect = selected.getBoundingClientRect();
+        if (rect.bottom > window.innerHeight * 0.7) {
+          options.classList.add("open-upwards");
+        } else {
+          options.classList.remove("open-upwards");
+        }
+      }
+
       options.style.display = isOpen ? "none" : "block";
       select.classList.toggle("open", !isOpen);
       const chevron = selected.querySelector(".chevron-icon");
@@ -2897,6 +2931,43 @@ export const initTodoLogic = async () => {
     });
 
     document.addEventListener(LANGUAGE_CHANGED_EVENT, () => {
+      const tabListSpan = document.querySelector("#tab-list span");
+      if (tabListSpan) tabListSpan.textContent = t("list_view");
+
+      const tabBoardSpan = document.querySelector("#tab-board span");
+      if (tabBoardSpan) tabBoardSpan.textContent = t("board_view");
+
+      const btnAddTaskSpan = document.querySelector("#todo-create-task-btn span");
+      if (btnAddTaskSpan) btnAddTaskSpan.textContent = t("add_task");
+
+      const sidebarTitle = document.querySelector(".sidebar-title");
+      if (sidebarTitle) sidebarTitle.textContent = t("projects") || "Projects";
+
+      const searchInput = document.getElementById("project-search-input");
+      if (searchInput) searchInput.placeholder = t("search_projects") || "Search projects...";
+
+      const todoSearch = document.getElementById("todo-search");
+      if (todoSearch) todoSearch.placeholder = t("search_tasks") || "Filter tasks...";
+
+      const overviewBtn = document.getElementById("project-overview-btn");
+      if (overviewBtn) {
+        overviewBtn.title = t("project_overview");
+        const span = overviewBtn.querySelector("span");
+        if (span) span.textContent = t("project_overview");
+      }
+
+      const filterAll = document.getElementById("filter-all");
+      if (filterAll) filterAll.textContent = t("filter_all") || "All";
+
+      const filterTodo = document.getElementById("filter-todo");
+      if (filterTodo) filterTodo.textContent = t("filter_todo") || "Todo";
+
+      const filterProgress = document.getElementById("filter-progress");
+      if (filterProgress) filterProgress.textContent = t("filter_progress") || "In Progress";
+
+      const filterDone = document.getElementById("filter-done");
+      if (filterDone) filterDone.textContent = t("filter_done") || "Done";
+
       renderView();
     });
 

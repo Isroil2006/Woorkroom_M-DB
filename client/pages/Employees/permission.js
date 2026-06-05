@@ -17,7 +17,9 @@ export const fetchNavItems = async () => {
         credentials: "include",
       });
       if (res.ok) {
-        NAV_ITEMS_CACHE = await res.json();
+        const data = await res.json();
+        // Super sozlamalar (nav_settings) ni ruxsatlar modalidan olib tashlaymiz
+        NAV_ITEMS_CACHE = data.filter(item => item.key !== "nav_settings");
         return NAV_ITEMS_CACHE;
       }
     } catch (err) {

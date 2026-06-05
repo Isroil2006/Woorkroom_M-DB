@@ -109,6 +109,7 @@ router.get("/me", auth, userController.getMe);
  *               items:
  *                 $ref: '#/components/schemas/User'
  */
+router.get("/assign-list", auth, checkPermission(), userController.getUsersForAssign);
 router.get("/search", auth, userController.searchUsers);
 router.get("/", auth, checkPermission(), userController.getAllUsers);
 

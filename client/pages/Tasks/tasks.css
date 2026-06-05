@@ -1,4 +1,4 @@
-﻿.tasks-container {
+.tasks-container {
     display: flex;
     width: 100%;
     height: 100%;
@@ -33,8 +33,8 @@
 }
 
 .sidebar-title {
-    font-size: 18px;
-    font-weight: 800;
+    font-size: 24px;
+    font-weight: 700;
     color: #1a1d2e;
     margin: 0;
 }
@@ -487,20 +487,24 @@
 }
 
 /* Custom Scrollbar for Settings (Matches Employees Style) */
-.project-settings-view::-webkit-scrollbar {
+.project-settings-view::-webkit-scrollbar,
+.settings-content::-webkit-scrollbar {
     width: 6px;
 }
 
-.project-settings-view::-webkit-scrollbar-track {
+.project-settings-view::-webkit-scrollbar-track,
+.settings-content::-webkit-scrollbar-track {
     background: transparent;
 }
 
-.project-settings-view::-webkit-scrollbar-thumb {
+.project-settings-view::-webkit-scrollbar-thumb,
+.settings-content::-webkit-scrollbar-thumb {
     background: #dde1f3;
     border-radius: 10px;
 }
 
-.project-settings-view::-webkit-scrollbar-thumb:hover {
+.project-settings-view::-webkit-scrollbar-thumb:hover,
+.settings-content::-webkit-scrollbar-thumb:hover {
     background: #cbd5e1;
 }
 
@@ -1674,56 +1678,70 @@ input:checked + .slider:before {
     to { transform: rotate(360deg); }
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
-   ASSIGNEE MULTI-PICKER (task modal)
-в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* ASSIGNEE MULTI-PICKER (task modal) */
 .todo-assignee-picker {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     padding: 8px;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 9px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
     min-height: 48px;
-    background: #fff;
+    max-height: 120px;
+    background: #f8fafc;
+    overflow-y: auto;
+}
+
+.todo-assignee-picker::-webkit-scrollbar {
+    width: 6px;
+}
+.todo-assignee-picker::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+.todo-assignee-picker::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+.todo-assignee-picker::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 .assignee-item {
-    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
     cursor: pointer;
-    transition: transform 0.15s, filter 0.15s;
+    transition: all 0.2s ease;
+}
+
+.assignee-item .assignee-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #475569;
 }
 
 .assignee-item:hover {
-    transform: scale(1.05);
+    background: #f1f5f9;
+    border-color: #cbd5e1;
 }
 
-.assignee-item.selected .todo-avatar {
-    filter: brightness(0.8);
-    box-shadow: 0 0 0 2px #5b6ef5;
+.assignee-item.selected {
+    border: 1px solid #5b6ef5;
+    border-radius: 8px !important;
+    padding: 5px 10px !important;
+
 }
 
-.assignee-check {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    background: #5b6ef5;
-    color: #fff;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    font-size: 10px;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid #fff;
+.assignee-item.selected .assignee-name {
+    color: #5b6ef5;
 }
 
-.assignee-item.selected .assignee-check {
-    display: flex;
-}
-
-/* в”Ђв”Ђ AVATAR STACK (multi-assignee) в”Ђв”Ђ */
+/*  AVATAR STACK (multi-assignee)  */
 .todo-avatar-stack {
     display: flex;
     align-items: center;
@@ -2776,6 +2794,17 @@ input:checked + .slider:before {
     to { opacity: 1; transform: translateY(0); }
 }
 
+.todo-list-status-custom-select .status-options.open-upwards {
+    top: auto;
+    bottom: calc(100% + 6px);
+    animation: todoSlideUp 0.2s ease-out;
+}
+
+@keyframes todoSlideUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 .todo-list-status-custom-select .status-options li {
     display: flex;
     align-items: center;
@@ -2845,4 +2874,12 @@ input:checked + .slider:before {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+
+/* Disabled state styles for Project Overview */
+.project-settings-view [disabled],
+.project-settings-view button[disabled],
+.project-settings-view input[disabled] {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
 }

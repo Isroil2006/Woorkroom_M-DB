@@ -12,13 +12,14 @@ import { getCurrentLang, setLanguage, LANGUAGE_CHANGED_EVENT } from "../../asset
 import { UnauthorizedPage, initUnauthorizedLogic } from "../../pages/Unauthorized/Unauthorized.js";
 import { NotFoundPageTemplate, initNotFoundLogic } from "../../pages/NotFound/NotFound.js";
 import { UnderConstructionPage, initUnderConstructionLogic } from "../../pages/UnderConstruction/UnderConstruction.js";
+import { SuperSettingsPage, initSuperSettingsLogic } from "../../pages/SuperSettings/supersettings.js";
 
 // To'liq tayyor bo'lmagan sahifalarni true qilib qoyiladi
 const UNDER_CONSTRUCTION = {
-  Tests: true,
+  Tests: false,
   Payments: true,
   Vacations: true,
-  Messenger: true,
+  Messenger: false,
   Infoportal: false,
 };
 
@@ -86,6 +87,7 @@ export const translations = {
     nav_support: "Yordam",
     nav_logout: "Chiqish",
     nav_profile: "Profil",
+    nav_settings: "Super Sozlamalar"
   },
   en: {
     nav_tests: "Tests",
@@ -98,6 +100,7 @@ export const translations = {
     nav_support: "Support",
     nav_logout: "Logout",
     nav_profile: "Profile",
+    nav_settings: "Super Settings"
   },
   ru: {
     nav_tests: "Тесты",
@@ -110,6 +113,7 @@ export const translations = {
     nav_support: "Поддержка",
     nav_logout: "Выход",
     nav_profile: "Профиль",
+    nav_settings: "Супер Настройки"
   },
 };
 
@@ -126,6 +130,7 @@ const NAV_PERM_MAP = {
   Employees: "nav_employees",
   Messenger: "nav_messenger",
   Infoportal: "nav_infoportal",
+  SuperSettings: null, // Adminlarga ko'rinadigan qism
 };
 
 const ROUTES = {
@@ -140,6 +145,7 @@ const ROUTES = {
   "/messenger": "Messenger",
   "/calendar": "Infoportal",
   "/profile": "user-profile",
+  "/super-settings": "SuperSettings",
 };
 
 const PATH_MAP = {
@@ -150,6 +156,7 @@ const PATH_MAP = {
   Employees: "/employees",
   Messenger: "/messenger",
   Infoportal: "/calendar",
+  SuperSettings: "/super-settings",
 };
 
 // ─── NAV HTML ─────────────────────────────────────────────────────
@@ -238,6 +245,13 @@ const renderNavigation = () => {
                 <span>${t("nav_messenger")}</span>
             </a>
         </li>
+        ${false ? `
+        <li data-page="SuperSettings" class="${currentNavPage === "SuperSettings" ? "active" : ""} loading">
+            <a href="#super-settings">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                <span>${t("nav_settings")}</span>
+            </a>
+        </li>` : ""}
     </ul>
 
     <div class="profile-menu-container">
@@ -444,7 +458,7 @@ const renderPage = (pageName, force = false) => {
     }
   } else if (pageName === "Messenger") {
     if (!skipRender) {
-      contentArea.innerHTML = MassangerPage();
+      contentArea.innerHTML = MassangerPage;
       initMessengerLogic();
     }
   } else if (pageName === "Infoportal") {
@@ -459,6 +473,9 @@ const renderPage = (pageName, force = false) => {
     }
   } else if (pageName === "user-profile") {
     userProfileRender();
+  } else if (pageName === "SuperSettings") {
+    contentArea.innerHTML = SuperSettingsPage();
+    initSuperSettingsLogic();
   } else if (pageName === "NotFound") {
     contentArea.innerHTML = NotFoundPageTemplate();
     initNotFoundLogic();

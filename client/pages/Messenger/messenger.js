@@ -1,6 +1,6 @@
-import { createMsgAnalyticsBtn, initMsgAnalytics } from "./analytics.js";
 import { translations } from "./translations.js";
 import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
+import { API_URL, getAuthHeaders, fetchCurrentUser } from "../../assets/js/api.js";
  
 const t = createTranslationHelper(translations);
 
@@ -53,17 +53,76 @@ const avatarHtml = (user, size = 42) => {
   return `<div class="msg-avatar" style="${s}background:${avatarColor(user.username)};">${initials(user.username)}</div>`;
 };
 
-// ─── DATA ─────────────────────────────────────
-const getUsers = () => JSON.parse(localStorage.getItem("users")) || [];
-const getCurrent = () => JSON.parse(localStorage.getItem("currentUser"));
-const getMsgsKey = (a, b) => {
-  const s = [a, b].sort();
-  return `msg_chat_${s[0]}_${s[1]}`;
+// ─── STATE & DATA ───────────────────────────────
+let localUsers = [];
+let localMessages = [];
+
+const getUsers = () => localUsers;
+
+const getMessages = (a, b) => {
+    return localMessages.filter(m => 
+        (m.from === a && m.to === b) || (m.from === b && m.to === a)
+    );
 };
-const getMessages = (a, b) =>
-  JSON.parse(localStorage.getItem(getMsgsKey(a, b))) || [];
-const saveMessages = (a, b, msgs) =>
-  localStorage.setItem(getMsgsKey(a, b), JSON.stringify(msgs));
+
+// Async helpers
+const loadMessengerData = async () => {
+    try {
+        const [usersRes, msgsRes] = await Promise.all([
+            fetch(`${API_URL}/api/messenger/contacts`, { headers: getAuthHeaders(), credentials: "include" }),
+            fetch(`${API_URL}/api/messenger/my-messages`, { headers: getAuthHeaders(), credentials: "include" })
+        ]);
+        if(usersRes.ok) localUsers = await usersRes.json();
+        if(msgsRes.ok) {
+            const rawMsgs = await msgsRes.json();
+            const cu = currentUser;
+            const oldMessages = localMessages;
+            localMessages = rawMsgs.map(m => {
+                const s = localUsers.find(u => u._id === m.sender || u.userId === m.sender) || (cu && (cu._id === m.sender || cu.userId === m.sender) ? cu : null);
+                const r = localUsers.find(u => u._id === m.receiver || u.userId === m.receiver) || (cu && (cu._id === m.receiver || cu.userId === m.receiver) ? cu : null);
+                const existingMsg = oldMessages.find(oldM => oldM.id === m._id);
+                return {
+                    id: m._id,
+                    from: s ? s.username : "Unknown",
+                    to: r ? r.username : "Unknown",
+                    type: m.type,
+                    text: m.text,
+                    photoId: m.photoId,
+                    dataUrl: existingMsg ? existingMsg.dataUrl : null, // Preserve if already fetched
+                    at: m.createdAt,
+                    edited: m.edited,
+                    isRead: m.isRead
+                };
+            });
+        }
+    } catch(e) {
+        console.error("Error loading messenger data", e);
+    }
+};
+
+const fetchPhoto = async (msg) => {
+    if(!msg.photoId || msg.dataUrl) return;
+    try {
+        const res = await fetch(`${API_URL}/api/messenger/photo/${msg.photoId}`, { headers: getAuthHeaders(), credentials: "include" });
+        if(res.ok) {
+            const data = await res.json();
+            msg.dataUrl = data.dataUrl;
+            // Update DOM directly if the skeleton is there
+            const skel = document.getElementById(`skel-${msg.id}`);
+            if(skel) {
+                const img = document.createElement("img");
+                img.src = msg.dataUrl;
+                img.className = "msg-img-bubble";
+                img.dataset.lightbox = msg.dataUrl;
+                img.addEventListener("click", () => openLightbox(img.dataset.lightbox));
+                skel.replaceWith(img);
+            }
+        }
+    } catch(e) {
+        console.error("Error loading photo", e);
+    }
+};
+
 const getLastMsg = (a, b) => {
   const m = getMessages(a, b);
   return m[m.length - 1] || null;
@@ -104,21 +163,19 @@ const getMsgCountFrom = (a, b) =>
 const getImgMsgs = (a, b) =>
   getMessages(a, b).filter((m) => m.type === "image");
 
-// Unread tracking — localStorage da oxirgi o'qilgan vaqt saqlanadi
-const getReadKey = (a, b) => {
-  const s = [a, b].sort();
-  return `msg_read_${s[0]}_${s[1]}_${a}`;
-};
-const getReadTime = (me, contact) =>
-  localStorage.getItem(getReadKey(me, contact)) || "";
-const markAsRead = (me, contact) =>
-  localStorage.setItem(getReadKey(me, contact), new Date().toISOString());
 const hasUnread = (me, contact) => {
   const msgs = getMessages(me, contact).filter((m) => m.from === contact);
-  if (!msgs.length) return false;
-  const lastRead = getReadTime(me, contact);
-  if (!lastRead) return true;
-  return msgs.some((m) => m.at > lastRead);
+  return msgs.some((m) => !m.isRead);
+};
+const markAsRead = async (me, contact) => {
+   const contactUser = localUsers.find(u => u.username === contact);
+   if(contactUser) {
+       await fetch(`${API_URL}/api/messenger/read/${contactUser._id || contactUser.userId}`, { method: 'PUT', headers: getAuthHeaders(), credentials: "include" });
+       // locally update
+       localMessages.forEach(m => {
+           if(m.from === contact && m.to === me) m.isRead = true;
+       });
+   }
 };
 
 // ─── ONLINE STATUS ────────────────────────────
@@ -138,7 +195,8 @@ const avatarHtmlFromUser = (user, size = 34) =>
 
 export const MassangerPage = `<div class="messenger-wrap" id="messenger-root"></div>`;
 
-// ─── STATE ────────────────────────────────────
+// ─── STATE (UI) ─────────────────────────────────
+let currentLang = "uz";
 let currentUser = null;
 let activeContact = null;
 let searchQuery = "";
@@ -149,6 +207,7 @@ let userCardOpen = false;
 let infoExpanded = false;
 let attachExpanded = false;
 let editingMsgId = null; // inline edit in input bar
+let chatMenuOpen = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -176,11 +235,11 @@ const renderRoot = () => {
 const renderSidebar = () => {
   const tr = translations[currentLang];
   const users = getUsers().filter((u) => u.username !== currentUser?.username);
-  const filtered = users.filter(
-    (u) =>
-      !searchQuery ||
-      u.username.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const activeChats = users.filter((u) => getMessages(currentUser?.username, u.username).length > 0);
+  let searchResults = [];
+  if (searchQuery) {
+      searchResults = users.filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
+  }
 
   if (sidebarCollapsed) {
     return `
@@ -190,7 +249,7 @@ const renderSidebar = () => {
                 </button>
             </div>
             <div class="msg-contacts-list msg-contacts-list--collapsed" id="msg-contacts-list">
-                ${filtered.map((u) => renderContactMini(u)).join("")}
+                ${activeChats.map((u) => renderContactMini(u)).join("")}
             </div>`;
   }
 
@@ -212,15 +271,26 @@ const renderSidebar = () => {
             </div>
             ${userCardOpen ? renderUserCard() : ""}
         </div>
-        <div class="msg-search-wrap">
+        <div class="msg-search-wrap" style="position:relative">
             <div class="msg-search-inner">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#aaa" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#aaa" stroke-width="2" stroke-linecap="round"/></svg>
-                <input type="text" id="msg-search-input" placeholder="${tr.search_placeholder}" value="${escHtml(searchQuery)}" />
+                <input type="text" id="msg-search-input" placeholder="${tr.search_placeholder}" value="${escHtml(searchQuery)}" autocomplete="off" />
             </div>
+            ${searchQuery ? `
+            <div class="msg-search-dropdown">
+                ${searchResults.length === 0 ? `<div class="msg-search-empty">${tr.no_users}</div>` : 
+                  searchResults.map(u => `
+                    <div class="msg-search-item" data-username="${u.username}">
+                        ${avatarHtml(u, 32)}
+                        <span class="msg-search-item-name">${escHtml(u.username)}</span>
+                    </div>
+                  `).join("")}
+            </div>
+            ` : ""}
         </div>
         <div class="msg-contacts-label">${tr.contacts_label}</div>
         <div class="msg-contacts-list" id="msg-contacts-list">
-            ${filtered.length === 0 ? `<div style="padding:20px;text-align:center;color:#c0c7d4;font-size:12px">${tr.no_users}</div>` : filtered.map((u) => renderContactItem(u)).join("")}
+            ${activeChats.length === 0 ? `<div style="padding:20px;text-align:center;color:#c0c7d4;font-size:12px">${tr.no_users}</div>` : activeChats.map((u) => renderContactItem(u)).join("")}
         </div>`;
 };
 
@@ -380,8 +450,14 @@ const renderChatArea = () => {
                     <div class="msg-chat-status-text">${tr.offline}</div>
                 </div>
             </div>
-            <div class="msg-chat-header-right">
-                ${createMsgAnalyticsBtn(currentLang)}
+            <div class="msg-chat-header-right" style="position:relative">
+                <button class="msg-icon-btn" id="msg-chat-menu-trigger" title="Sozlamalar">
+                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M12 13a1 1 0 100-2 1 1 0 000 2zm0-7a1 1 0 100-2 1 1 0 000 2zm0 14a1 1 0 100-2 1 1 0 000 2z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+                <div class="msg-chat-menu" id="msg-chat-menu" style="display: ${chatMenuOpen ? 'flex' : 'none'};">
+                    <button class="msg-chat-menu-item" id="msg-menu-clear">Chatni tozalash</button>
+                    <button class="msg-chat-menu-item danger" id="msg-menu-delete">O'chirish</button>
+                </div>
             </div>
         </div>
         <div class="msg-feed" id="msg-feed">${renderMessages()}</div>
@@ -503,6 +579,11 @@ const renderMessages = () => {
     const wrapCls = `msg-row ${isMine ? "msg-row--mine" : "msg-row--theirs"} ${isFirstInGroup ? "msg-row--first" : "msg-row--cont"}`;
 
     if (msg.type === "image") {
+      if (!msg.dataUrl && msg.photoId) {
+        fetchPhoto(msg);
+      }
+      const imgHtml = msg.dataUrl ? `<img src="${msg.dataUrl}" class="msg-img-bubble" data-lightbox="${msg.dataUrl}"/>` : `<div class="msg-img-skeleton" id="skel-${msg.id}"></div>`;
+
       // image → only delete
       const acts = `<div class="msg-hover-acts ${isMine ? "msg-ha-left" : "msg-ha-right"}">${delBtn}</div>`;
       html += `
@@ -513,7 +594,7 @@ const renderMessages = () => {
                     <div class="msg-hover-wrap">
                         ${acts}
                         <div class="msg-img-outer">
-                            <img src="${msg.dataUrl}" class="msg-img-bubble" data-lightbox="${msg.dataUrl}"/>
+                            ${imgHtml}
                             <span class="msg-time-in">${formatTime(msg.at)}</span>
                         </div>
                     </div>
@@ -563,72 +644,108 @@ const smartScroll = () => {
   if (isNearBottom()) scrollFeed();
 };
 
-const sendMessage = () => {
+const sendMessage = async () => {
   if (!activeContact || !currentUser) return;
   const input = $("msg-text-input"),
     text = input ? input.value.trim() : "";
+  const receiverUser = localUsers.find(u => u.username === activeContact.username);
+  if(!receiverUser) return;
+  const receiverId = receiverUser._id || receiverUser.userId;
 
-  // If in edit mode — save edit instead of sending new
+  // If in edit mode
   if (editingMsgId) {
     if (text) {
-      const msgs = getMessages(currentUser.username, activeContact.username);
-      msgs.forEach((m) => {
-        if (m.id === editingMsgId) {
-          m.text = text;
-          m.edited = true;
-        }
-      });
-      saveMessages(currentUser.username, activeContact.username, msgs);
+      try {
+         const res = await fetch(`${API_URL}/api/messenger/${editingMsgId}`, {
+             method: 'PUT',
+             headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+             credentials: "include",
+             body: JSON.stringify({ text })
+         });
+         if(res.ok) {
+             const updated = await res.json();
+             localMessages.forEach(m => {
+                 if(m.id === editingMsgId) {
+                     m.text = updated.text;
+                     m.edited = updated.edited;
+                 }
+             });
+         }
+      } catch(e) { console.error("Edit error", e); }
     }
     cancelEdit();
     return;
   }
 
+  // Disable send button temporarily
+  const sBtn = $("msg-send-btn");
+  if(sBtn) sBtn.disabled = true;
+
   if (pendingImages.length > 0) {
-    pendingImages.forEach(({ dataUrl }) => {
-      const msgs = getMessages(currentUser.username, activeContact.username);
-      msgs.push({
-        id: genId(),
-        from: currentUser.username,
-        type: "image",
-        dataUrl,
-        at: new Date().toISOString(),
-      });
-      saveMessages(currentUser.username, activeContact.username, msgs);
-    });
+    for(let i = 0; i < pendingImages.length; i++) {
+        const { dataUrl } = pendingImages[i];
+        try {
+            await fetch(`${API_URL}/api/messenger/send`, {
+                method: 'POST',
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                credentials: "include",
+                body: JSON.stringify({ receiverId, type: 'image', fileData: dataUrl })
+            });
+        } catch(e) { console.error("Send image error", e); }
+    }
     pendingImages = [];
     renderImgPreview();
   }
   if (text) {
-    const msgs = getMessages(currentUser.username, activeContact.username);
-    msgs.push({
-      id: genId(),
-      from: currentUser.username,
-      type: "text",
-      text,
-      at: new Date().toISOString(),
-    });
-    saveMessages(currentUser.username, activeContact.username, msgs);
-    if (input) {
-      input.value = "";
-      autoResizeInput();
-    }
+    try {
+        await fetch(`${API_URL}/api/messenger/send`, {
+            method: 'POST',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            credentials: "include",
+            body: JSON.stringify({ receiverId, type: 'text', text })
+        });
+        if (input) {
+          input.value = "";
+          autoResizeInput();
+        }
+    } catch(e) { console.error("Send text error", e); }
   }
+
+  // Refresh messages
+  await loadMessengerData();
   updateSendBtn();
   refreshFeed(true);
   refreshContacts();
   refreshInfoPanel();
 };
 
-const deleteMsg = (mid) => {
+const deleteMsg = async (mid) => {
   if (editingMsgId === mid) cancelEdit();
-  const msgs = getMessages(currentUser.username, activeContact.username).filter(
-    (m) => m.id !== mid,
-  );
-  saveMessages(currentUser.username, activeContact.username, msgs);
+  try {
+      await fetch(`${API_URL}/api/messenger/${mid}`, { method: 'DELETE', headers: getAuthHeaders(), credentials: "include" });
+      localMessages = localMessages.filter((m) => m.id !== mid);
+  } catch(e) { console.error("Delete error", e); }
   refreshFeed();
   refreshContacts();
   refreshInfoPanel();
+};
+
+const clearActiveChat = async (deleteUser = false) => {
+  if (!activeContact) return;
+  try {
+    const receiverId = activeContact._id || activeContact.userId;
+    if (!receiverId) return;
+    await fetch(`${API_URL}/api/messenger/chat/${receiverId}`, { method: 'DELETE', headers: getAuthHeaders(), credentials: "include" });
+    localMessages = localMessages.filter((m) => !(
+      (m.from === currentUser.username && m.to === activeContact.username) ||
+      (m.from === activeContact.username && m.to === currentUser.username)
+    ));
+    if (deleteUser) {
+      activeContact = null;
+    }
+    chatMenuOpen = false;
+    renderRoot();
+  } catch (e) { console.error("Clear chat error", e); }
 };
 
 // Edit in input bar — no inline edit in feed
@@ -686,20 +803,19 @@ const refreshFeed = (forceScroll = false) => {
   if (forceScroll || wasNear) scrollFeed();
 };
 const refreshContacts = () => {
-  const list = $("msg-contacts-list");
-  if (!list) return;
-  const users = getUsers().filter((u) => u.username !== currentUser?.username);
-  const filtered = users.filter(
-    (u) =>
-      !searchQuery ||
-      u.username.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-  list.innerHTML = sidebarCollapsed
-    ? filtered.map((u) => renderContactMini(u)).join("")
-    : filtered.length === 0
-      ? `<div style="padding:20px;text-align:center;color:#c0c7d4;font-size:12px">${translations[currentLang].no_users}</div>`
-      : filtered.map((u) => renderContactItem(u)).join("");
-  attachContactEvents();
+  const sb = $("msg-sidebar");
+  if (!sb) return;
+  const isInputFocused = document.activeElement && document.activeElement.id === "msg-search-input";
+  sb.innerHTML = renderSidebar();
+  attachSidebarEvents();
+  if (isInputFocused) {
+    const si = $("msg-search-input");
+    if (si) {
+      si.focus();
+      const val = si.value;
+      si.setSelectionRange(val.length, val.length);
+    }
+  }
 };
 const refreshInfoPanel = () => {
   const p = $("msg-info-panel");
@@ -823,7 +939,7 @@ const attachFeedEvents = () => {
 };
 
 const attachContactEvents = () => {
-  document.querySelectorAll(".msg-contact-item").forEach((item) => {
+  document.querySelectorAll(".msg-contact-item, .msg-search-item").forEach((item) => {
     item.addEventListener("click", () => {
       activeContact =
         getUsers().find((u) => u.username === item.dataset.username) || null;
@@ -833,6 +949,7 @@ const attachContactEvents = () => {
       pendingImages = [];
       infoExpanded = false;
       attachExpanded = false;
+      searchQuery = "";
       renderRoot();
       scrollFeed();
     });
@@ -915,7 +1032,72 @@ const attachSidebarEvents = () => {
   attachContactEvents();
 };
 
+const showConfirmModal = (message, onConfirm) => {
+  const existing = document.getElementById("msg-confirm-modal");
+  if (existing) existing.remove();
+
+  const modalOverlay = document.createElement("div");
+  modalOverlay.id = "msg-confirm-modal";
+  modalOverlay.className = "msg-modal-overlay";
+  
+  modalOverlay.innerHTML = `
+    <div class="msg-modal-content">
+      <div class="msg-modal-body">${escHtml(message)}</div>
+      <div class="msg-modal-footer">
+        <button class="msg-btn-cancel">Bekor qilish</button>
+        <button class="msg-btn-confirm">Tasdiqlash</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modalOverlay);
+
+  const btnCancel = modalOverlay.querySelector(".msg-btn-cancel");
+  const btnConfirm = modalOverlay.querySelector(".msg-btn-confirm");
+
+  btnCancel.addEventListener("click", () => {
+    modalOverlay.remove();
+  });
+
+  btnConfirm.addEventListener("click", async () => {
+    modalOverlay.remove();
+    await onConfirm();
+  });
+
+  modalOverlay.addEventListener("click", (e) => {
+    if (e.target === modalOverlay) modalOverlay.remove();
+  });
+};
+
 const attachChatEvents = () => {
+  const ct = $("msg-chat-menu-trigger");
+  if (ct) {
+    ct.addEventListener("click", (e) => {
+      e.stopPropagation();
+      chatMenuOpen = !chatMenuOpen;
+      const menu = $("msg-chat-menu");
+      if (menu) menu.style.display = chatMenuOpen ? "flex" : "none";
+    });
+  }
+  const mc = $("msg-menu-clear");
+  if (mc) {
+    mc.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showConfirmModal("Chatdagi barcha xabarlarni tozalashni xohlaysizmi?", async () => {
+          await clearActiveChat(false);
+      });
+    });
+  }
+  const md = $("msg-menu-delete");
+  if (md) {
+    md.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showConfirmModal("Ushbu chatni butunlay o'chirib tashlashni xohlaysizmi?", async () => {
+          await clearActiveChat(true);
+      });
+    });
+  }
+
   const sb = $("msg-send-btn");
   if (sb) sb.addEventListener("click", sendMessage);
   const ti = $("msg-text-input");
@@ -989,9 +1171,15 @@ const attachChatEvents = () => {
         attachSidebarEvents();
       }
     }
+    
+    const cMenu = $("msg-chat-menu"),
+      cTrigger = $("msg-chat-menu-trigger");
+    if (chatMenuOpen && cTrigger && !cTrigger.contains(e.target) && (!cMenu || !cMenu.contains(e.target))) {
+      chatMenuOpen = false;
+      if (cMenu) cMenu.style.display = "none";
+    }
   });
   scrollFeed();
-  initMsgAnalytics(currentLang);
 };
 
 const attachRootEvents = () => {
@@ -1001,11 +1189,120 @@ const attachRootEvents = () => {
 };
 
 // ═══════════════════════════════════════════════
+//  PUSHER INTEGRATION
+// ═══════════════════════════════════════════════
+let pusherClient = null;
+let pusherChannel = null;
+
+const handleIncomingPusherMessage = (data, action) => {
+    if (action === 'new') {
+        const m = data;
+        const cu = currentUser;
+        const s = localUsers.find(u => String(u._id || u.userId) === String(m.sender)) || (cu && String(cu._id || cu.userId) === String(m.sender) ? cu : null);
+        const r = localUsers.find(u => String(u._id || u.userId) === String(m.receiver)) || (cu && String(cu._id || cu.userId) === String(m.receiver) ? cu : null);
+        
+        const formatted = {
+            id: m._id,
+            from: s ? s.username : "Unknown",
+            to: r ? r.username : "Unknown",
+            type: m.type,
+            text: m.text,
+            photoId: m.photoId,
+            dataUrl: null,
+            at: m.createdAt,
+            edited: m.edited,
+            isRead: m.isRead
+        };
+        
+        // Check if message already exists
+        if (!localMessages.find(msg => msg.id === formatted.id)) {
+            localMessages.push(formatted);
+        }
+        
+        if (activeContact && (formatted.from === activeContact || formatted.to === activeContact)) {
+            const fa = document.getElementById("msg-feed-area");
+            if (fa) {
+                fa.innerHTML = renderFeed();
+                scrollFeed();
+            }
+        }
+        const sb = document.getElementById("msg-sidebar");
+        if (sb) {
+            sb.innerHTML = renderSidebar();
+            attachSidebarEvents();
+        }
+    } else if (action === 'edit') {
+        const msg = localMessages.find(m => m.id === data._id);
+        if (msg) {
+            msg.text = data.text;
+            msg.edited = data.edited;
+            if (activeContact) {
+                const fa = document.getElementById("msg-feed-area");
+                if (fa) fa.innerHTML = renderFeed();
+            }
+            const sb = document.getElementById("msg-sidebar");
+            if (sb) {
+                sb.innerHTML = renderSidebar();
+                attachSidebarEvents();
+            }
+        }
+    } else if (action === 'delete') {
+        localMessages = localMessages.filter(m => m.id !== data.messageId);
+        if (activeContact) {
+            const fa = document.getElementById("msg-feed-area");
+            if (fa) fa.innerHTML = renderFeed();
+        }
+        const sb = document.getElementById("msg-sidebar");
+        if (sb) {
+            sb.innerHTML = renderSidebar();
+            attachSidebarEvents();
+        }
+    } else if (action === 'read') {
+        const contactUser = localUsers.find(u => String(u._id || u.userId) === String(data.readerId));
+        if (contactUser) {
+            localMessages.forEach(m => {
+                if (m.to === contactUser.username && m.from === currentUser.username) {
+                    m.isRead = true;
+                }
+            });
+            if (activeContact === contactUser.username) {
+                const fa = document.getElementById("msg-feed-area");
+                if (fa) fa.innerHTML = renderFeed();
+            }
+        }
+    } else if (action === 'chat-delete') {
+        const contactUser = localUsers.find(u => String(u._id || u.userId) === String(data.deletedBy));
+        if (contactUser) {
+            localMessages = localMessages.filter(m => !(m.from === contactUser.username || m.to === contactUser.username));
+            if (activeContact === contactUser.username) {
+                activeContact = null;
+            }
+            const root = document.getElementById("messenger-root");
+            if (root) {
+                const tr = translations[currentLang];
+                root.innerHTML = `
+                    <h1 class="messenger-title">${tr.title}</h1>
+                    <div class="messenger-body">
+                        <div class="msg-sidebar ${sidebarCollapsed ? "collapsed" : ""}" id="msg-sidebar">
+                            ${renderSidebar()}
+                        </div>
+                        <div class="msg-chat-area" id="msg-chat-area">
+                            ${renderChatArea()}
+                        </div>
+                        ${activeContact ? `<div class="msg-info-panel" id="msg-info-panel">${renderInfoPanel()}</div>` : ""}
+                    </div>`;
+                attachRootEvents();
+            }
+        }
+    }
+};
+
+// ═══════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════
-export const initMessengerLogic = () => {
+export const initMessengerLogic = async () => {
   currentLang = sessionStorage.getItem("language") || "uz";
-  currentUser = getCurrent();
+  currentUser = await fetchCurrentUser();
   activeContact = null;
   searchQuery = "";
   pendingImages = [];
@@ -1014,5 +1311,24 @@ export const initMessengerLogic = () => {
   userCardOpen = false;
   infoExpanded = false;
   attachExpanded = false;
+  await loadMessengerData();
+  
+  if (!pusherClient && window.Pusher && currentUser) {
+      Pusher.logToConsole = false;
+      // TODO: Replace with actual APP_KEY and CLUSTER
+      pusherClient = new Pusher('a1030ba785c6160c84e2', {
+          cluster: 'ap2'
+      });
+      
+      const currentUserId = currentUser.userId || currentUser._id;
+      pusherChannel = pusherClient.subscribe(`user-${currentUserId}`);
+
+      pusherChannel.bind('new-message', (data) => handleIncomingPusherMessage(data.message, 'new'));
+      pusherChannel.bind('message-edited', (data) => handleIncomingPusherMessage(data.message, 'edit'));
+      pusherChannel.bind('message-deleted', (data) => handleIncomingPusherMessage(data, 'delete'));
+      pusherChannel.bind('messages-read', (data) => handleIncomingPusherMessage(data, 'read'));
+      pusherChannel.bind('chat-deleted', (data) => handleIncomingPusherMessage(data, 'chat-delete'));
+  }
+
   renderRoot();
 };

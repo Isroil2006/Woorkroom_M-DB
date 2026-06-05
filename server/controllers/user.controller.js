@@ -243,3 +243,37 @@ exports.searchUsers = async (req, res) => {
     res.status(500).json({ message: "Qidiruvda xatolik", error: error.message });
   }
 };
+
+// Get Users with Pagination and Search for Assignment
+exports.getUsersForAssign = async (req, res) => {
+  try {
+    const { query, page = 1, limit = 5 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    let dbQuery = {};
+    if (query && query.length >= 2) {
+      dbQuery = {
+        $or: [
+          { username: { $regex: query, $options: "i" } },
+          { email: { $regex: query, $options: "i" } },
+        ]
+      };
+    }
+
+    const users = await User.find(dbQuery)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .select("username email userId avatar");
+
+    const total = await User.countDocuments(dbQuery);
+
+    res.status(200).json({
+      users,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit))
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Xatolik yuz berdi", error: error.message });
+  }
+};

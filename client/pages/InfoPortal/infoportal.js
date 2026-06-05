@@ -240,8 +240,42 @@ const collectAllEvents = async () => {
         }
       });
     }
+
+    // Yana testlarni ham yuklab olish
+    const resTests = await fetch(`${BASE_URL}/api/tests/assigned`, {
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
+    
+    if (resTests.ok) {
+        const tests = await resTests.json();
+        if (Array.isArray(tests)) {
+            tests.forEach((t) => {
+                const startDate = parseDate(t.validFrom);
+                const endDate = parseDate(t.validUntil);
+                if (startDate && endDate) {
+                    events.push({
+                        id: `test_${t._id}`,
+                        type: EVENT_TYPES.TEST_COMPLETED, // Test event type sifatida ishlatsak bo'ladi (yoki yangi yaratish)
+                        title: `Test: ${t.title}`,
+                        startDate: startDate,
+                        endDate: endDate,
+                        date: dateToString(endDate),
+                        dateObj: endDate,
+                        timeStr: "",
+                        status: "todo",
+                        userStatus: {},
+                        createdBy: t.createdBy,
+                        priority: "high",
+                        project: "Testlar",
+                        assignees: t.assignedUsers || [],
+                    });
+                }
+            });
+        }
+    }
   } catch (err) {
-    console.error("Failed to fetch calendar tasks:", err);
+    console.error("Failed to fetch calendar events:", err);
   }
 
   return events;
@@ -299,7 +333,6 @@ export const InfoPortalPage = () => `
                 </button>
                 <div class="cal-view-menu" id="cal-view-menu">
                     <button class="cal-view-option ${currentView === 'month' ? 'active' : ''}" data-view="month">${t("month")}</button>
-                    <button class="cal-view-option ${currentView === 'week' ? 'active' : ''}" data-view="week">${t("week")}</button>
                     <button class="cal-view-option ${currentView === 'day' ? 'active' : ''}" data-view="day">${t("day")}</button>
                     <button class="cal-view-option ${currentView === 'horizontal' ? 'active' : ''}" data-view="horizontal">${t("horizontal")}</button>
                 </div>
@@ -656,19 +689,31 @@ const renderDayView = async () => {
   const dayEvents = await getEventsForDate(dateStr);
 
   let html = "";
+  
+  // All day tasks section
+  let allDayContent = "";
+  if (dayEvents.length > 0) {
+    allDayContent = dayEvents
+      .map(
+        (e) => `<div class="cal-all-day-task" data-id="${e.id}" style="border-left: 3px solid ${eventColors[e.type]?.bg || '#5b6ef5'}">
+           <span class="cal-all-day-project-badge">${e.project && e.project !== "No Project" ? e.project : "Loyiha biriktirilmagan"}</span>
+           <span class="cal-all-day-title">${e.title}</span>
+        </div>`
+      )
+      .join("");
+  }
+  
+  html += `<div class="cal-time-row cal-all-day-row">
+          <div class="cal-time-label" style="font-size: 11px; font-weight: 600; color: #64748b; line-height: 1.2; display: flex; align-items: center; justify-content: center;">Kun davomida</div>
+          <div class="cal-time-cell full-width today" data-date="${dateStr}" data-hour="all-day" style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 10px; padding: 12px; align-items: center; justify-content: flex-start;">
+              ${allDayContent}
+          </div>
+      </div>`;
+
   for (let hour = 0; hour < 24; hour++) {
-    let cellContent = "";
-    const hourEvents = dayEvents.filter((e) => getEventHour(e.timeStr) === hour);
-    if (hourEvents.length > 0) {
-      const prioritized = getPrioritizedEvents(hourEvents, 5);
-      cellContent = prioritized
-        .map((e) => `<span class="cal-event-icon" style="color: ${eventColors[e.type]?.text || "#666"}" title="${e.title}">${eventIcons[e.type] || eventIcons[EVENT_TYPES.TASK_DUE]}</span>`)
-        .join("");
-    }
     html += `<div class="cal-time-row">
             <div class="cal-time-label">${hour.toString().padStart(2, "0")}:00</div>
             <div class="cal-time-cell full-width today" data-date="${dateStr}" data-hour="${hour}">
-                ${cellContent}
             </div>
         </div>`;
   }
