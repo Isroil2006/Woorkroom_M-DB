@@ -1220,43 +1220,26 @@ const handleIncomingPusherMessage = (data, action) => {
         }
         
         if (activeContact && (formatted.from === activeContact || formatted.to === activeContact)) {
-            const fa = document.getElementById("msg-feed-area");
-            if (fa) {
-                fa.innerHTML = renderFeed();
-                scrollFeed();
-            }
+            if (typeof refreshFeed === 'function') refreshFeed(true);
         }
-        const sb = document.getElementById("msg-sidebar");
-        if (sb) {
-            sb.innerHTML = renderSidebar();
-            attachSidebarEvents();
-        }
+        if (typeof refreshContacts === 'function') refreshContacts();
+        
     } else if (action === 'edit') {
         const msg = localMessages.find(m => m.id === data._id);
         if (msg) {
             msg.text = data.text;
             msg.edited = data.edited;
-            if (activeContact) {
-                const fa = document.getElementById("msg-feed-area");
-                if (fa) fa.innerHTML = renderFeed();
+            if (activeContact && (msg.from === activeContact || msg.to === activeContact)) {
+                if (typeof refreshFeed === 'function') refreshFeed(false);
             }
-            const sb = document.getElementById("msg-sidebar");
-            if (sb) {
-                sb.innerHTML = renderSidebar();
-                attachSidebarEvents();
-            }
+            if (typeof refreshContacts === 'function') refreshContacts();
         }
     } else if (action === 'delete') {
         localMessages = localMessages.filter(m => m.id !== data.messageId);
         if (activeContact) {
-            const fa = document.getElementById("msg-feed-area");
-            if (fa) fa.innerHTML = renderFeed();
+            if (typeof refreshFeed === 'function') refreshFeed(false);
         }
-        const sb = document.getElementById("msg-sidebar");
-        if (sb) {
-            sb.innerHTML = renderSidebar();
-            attachSidebarEvents();
-        }
+        if (typeof refreshContacts === 'function') refreshContacts();
     } else if (action === 'read') {
         const contactUser = localUsers.find(u => String(u._id || u.userId) === String(data.readerId));
         if (contactUser) {
@@ -1266,8 +1249,7 @@ const handleIncomingPusherMessage = (data, action) => {
                 }
             });
             if (activeContact === contactUser.username) {
-                const fa = document.getElementById("msg-feed-area");
-                if (fa) fa.innerHTML = renderFeed();
+                if (typeof refreshFeed === 'function') refreshFeed(false);
             }
         }
     } else if (action === 'chat-delete') {
@@ -1277,22 +1259,7 @@ const handleIncomingPusherMessage = (data, action) => {
             if (activeContact === contactUser.username) {
                 activeContact = null;
             }
-            const root = document.getElementById("messenger-root");
-            if (root) {
-                const tr = translations[currentLang];
-                root.innerHTML = `
-                    <h1 class="messenger-title">${tr.title}</h1>
-                    <div class="messenger-body">
-                        <div class="msg-sidebar ${sidebarCollapsed ? "collapsed" : ""}" id="msg-sidebar">
-                            ${renderSidebar()}
-                        </div>
-                        <div class="msg-chat-area" id="msg-chat-area">
-                            ${renderChatArea()}
-                        </div>
-                        ${activeContact ? `<div class="msg-info-panel" id="msg-info-panel">${renderInfoPanel()}</div>` : ""}
-                    </div>`;
-                attachRootEvents();
-            }
+            if (typeof renderRoot === 'function') renderRoot();
         }
     }
 };
