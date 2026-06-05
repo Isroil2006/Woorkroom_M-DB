@@ -1195,12 +1195,14 @@ let pusherClient = null;
 let pusherChannel = null;
 
 const handleIncomingPusherMessage = (data, action) => {
+    console.log("PUSHER KELDI:", action, data);
     if (action === 'new') {
         const m = data;
         const cu = currentUser;
         const s = localUsers.find(u => String(u._id || u.userId) === String(m.sender)) || (cu && String(cu._id || cu.userId) === String(m.sender) ? cu : null);
         const r = localUsers.find(u => String(u._id || u.userId) === String(m.receiver)) || (cu && String(cu._id || cu.userId) === String(m.receiver) ? cu : null);
         
+        console.log("Sender:", s, "Receiver:", r);
         const formatted = {
             id: m._id,
             from: s ? s.username : "Unknown",
@@ -1214,12 +1216,16 @@ const handleIncomingPusherMessage = (data, action) => {
             isRead: m.isRead
         };
         
+        console.log("Formatted:", formatted);
+        
         // Check if message already exists
         if (!localMessages.find(msg => msg.id === formatted.id)) {
             localMessages.push(formatted);
+            console.log("Xabar localMessages ga qoshildi");
         }
         
-        if (activeContact && (formatted.from === activeContact || formatted.to === activeContact)) {
+        if (activeContact && (formatted.from === activeContact.username || formatted.to === activeContact.username || formatted.from === activeContact || formatted.to === activeContact)) {
+            console.log("Ekranni yangilayapman: refreshFeed");
             if (typeof refreshFeed === 'function') refreshFeed(true);
         }
         if (typeof refreshContacts === 'function') refreshContacts();
@@ -1229,7 +1235,7 @@ const handleIncomingPusherMessage = (data, action) => {
         if (msg) {
             msg.text = data.text;
             msg.edited = data.edited;
-            if (activeContact && (msg.from === activeContact || msg.to === activeContact)) {
+            if (activeContact && (msg.from === activeContact || msg.to === activeContact || msg.from === activeContact.username || msg.to === activeContact.username)) {
                 if (typeof refreshFeed === 'function') refreshFeed(false);
             }
             if (typeof refreshContacts === 'function') refreshContacts();
@@ -1256,7 +1262,7 @@ const handleIncomingPusherMessage = (data, action) => {
         const contactUser = localUsers.find(u => String(u._id || u.userId) === String(data.deletedBy));
         if (contactUser) {
             localMessages = localMessages.filter(m => !(m.from === contactUser.username || m.to === contactUser.username));
-            if (activeContact === contactUser.username) {
+            if (activeContact === contactUser.username || activeContact?.username === contactUser.username) {
                 activeContact = null;
             }
             if (typeof renderRoot === 'function') renderRoot();
