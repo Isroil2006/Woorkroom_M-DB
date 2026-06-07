@@ -1,5 +1,5 @@
-import { translations } from "./translations.js";
-import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
+import { translations, MSG_AN_TR } from "./translations.js";
+import { getCurrentLang, createTranslationHelper, LANGUAGE_CHANGED_EVENT } from "../../assets/js/i18n.js";
 import { API_URL, getAuthHeaders, fetchCurrentUser } from "../../assets/js/api.js";
  
 const t = createTranslationHelper(translations);
@@ -244,7 +244,7 @@ const renderSidebar = () => {
   if (sidebarCollapsed) {
     return `
             <div class="msg-sidebar-header msg-sidebar-header--collapsed">
-                <button class="msg-icon-btn" id="msg-collapse-btn" title="Ochish">
+                <button class="msg-icon-btn" id="msg-collapse-btn" title="${tr.expand}">
                     <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
                 </button>
             </div>
@@ -265,7 +265,7 @@ const renderSidebar = () => {
                 <span class="msg-current-user-name">${escHtml(freshMe?.username || "")}</span>
             </div>
             <div class="msg-sidebar-actions">
-                <button class="msg-icon-btn" id="msg-collapse-btn" title="Yig'ish">
+                <button class="msg-icon-btn" id="msg-collapse-btn" title="${tr.collapse}">
                     <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
                 </button>
             </div>
@@ -451,12 +451,12 @@ const renderChatArea = () => {
                 </div>
             </div>
             <div class="msg-chat-header-right" style="position:relative">
-                <button class="msg-icon-btn" id="msg-chat-menu-trigger" title="Sozlamalar">
+                <button class="msg-icon-btn" id="msg-chat-menu-trigger" title="${tr.settings}">
                     <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M12 13a1 1 0 100-2 1 1 0 000 2zm0-7a1 1 0 100-2 1 1 0 000 2zm0 14a1 1 0 100-2 1 1 0 000 2z" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>
                 </button>
                 <div class="msg-chat-menu" id="msg-chat-menu" style="display: ${chatMenuOpen ? 'flex' : 'none'};">
-                    <button class="msg-chat-menu-item" id="msg-menu-clear">Chatni tozalash</button>
-                    <button class="msg-chat-menu-item danger" id="msg-menu-delete">O'chirish</button>
+                    <button class="msg-chat-menu-item" id="msg-menu-clear">${tr.clear_chat}</button>
+                    <button class="msg-chat-menu-item danger" id="msg-menu-delete">${tr.delete_chat}</button>
                 </div>
             </div>
         </div>
@@ -1044,8 +1044,8 @@ const showConfirmModal = (message, onConfirm) => {
     <div class="msg-modal-content">
       <div class="msg-modal-body">${escHtml(message)}</div>
       <div class="msg-modal-footer">
-        <button class="msg-btn-cancel">Bekor qilish</button>
-        <button class="msg-btn-confirm">Tasdiqlash</button>
+        <button class="msg-btn-cancel">${translations[getCurrentLang()].cancel}</button>
+        <button class="msg-btn-confirm">${translations[getCurrentLang()].confirm}</button>
       </div>
     </div>
   `;
@@ -1078,24 +1078,26 @@ const attachChatEvents = () => {
       const menu = $("msg-chat-menu");
       if (menu) menu.style.display = chatMenuOpen ? "flex" : "none";
     });
-  }
-  const mc = $("msg-menu-clear");
-  if (mc) {
-    mc.addEventListener("click", (e) => {
-      e.stopPropagation();
-      showConfirmModal("Chatdagi barcha xabarlarni tozalashni xohlaysizmi?", async () => {
+    const menuClear = document.getElementById("msg-menu-clear");
+    if (menuClear) {
+      menuClear.addEventListener("click", (e) => {
+        e.stopPropagation();
+        chatMenuOpen = false;
+        showConfirmModal(translations[getCurrentLang()].confirm_clear_chat, async () => {
           await clearActiveChat(false);
+        });
       });
-    });
-  }
-  const md = $("msg-menu-delete");
-  if (md) {
-    md.addEventListener("click", (e) => {
-      e.stopPropagation();
-      showConfirmModal("Ushbu chatni butunlay o'chirib tashlashni xohlaysizmi?", async () => {
+    }
+    const menuDelete = document.getElementById("msg-menu-delete");
+    if (menuDelete) {
+      menuDelete.addEventListener("click", (e) => {
+        e.stopPropagation();
+        chatMenuOpen = false;
+        showConfirmModal(translations[getCurrentLang()].confirm_delete_chat, async () => {
           await clearActiveChat(true);
+        });
       });
-    });
+    }
   }
 
   const sb = $("msg-send-btn");
@@ -1305,3 +1307,11 @@ export const initMessengerLogic = async () => {
 
   renderRoot();
 };
+
+// Listen for global language change events to re-render dynamically
+document.addEventListener(LANGUAGE_CHANGED_EVENT, (e) => {
+    currentLang = e.detail.lang;
+    if (document.getElementById("messenger-root")) {
+        renderRoot();
+    }
+});
