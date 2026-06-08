@@ -84,7 +84,7 @@ exports.sendMessage = async (req, res) => {
     await newMessage.save();
 
     try {
-      pusher.trigger(`user-${receiverId}`, "new-message", {
+      await pusher.trigger(`user-${receiverId}`, "new-message", {
         message: newMessage
       });
     } catch (err) {
@@ -115,7 +115,7 @@ exports.editMessage = async (req, res) => {
     await message.save();
 
     try {
-      pusher.trigger(`user-${message.receiver}`, "message-edited", {
+      await pusher.trigger(`user-${message.receiver}`, "message-edited", {
         message: message
       });
     } catch (err) {
@@ -144,7 +144,7 @@ exports.deleteMessage = async (req, res) => {
     await Message.findByIdAndDelete(messageId);
 
     try {
-      pusher.trigger(`user-${message.receiver}`, "message-deleted", {
+      await pusher.trigger(`user-${message.receiver}`, "message-deleted", {
         messageId: messageId,
         senderId: message.sender,
         receiverId: message.receiver
@@ -191,7 +191,7 @@ exports.markAsRead = async (req, res) => {
 
     try {
       // SenderId (xabar egasi) ga sening xabarlaringni o'qishdi degan signal yuboriladi
-      pusher.trigger(`user-${senderId}`, "messages-read", {
+      await pusher.trigger(`user-${senderId}`, "messages-read", {
         readerId: receiverId
       });
     } catch (err) {
@@ -231,7 +231,7 @@ exports.deleteChat = async (req, res) => {
     });
 
     try {
-      pusher.trigger(`user-${receiverId}`, "chat-deleted", {
+      await pusher.trigger(`user-${receiverId}`, "chat-deleted", {
         deletedBy: currentUserId
       });
     } catch (err) {
