@@ -244,3 +244,59 @@ exports.deleteChat = async (req, res) => {
   }
 };
 
+// 9. Pusher Presence Channel autentifikatsiyasi
+exports.pusherAuth = async (req, res) => {
+  try {
+    const socketId = req.body.socket_id;
+    const channelName = req.body.channel_name;
+    const userId = req.user.id;
+
+    // User ma'lumotlarini olish
+    const user = await User.findById(userId).select("username email");
+    if (!user) {
+      return res.status(403).json({ message: "Foydalanuvchi topilmadi" });
+    }
+
+    const presenceData = {
+      user_id: userId,
+      user_info: {
+        username: user.username,
+        email: user.email
+      }
+    };
+
+    const authResponse = pusher.authorizeChannel(socketId, channelName, presenceData);
+    res.json(authResponse);
+  } catch (error) {
+    console.error("Pusher auth error:", error);
+    res.status(500).json({ message: "Pusher autentifikatsiyada xatolik", error: error.message });
+  }
+};
+
+// 10. Typing indicator relay
+exports.typingEvent = async (req, res) => {
+  try {
+    const { receiverId } = req.body;
+    const senderId = req.user.id;
+
+    if (!receiverId) {
+      return res.status(400).json({ message: "Qabul qiluvchi ko'rsatilmagan" });
+    }
+
+    // Sender username ni olish
+    const sender = await User.findById(senderId).select("username");
+
+    try {
+      await pusher.trigger(`user-${receiverId}`, "typing", {
+        senderId: senderId,
+        senderUsername: sender ? sender.username : "Unknown"
+      });
+    } catch (err) {
+      console.error("Pusher typing error:", err);
+    }
+
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ message: "Typing eventda xatolik", error: error.message });
+  }
+};

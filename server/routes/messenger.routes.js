@@ -33,4 +33,10 @@ router.get("/photo/:photoId", messengerController.getPhoto);
 // Mark as read
 router.put("/read/:senderId", messengerController.markAsRead);
 
+// Pusher presence channel auth
+router.post("/pusher/auth", messengerController.pusherAuth);
+
+// Typing indicator
+router.post("/typing", messengerController.typingEvent);
+
 module.exports = router;

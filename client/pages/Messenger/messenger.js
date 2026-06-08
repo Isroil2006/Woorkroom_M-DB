@@ -57,6 +57,45 @@ const avatarHtml = (user, size = 42) => {
 let localUsers = [];
 let localMessages = [];
 
+// ─── ONLINE / TYPING TRACKING ───────────────────
+const onlineUserIds = new Set();
+const typingUsers = new Map(); // userId → timeoutId
+
+const isUserOnline = (user) => {
+  if (!user) return false;
+  const uid = user._id || user.userId;
+  return uid ? onlineUserIds.has(String(uid)) : false;
+};
+
+const isUserTyping = (user) => {
+  if (!user) return false;
+  const uid = user._id || user.userId;
+  return uid ? typingUsers.has(String(uid)) : false;
+};
+
+// Typing event throttle
+let lastTypingSent = 0;
+const TYPING_THROTTLE_MS = 2000;
+const TYPING_DISPLAY_MS = 3000;
+
+const sendTypingEvent = async () => {
+  if (!activeContact || !currentUser) return;
+  const now = Date.now();
+  if (now - lastTypingSent < TYPING_THROTTLE_MS) return;
+  lastTypingSent = now;
+  const receiverUser = localUsers.find(u => u.username === activeContact.username);
+  if (!receiverUser) return;
+  const receiverId = receiverUser._id || receiverUser.userId;
+  try {
+    fetch(`${API_URL}/api/messenger/typing`, {
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ receiverId })
+    });
+  } catch (e) { /* silent */ }
+};
+
 const getUsers = () => localUsers;
 
 const getMessages = (a, b) => {
@@ -320,11 +359,12 @@ const renderUserCard = () => {
 
 const renderContactMini = (user) => {
   const isActive = activeContact?.username === user.username;
+  const statusClass = isUserOnline(user) ? "online" : "offline";
   return `
         <div class="msg-contact-item msg-contact-mini ${isActive ? "active" : ""}" data-username="${user.username}" title="${escHtml(user.username)}">
             <div class="msg-avatar-wrap">
                 ${avatarHtml(user, 38)}
-                <span class="msg-status-dot offline"></span>
+                <span class="msg-status-dot ${statusClass}"></span>
             </div>
         </div>`;
 };
@@ -334,9 +374,13 @@ const renderContactItem = (user) => {
   const last = getLastMsg(currentUser.username, user.username);
   const isActive = activeContact?.username === user.username;
   const unread = !isActive && hasUnread(currentUser.username, user.username);
+  const statusClass = isUserOnline(user) ? "online" : "offline";
+  const userIsTyping = isUserTyping(user);
   let previewText = "",
     timeStr = "";
-  if (last) {
+  if (userIsTyping) {
+    previewText = tr.typing;
+  } else if (last) {
     timeStr = formatTime(last.at);
     if (last.type === "image")
       previewText =
@@ -353,7 +397,7 @@ const renderContactItem = (user) => {
         <div class="msg-contact-item ${isActive ? "active" : ""}" data-username="${user.username}">
             <div class="msg-avatar-wrap">
                 ${avatarHtml(user, 42)}
-                <span class="msg-status-dot offline"></span>
+                <span class="msg-status-dot ${statusClass}"></span>
             </div>
             <div class="msg-contact-info">
                 <div class="msg-contact-row">
@@ -361,7 +405,7 @@ const renderContactItem = (user) => {
                     <span class="msg-contact-time">${timeStr}</span>
                 </div>
                 <div class="msg-contact-row" style="margin-top:2px">
-                    <span class="msg-contact-preview ${unread ? "msg-contact-preview--unread" : ""}">${escHtml(previewText)}</span>
+                    <span class="msg-contact-preview ${userIsTyping ? "msg-contact-preview--typing" : ""} ${unread ? "msg-contact-preview--unread" : ""}">${escHtml(previewText)}</span>
                     ${unread ? `<span class="msg-unread-dot"></span>` : ""}
                 </div>
             </div>
@@ -444,10 +488,10 @@ const renderChatArea = () => {
   return `
         <div class="msg-chat-header">
             <div class="msg-chat-header-left">
-                <div class="msg-avatar-wrap">${avatarHtml(activeContact, 38)}<span class="msg-status-dot offline"></span></div>
+                <div class="msg-avatar-wrap">${avatarHtml(activeContact, 38)}<span class="msg-status-dot ${isUserOnline(activeContact) ? 'online' : 'offline'}"></span></div>
                 <div>
                     <div class="msg-chat-recipient-name">${escHtml(activeContact.username)}</div>
-                    <div class="msg-chat-status-text">${tr.offline}</div>
+                    <div class="msg-chat-status-text ${isUserTyping(activeContact) ? 'typing' : ''}" id="msg-chat-status-text">${isUserTyping(activeContact) ? tr.typing : (isUserOnline(activeContact) ? tr.online : tr.offline)}</div>
                 </div>
             </div>
             <div class="msg-chat-header-right" style="position:relative">
@@ -1107,6 +1151,7 @@ const attachChatEvents = () => {
     ti.addEventListener("input", () => {
       autoResizeInput();
       updateSendBtn();
+      sendTypingEvent();
     });
     ti.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -1195,16 +1240,66 @@ const attachRootEvents = () => {
 // ═══════════════════════════════════════════════
 let pusherClient = null;
 let pusherChannel = null;
+let presenceChannel = null;
+
+const handleTypingEvent = (data) => {
+    const senderId = String(data.senderId);
+    // Clear existing timeout if any
+    if (typingUsers.has(senderId)) {
+        clearTimeout(typingUsers.get(senderId));
+    }
+    // Set typing with auto-clear timeout
+    typingUsers.set(senderId, setTimeout(() => {
+        typingUsers.delete(senderId);
+        updateTypingUI();
+    }, TYPING_DISPLAY_MS));
+    updateTypingUI();
+};
+
+const updateTypingUI = () => {
+    const tr = translations[getCurrentLang()];
+    // Update chat header status text
+    if (activeContact) {
+        const statusEl = document.getElementById("msg-chat-status-text");
+        if (statusEl) {
+            if (isUserTyping(activeContact)) {
+                statusEl.textContent = tr.typing;
+                statusEl.classList.add("typing");
+            } else {
+                statusEl.textContent = isUserOnline(activeContact) ? tr.online : tr.offline;
+                statusEl.classList.remove("typing");
+            }
+        }
+    }
+    // Update sidebar contact list
+    refreshContacts();
+};
+
+const updateOnlineUI = () => {
+    const tr = translations[getCurrentLang()];
+    // Update all status dots in sidebar
+    refreshContacts();
+    // Update chat header
+    if (activeContact) {
+        const statusEl = document.getElementById("msg-chat-status-text");
+        const dotEls = document.querySelectorAll(".msg-chat-header .msg-status-dot");
+        if (statusEl && !isUserTyping(activeContact)) {
+            statusEl.textContent = isUserOnline(activeContact) ? tr.online : tr.offline;
+            statusEl.classList.remove("typing");
+        }
+        dotEls.forEach(dot => {
+            dot.className = `msg-status-dot ${isUserOnline(activeContact) ? 'online' : 'offline'}`;
+        });
+    }
+};
 
 const handleIncomingPusherMessage = (data, action) => {
-    console.log("PUSHER KELDI:", action, data);
     if (action === 'new') {
         const m = data;
         const cu = currentUser;
         const s = localUsers.find(u => String(u._id || u.userId) === String(m.sender)) || (cu && String(cu._id || cu.userId) === String(m.sender) ? cu : null);
         const r = localUsers.find(u => String(u._id || u.userId) === String(m.receiver)) || (cu && String(cu._id || cu.userId) === String(m.receiver) ? cu : null);
         
-        console.log("Sender:", s, "Receiver:", r);
         const formatted = {
             id: m._id,
             from: s ? s.username : "Unknown",
@@ -1218,36 +1313,42 @@ const handleIncomingPusherMessage = (data, action) => {
             isRead: m.isRead
         };
         
-        console.log("Formatted:", formatted);
-        
         // Check if message already exists
         if (!localMessages.find(msg => msg.id === formatted.id)) {
             localMessages.push(formatted);
-            console.log("Xabar localMessages ga qoshildi");
         }
         
-        if (activeContact && (formatted.from === activeContact.username || formatted.to === activeContact.username || formatted.from === activeContact || formatted.to === activeContact)) {
-            console.log("Ekranni yangilayapman: refreshFeed");
-            if (typeof refreshFeed === 'function') refreshFeed(true);
+        // Clear typing indicator for sender when message arrives
+        const senderUser = localUsers.find(u => u.username === formatted.from);
+        if (senderUser) {
+            const senderUid = String(senderUser._id || senderUser.userId);
+            if (typingUsers.has(senderUid)) {
+                clearTimeout(typingUsers.get(senderUid));
+                typingUsers.delete(senderUid);
+            }
         }
-        if (typeof refreshContacts === 'function') refreshContacts();
+        
+        if (activeContact && (formatted.from === activeContact.username || formatted.to === activeContact.username)) {
+            refreshFeed(true);
+        }
+        refreshContacts();
         
     } else if (action === 'edit') {
         const msg = localMessages.find(m => m.id === data._id);
         if (msg) {
             msg.text = data.text;
             msg.edited = data.edited;
-            if (activeContact && (msg.from === activeContact || msg.to === activeContact || msg.from === activeContact.username || msg.to === activeContact.username)) {
-                if (typeof refreshFeed === 'function') refreshFeed(false);
+            if (activeContact && (msg.from === activeContact.username || msg.to === activeContact.username)) {
+                refreshFeed(false);
             }
-            if (typeof refreshContacts === 'function') refreshContacts();
+            refreshContacts();
         }
     } else if (action === 'delete') {
         localMessages = localMessages.filter(m => m.id !== data.messageId);
         if (activeContact) {
-            if (typeof refreshFeed === 'function') refreshFeed(false);
+            refreshFeed(false);
         }
-        if (typeof refreshContacts === 'function') refreshContacts();
+        refreshContacts();
     } else if (action === 'read') {
         const contactUser = localUsers.find(u => String(u._id || u.userId) === String(data.readerId));
         if (contactUser) {
@@ -1256,8 +1357,8 @@ const handleIncomingPusherMessage = (data, action) => {
                     m.isRead = true;
                 }
             });
-            if (activeContact === contactUser.username) {
-                if (typeof refreshFeed === 'function') refreshFeed(false);
+            if (activeContact?.username === contactUser.username) {
+                refreshFeed(false);
             }
         }
     } else if (action === 'chat-delete') {
@@ -1267,7 +1368,7 @@ const handleIncomingPusherMessage = (data, action) => {
             if (activeContact === contactUser.username || activeContact?.username === contactUser.username) {
                 activeContact = null;
             }
-            if (typeof renderRoot === 'function') renderRoot();
+            renderRoot();
         }
     }
 };
@@ -1289,20 +1390,63 @@ export const initMessengerLogic = async () => {
   await loadMessengerData();
   
   if (!pusherClient && window.Pusher && currentUser) {
-      Pusher.logToConsole = false;
-      // TODO: Replace with actual APP_KEY and CLUSTER
+      const currentUserId = currentUser.userId || currentUser._id;
+
       pusherClient = new Pusher('a1030ba785c6160c84e2', {
-          cluster: 'ap2'
+          cluster: 'ap2',
+          channelAuthorization: {
+              customHandler: async ({ channelName, socketId }, callback) => {
+                  try {
+                      const res = await fetch(`${API_URL}/api/messenger/pusher/auth`, {
+                          method: 'POST',
+                          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({ socket_id: socketId, channel_name: channelName })
+                      });
+                      if (res.ok) {
+                          const data = await res.json();
+                          callback(null, data);
+                      } else {
+                          callback(new Error(`Pusher auth failed: ${res.status}`), null);
+                      }
+                  } catch (err) {
+                      callback(err, null);
+                  }
+              }
+          }
       });
       
-      const currentUserId = currentUser.userId || currentUser._id;
+      // Private channel for messages (same as before)
       pusherChannel = pusherClient.subscribe(`user-${currentUserId}`);
-
       pusherChannel.bind('new-message', (data) => handleIncomingPusherMessage(data.message, 'new'));
       pusherChannel.bind('message-edited', (data) => handleIncomingPusherMessage(data.message, 'edit'));
       pusherChannel.bind('message-deleted', (data) => handleIncomingPusherMessage(data, 'delete'));
       pusherChannel.bind('messages-read', (data) => handleIncomingPusherMessage(data, 'read'));
       pusherChannel.bind('chat-deleted', (data) => handleIncomingPusherMessage(data, 'chat-delete'));
+      pusherChannel.bind('typing', (data) => handleTypingEvent(data));
+
+      // Presence channel for online/offline tracking
+      presenceChannel = pusherClient.subscribe('presence-messenger');
+      presenceChannel.bind('pusher:subscription_succeeded', (members) => {
+          onlineUserIds.clear();
+          members.each((member) => {
+              onlineUserIds.add(String(member.id));
+          });
+          updateOnlineUI();
+      });
+      presenceChannel.bind('pusher:member_added', (member) => {
+          onlineUserIds.add(String(member.id));
+          updateOnlineUI();
+      });
+      presenceChannel.bind('pusher:member_removed', (member) => {
+          onlineUserIds.delete(String(member.id));
+          // Also clear typing if user went offline
+          if (typingUsers.has(String(member.id))) {
+              clearTimeout(typingUsers.get(String(member.id)));
+              typingUsers.delete(String(member.id));
+          }
+          updateOnlineUI();
+      });
   }
 
   renderRoot();
@@ -1315,3 +1459,4 @@ document.addEventListener(LANGUAGE_CHANGED_EVENT, (e) => {
         renderRoot();
     }
 });
+

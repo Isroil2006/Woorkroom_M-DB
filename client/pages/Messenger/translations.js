@@ -37,6 +37,7 @@ export const translations = {
         confirm: "Tasdiqlash",
         confirm_clear_chat: "Chatdagi barcha xabarlarni tozalashni xohlaysizmi?",
         confirm_delete_chat: "Ushbu chatni butunlay o'chirib tashlashni xohlaysizmi?",
+        typing: "yozyabdi...",
     },
     en: {
         title: "Messages",
@@ -76,6 +77,7 @@ export const translations = {
         confirm: "Confirm",
         confirm_clear_chat: "Are you sure you want to clear all messages in this chat?",
         confirm_delete_chat: "Are you sure you want to completely delete this chat?",
+        typing: "typing...",
     },
     ru: {
         title: "Сообщения",
@@ -115,6 +117,7 @@ export const translations = {
         confirm: "Подтвердить",
         confirm_clear_chat: "Вы уверены, что хотите очистить все сообщения в этом чате?",
         confirm_delete_chat: "Вы уверены, что хотите полностью удалить этот чат?",
+        typing: "печатает...",
     },
 };
 
