@@ -1150,6 +1150,19 @@ export const TodoPage = () => `
         <span class="todo-form-error" id="tm-title-error"></span>
       </div>
       <div class="todo-form-group">
+        <label class="todo-form-label" id="lbl-task-file">${t("attach_file_pdf") || "PDF Fayl biriktirish (max 5MB)"}</label>
+        <div class="custom-file-upload">
+          <input type="file" id="tm-file" accept="application/pdf" class="hidden-file-input" multiple />
+          <label for="tm-file" class="file-upload-label">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 4v16m-8-8h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span class="file-upload-text">${t("choose_file") || "Fayl tanlash"}</span>
+          </label>
+        </div>
+        <div id="tm-file-list" style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;"></div>
+        <div id="tm-file-quota" style="font-size: 11px; color: #64748b; text-align: right; margin-top: 4px;">0.00 MB / 5.00 MB</div>
+        <span class="todo-form-error" id="tm-file-error"></span>
+      </div>
+      <div class="todo-form-group">
         <label class="todo-form-label" id="lbl-task-desc">Description</label>
         <textarea class="todo-form-input" id="tm-desc" rows="3" placeholder="Description..."></textarea>
       </div>
@@ -1267,6 +1280,11 @@ export const TodoPage = () => `
         <div class="todo-detail-meta-row">
           <span class="todo-detail-meta-key" id="td-lbl-duedate">Due Date</span>
           <span id="td-meta-duedate"></span>
+        </div>
+        
+        <div class="todo-detail-meta-row" id="td-meta-file-container" style="display:none">
+          <span class="todo-detail-meta-key">Fayllar</span>
+          <div id="td-meta-file" style="display:flex; flex-direction:column; gap:4px"></div>
         </div>
         
         <div class="todo-detail-meta-row">
@@ -2196,6 +2214,76 @@ const openTaskModal = async (taskId, defaultStatus = "todo") => {
   $("tm-title-error").textContent = "";
 
   $("task-modal").style.display = "flex";
+  
+  const fileInput = $("tm-file");
+  const fileList = $("tm-file-list");
+  const fileQuota = $("tm-file-quota");
+  
+  let currentExistingSize = 0;
+  if (task && task.files && task.files.length > 0) {
+      currentExistingSize = task.files.reduce((acc, f) => acc + (f.fileSize || 0), 0);
+  }
+  
+  window.currentTaskNewFiles = [];
+  const MAX_TOTAL_SIZE = 5 * 1024 * 1024; // 5 MB
+
+  window.renderFileList = () => {
+      if (!fileList || !fileQuota) return;
+      fileList.innerHTML = "";
+      
+      let newFilesSize = window.currentTaskNewFiles.reduce((acc, f) => acc + f.size, 0);
+      let totalSize = currentExistingSize + newFilesSize;
+      
+      fileQuota.textContent = `${(totalSize / 1024 / 1024).toFixed(2)} MB / 5.00 MB`;
+      fileQuota.style.color = totalSize > MAX_TOTAL_SIZE ? "#ef4444" : "#64748b";
+
+      window.currentTaskNewFiles.forEach((file, index) => {
+          const item = document.createElement("div");
+          item.style = "display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;";
+          item.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#5b6ef5" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="#5b6ef5" stroke-width="2" stroke-linejoin="round"/></svg>
+                  <span style="font-size: 12px; color: #1a1d2e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.name}</span>
+                  <span style="font-size: 10px; color: #8892a4; flex-shrink:0">(${(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+              </div>
+              <button type="button" class="todo-remove-file-btn" data-index="${index}" style="background:none; border:none; color:#ef4444; cursor:pointer; padding:2px; display:flex;">
+                <svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+          `;
+          fileList.appendChild(item);
+      });
+      
+      fileList.querySelectorAll(".todo-remove-file-btn").forEach(btn => {
+          btn.onclick = (e) => {
+              const idx = parseInt(e.currentTarget.dataset.index);
+              window.currentTaskNewFiles.splice(idx, 1);
+              window.renderFileList();
+          }
+      });
+  };
+
+  if (fileInput) {
+    fileInput.value = "";
+    window.renderFileList();
+    
+    fileInput.onchange = (e) => {
+      const selected = Array.from(e.target.files);
+      if (selected.length > 0) {
+        const validFiles = selected.filter(f => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
+        if (validFiles.length < selected.length) {
+            showNotification("Faqat PDF fayllarni yuklash mumkin", "warning");
+        }
+        
+        validFiles.forEach(f => {
+            window.currentTaskNewFiles.push(f);
+        });
+        
+        window.renderFileList();
+      }
+      fileInput.value = ""; 
+    };
+  }
+  
   setTimeout(() => $("tm-title").focus(), 100);
 };
 
@@ -2246,6 +2334,16 @@ const saveTask = async () => {
     createdBy: cu?._id || cu?.userId,
   };
 
+  const MAX_TOTAL_SIZE = 5 * 1024 * 1024;
+  const quotaText = $("tm-file-quota") ? $("tm-file-quota").textContent : "";
+  if (quotaText && quotaText.includes("MB")) {
+      const usedStr = quotaText.split("MB")[0].trim();
+      if (parseFloat(usedStr) > 5.0) {
+          showNotification("Umumiy fayllar hajmi 5MB dan oshmasligi kerak!", "error");
+          return;
+      }
+  }
+
   saveBtn.classList.add("loading");
 
   let res;
@@ -2267,7 +2365,39 @@ const saveTask = async () => {
     }
 
     if (res.ok) {
+      const savedTask = await res.json();
+      
+      if (window.currentTaskNewFiles && window.currentTaskNewFiles.length > 0) {
+        try {
+            await Promise.all(window.currentTaskNewFiles.map(async (f) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(f);
+                await new Promise(r => reader.onload = r);
+                const fileData = reader.result;
+                
+                await fetch(`${BASE_URL}/api/project-files/upload`, {
+                  method: "POST",
+                  headers: getAuthHeaders(),
+                  credentials: "include",
+                  body: JSON.stringify({
+                    taskId: savedTask._id || editingTaskId,
+                    projectId: currentProjectId,
+                    fileName: f.name,
+                    fileType: f.type,
+                    fileData: fileData,
+                    fileSize: f.size
+                  }),
+                });
+            }));
+        } catch (e) {
+          console.error("File upload error:", e);
+          showNotification("Vazifa saqlandi, lekin ba'zi fayllar yuklanmadi", "error");
+        }
+      }
+
       $("task-modal").style.display = "none";
+      const fileInput = $("tm-file");
+      if (fileInput) fileInput.value = "";
       showNotification(editingTaskId ? t("task_updated") || "Task updated" : t("task_created") || "Task created", "success");
       await renderView(true);
     } else {
@@ -2518,6 +2648,11 @@ const renderTaskDetailView = async () => {
           <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0;">${task.title}</h2>
         </div>
         <div class="settings-actions" style="gap: 8px; display: flex;">
+           <button class="todo-detail-history-btn" id="task-detail-chat-btn" style="position: relative; align-items: center; display: flex; gap: 6px; padding: 8px 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; color: #5a6279; transition: all 0.2s;">
+             <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+             <span>${t("chat")}</span>
+             <span class="task-chat-badge" id="task-chat-badge-${task._id}" style="display:none; position: absolute; top: -6px; right: -6px; background: #ef4444; color: white; font-size: 10px; font-weight: bold; min-width: 18px; height: 18px; border-radius: 9px; padding: 0 4px; align-items: center; justify-content: center;">0</span>
+           </button>
            <button class="todo-detail-history-btn" id="td-history-btn" style="align-items: center; display: flex; gap: 6px; padding: 8px 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; color: #5a6279; transition: all 0.2s;">
              <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
              <span>${lang === "uz" ? "Tarix" : lang === "ru" ? "История" : "History"}</span>
@@ -2532,6 +2667,20 @@ const renderTaskDetailView = async () => {
       <div class="todo-detail-body" id="td-main-body">
         <div class="todo-detail-main">
           
+          ${task.files && task.files.length > 0 ? `
+          <div class="todo-detail-section" style="margin-bottom: 20px;">
+            <p class="todo-detail-section-label">${t("attached_files") || "Fayllar (PDF)"}</p>
+            <div style="display:flex; flex-direction:column; gap:8px">
+              ${task.files.map(f => `
+                <div style="display:flex; align-items:center; gap:8px; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0; width: max-content;">
+                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#5b6ef5" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="#5b6ef5" stroke-width="2" stroke-linejoin="round"/></svg>
+                  <a href="#" onclick="downloadFile('${f._id}', '${f.fileName}'); return false;" style="font-size:14px; color:#5b6ef5; text-decoration:none; font-weight: 500;">${f.fileName}</a>
+                  <span style="font-size:12px; color:#8892a4; margin-left: 8px;">(${(f.fileSize / 1024 / 1024).toFixed(2)} MB)</span>
+                </div>
+              `).join("")}
+            </div>
+          </div>` : ""}
+
           <div class="todo-detail-section">
             <p class="todo-detail-section-label" id="td-lbl-desc">${t("description_label")}</p>
             <p class="todo-detail-desc" id="td-desc">
@@ -2627,12 +2776,50 @@ const renderTaskDetailView = async () => {
         </div>
       </div>
     </div>
+
+    <!-- CHAT SLIDE OVER PANEL -->
+    <div class="task-chat-overlay" id="task-chat-overlay"></div>
+    <div class="task-chat-panel" id="task-chat-panel">
+      <div class="tc-header">
+        <div class="tc-header-info">
+          <h3>${t("chat_title") || "Vazifa Chati"}</h3>
+          <span style="font-size:12px; color:#64748b; font-weight:normal;">${task.title}</span>
+        </div>
+        <button class="tc-close-btn" id="task-chat-close-btn">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="tc-feed" id="tc-feed"></div>
+      <div class="tc-input-area">
+        <input type="text" id="tc-input" placeholder="${t("write_msg") || "Xabar yozing..."}" autocomplete="off" />
+        <button id="tc-send-btn" disabled>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M22 2L11 13" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M22 2L15 22l-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
   `;
 
   // Attach event handlers
   $("back-to-tasks-btn").onclick = () => {
     viewMode = "tasks";
     renderView();
+  };
+
+  window.downloadFile = async (fileId, fileName) => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/project-files/${fileId}`, { headers: getAuthHeaders(), credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        const link = document.createElement("a");
+        link.href = data.fileData;
+        link.download = fileName;
+        link.click();
+      } else {
+        showNotification("Faylni o'qishda xatolik", "error");
+      }
+    } catch (e) {
+      showNotification("Server xatoligi", "error");
+    }
   };
 
   const editBtn = $("td-edit-btn");
@@ -2648,6 +2835,191 @@ const renderTaskDetailView = async () => {
       viewMode = "task-history";
       renderView();
     };
+  }
+
+  fetch(`${BASE_URL}/api/task-chat/project/${currentProjectId}/unread`, { headers: getAuthHeaders(), credentials: "include" })
+    .then(r => r.json())
+    .then(counts => {
+        window.taskUnreadCounts = counts;
+        const count = counts[task._id] || 0;
+        const badge = $("task-chat-badge-" + task._id);
+        if(badge && count > 0) {
+            badge.textContent = count > 99 ? "99+" : count;
+            badge.style.display = "flex";
+        }
+    }).catch(e => console.error("Unread count err:", e));
+
+  // Handle Chat Logic
+  const chatBtn = $("task-detail-chat-btn");
+  const chatOverlay = $("task-chat-overlay");
+  const chatPanel = $("task-chat-panel");
+  const chatCloseBtn = $("task-chat-close-btn");
+  const tcFeed = $("tc-feed");
+  const tcInput = $("tc-input");
+  const tcSendBtn = $("tc-send-btn");
+
+  let taskPusherChannel = null;
+
+  const openTaskChat = async () => {
+    chatOverlay.classList.add("show");
+    chatPanel.classList.add("show");
+    document.body.style.overflow = "hidden"; // Prevent scrolling behind
+
+    // Remove badge
+    const badge = $("task-chat-badge-" + task._id);
+    if(badge) badge.style.display = "none";
+    if(window.taskUnreadCounts && window.taskUnreadCounts[task._id]) {
+       window.taskUnreadCounts[task._id] = 0;
+    }
+
+    // Load Messages
+    tcFeed.innerHTML = `<div style="padding:20px; text-align:center; color:#94a3b8;"><svg class="spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="4.93" x2="19.07" y2="7.76"></line></svg></div>`;
+    
+    try {
+       // Mark as read
+       await fetch(`${BASE_URL}/api/task-chat/${task._id}/read`, { method: "PUT", headers: getAuthHeaders(), credentials: "include" });
+       // Fetch messages
+       const res = await fetch(`${BASE_URL}/api/task-chat/${task._id}`, { headers: getAuthHeaders(), credentials: "include" });
+       if(res.ok) {
+           const messages = await res.json();
+           renderTaskChatMessages(messages);
+           setTimeout(() => { tcFeed.scrollTop = tcFeed.scrollHeight; }, 50);
+       }
+    } catch(e) {
+       tcFeed.innerHTML = `<div style="padding:20px; text-align:center; color:#ef4444;">Xatolik yuz berdi</div>`;
+    }
+
+    // Connect Pusher
+    if(window.Pusher && !taskPusherChannel) {
+        if (!window.pusherClient) {
+            window.pusherClient = new Pusher('a1030ba785c6160c84e2', { cluster: 'ap2' });
+        }
+        taskPusherChannel = window.pusherClient.subscribe(`task-chat-${task._id}`);
+        taskPusherChannel.bind("new-task-message", (data) => {
+            const msg = data.message;
+            const isMine = cu && (msg.sender._id === cu._id || msg.sender.userId === cu._id);
+            if(!isMine) {
+               // Append to feed if not mine (mine is appended optimistically or via reload depending on logic, let's append all to be safe)
+               const html = generateTaskMsgHtml(msg, isMine);
+               tcFeed.insertAdjacentHTML("beforeend", html);
+               tcFeed.scrollTop = tcFeed.scrollHeight;
+               // Mark as read immediately since we are open
+               fetch(`${BASE_URL}/api/task-chat/${task._id}/read`, { method: "PUT", headers: getAuthHeaders(), credentials: "include" });
+            }
+        });
+    }
+  };
+
+  const closeTaskChat = () => {
+    chatOverlay.classList.remove("show");
+    chatPanel.classList.remove("show");
+    document.body.style.overflow = "";
+    if(taskPusherChannel && window.pusherClient) {
+       window.pusherClient.unsubscribe(`task-chat-${task._id}`);
+       taskPusherChannel = null;
+    }
+  };
+
+  if(chatBtn) chatBtn.onclick = openTaskChat;
+  if(chatCloseBtn) chatCloseBtn.onclick = closeTaskChat;
+  if(chatOverlay) chatOverlay.onclick = closeTaskChat;
+
+  const generateTaskMsgHtml = (msg, isMine) => {
+      const timeStr = new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      const senderName = msg.sender.username || "User";
+      
+      let avatarHtml = `<div class="tc-avatar" style="background:#e2e8f0;">U</div>`;
+      if(msg.sender.avatar && msg.sender.avatar !== "./assets/images/User-avatar.png") {
+          avatarHtml = `<img src="${msg.sender.avatar}" class="tc-avatar-img" />`;
+      } else {
+          avatarHtml = `<div class="tc-avatar" style="background:#5b6ef5; color:white;">${senderName.charAt(0).toUpperCase()}</div>`;
+      }
+
+      if(isMine) {
+         return `
+            <div class="tc-msg-row mine">
+               <div class="tc-msg-bubble">
+                  <div class="tc-msg-text">${String(msg.text).replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+                  <div class="tc-msg-time">${timeStr}</div>
+               </div>
+            </div>
+         `;
+      } else {
+         return `
+            <div class="tc-msg-row theirs">
+               ${avatarHtml}
+               <div class="tc-msg-content">
+                  <div class="tc-msg-sender">${senderName}</div>
+                  <div class="tc-msg-bubble">
+                     <div class="tc-msg-text">${String(msg.text).replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+                     <div class="tc-msg-time">${timeStr}</div>
+                  </div>
+               </div>
+            </div>
+         `;
+      }
+  };
+
+  const renderTaskChatMessages = (messages) => {
+     if(messages.length === 0) {
+        tcFeed.innerHTML = `<div style="padding:40px 20px; text-align:center; color:#94a3b8; font-size:14px;">${t("no_msgs_yet") || "Hozircha xabarlar yo'q"}</div>`;
+        return;
+     }
+     let html = "";
+     messages.forEach(msg => {
+        const isMine = cu && (msg.sender._id === cu._id || msg.sender.userId === cu._id || msg.sender === cu._id || msg.sender === cu.userId);
+        html += generateTaskMsgHtml(msg, isMine);
+     });
+     tcFeed.innerHTML = html;
+  };
+
+  if(tcInput) {
+      tcInput.addEventListener("input", (e) => {
+         tcSendBtn.disabled = e.target.value.trim().length === 0;
+      });
+      tcInput.addEventListener("keypress", (e) => {
+         if(e.key === "Enter" && !e.shiftKey) {
+             e.preventDefault();
+             if(!tcSendBtn.disabled) tcSendBtn.click();
+         }
+      });
+  }
+
+  if(tcSendBtn) {
+      tcSendBtn.onclick = async () => {
+          const text = tcInput.value.trim();
+          if(!text) return;
+          
+          tcInput.value = "";
+          tcSendBtn.disabled = true;
+
+          // Optimistic UI
+          const tempMsg = {
+             _id: "temp_" + Date.now(),
+             sender: cu,
+             text: text,
+             createdAt: new Date()
+          };
+          
+          if(tcFeed.innerHTML.includes("no_msgs_yet") || tcFeed.innerHTML.includes("Hozircha xabarlar")) {
+             tcFeed.innerHTML = "";
+          }
+          tcFeed.insertAdjacentHTML("beforeend", generateTaskMsgHtml(tempMsg, true));
+          tcFeed.scrollTop = tcFeed.scrollHeight;
+
+          try {
+             await fetch(`${BASE_URL}/api/task-chat/${task._id}`, {
+                 method: "POST",
+                 headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+                 credentials: "include",
+                 body: JSON.stringify({ projectId: currentProjectId, text })
+             });
+             // We don't necessarily need to replace optimistic with actual because it looks fine, but real app might.
+          } catch(e) {
+             console.error("Send message error", e);
+             showNotification("Xabar yuborishda xatolik", "error");
+          }
+      };
   }
 
   // Handle Log Time

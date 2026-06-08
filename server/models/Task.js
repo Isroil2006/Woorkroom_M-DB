@@ -34,6 +34,7 @@ const taskSchema = new mongoose.Schema({
   assignees: [{ type: String, ref: "User" }],
   createdBy: { type: String, ref: "User" },
   userStatus: { type: Map, of: String, default: {} },
+  files: [{ type: mongoose.Schema.Types.ObjectId, ref: "ProjectFile" }],
   createdAt: { type: Date, default: Date.now },
 });
 

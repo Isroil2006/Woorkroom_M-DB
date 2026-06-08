@@ -238,6 +238,7 @@ exports.getTasks = async (req, res) => {
     const tasks = await Task.find({ project: projectId })
       .populate("assignees", "username avatar email")
       .populate("createdBy", "username avatar")
+      .populate("files", "fileName fileType fileSize")
       .sort({ createdAt: -1 });
 
     res.json(tasks);
@@ -388,7 +389,8 @@ exports.updateTask = async (req, res) => {
     // Populate qaytarish (frontend kutayotgan formatda)
     const populated = await Task.findById(updated._id)
       .populate("assignees", "username avatar email")
-      .populate("createdBy", "username avatar");
+      .populate("createdBy", "username avatar")
+      .populate("files", "fileName fileType fileSize");
 
     // Log history
     try {
@@ -492,7 +494,8 @@ exports.toggleUserDone = async (req, res) => {
     const updated = await task.save();
     const populated = await Task.findById(updated._id)
       .populate("assignees", "username avatar email")
-      .populate("createdBy", "username avatar");
+      .populate("createdBy", "username avatar")
+      .populate("files", "fileName fileType fileSize");
 
     // Log history
     try {
@@ -542,6 +545,7 @@ exports.getAllTasks = async (req, res) => {
       .populate("assignees", "username avatar email")
       .populate("createdBy", "username avatar")
       .populate("project", "name")
+      .populate("files", "fileName fileType fileSize")
       .sort({ createdAt: -1 });
 
     res.json(tasks);

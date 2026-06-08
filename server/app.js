@@ -116,6 +116,8 @@ app.use("/api/super-settings", require("./routes/super-setting.routes"));
 app.use("/api/tests", require("./routes/test.routes"));
 app.use("/api/test-photos", require("./routes/testPhoto.routes"));
 app.use("/api/messenger", require("./routes/messenger.routes"));
+app.use("/api/project-files", require("./routes/projectFile.routes"));
+app.use("/api/task-chat", require("./routes/projectTaskChat.routes"));
 
 // Sahifalar uchun backend himoyasi (Manual URL terilganda ishlaydi)
 const auth = require("./middleware/auth.middleware");
