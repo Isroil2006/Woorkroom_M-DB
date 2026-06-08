@@ -4,8 +4,19 @@ const path = require("path");
 const cookieParser = require("cookie-parser");
 const swaggerUi = require("swagger-ui-express");
 const swaggerJsdoc = require("swagger-jsdoc");
+const dbConnect = require("./db");
 
 const app = express();
+
+app.use(async (req, res, next) => {
+  try {
+    await dbConnect();
+    next();
+  } catch (error) {
+    console.error("Database connection failed:", error);
+    res.status(500).json({ message: "Database connection failed", error: error.message });
+  }
+});
 
 // Swagger configuration
 const swaggerOptions = {

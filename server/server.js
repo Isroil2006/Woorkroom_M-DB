@@ -1,18 +1,8 @@
-const mongoose = require("mongoose");
-require("dotenv").config();
 const app = require("./app");
+const dbConnect = require("./db");
 
-// MongoDB Connection
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(async () => {
-    console.log("MongoDB ga muvaffaqiyatli ulandi");
-  })
-
-  .catch((err) => {
-    console.error("MongoDB ga ulanishda xatolik!");
-    console.error("Error Message:", err.message);
-  });
+// Boshlang'ich ulanishni ishga tushirish (Local uchun foydali, Serverless da middleware o'zi eplaydi)
+dbConnect().catch(console.error);
 
 // Start Server
 const PORT = process.env.PORT || 5000;
