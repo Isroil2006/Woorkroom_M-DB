@@ -725,42 +725,96 @@ const sendMessage = async () => {
   const sBtn = $("msg-send-btn");
   if(sBtn) sBtn.disabled = true;
 
-  if (pendingImages.length > 0) {
-    for(let i = 0; i < pendingImages.length; i++) {
-        const { dataUrl } = pendingImages[i];
+  if (input) {
+    input.value = "";
+    autoResizeInput();
+  }
+
+  const currentImages = [...pendingImages];
+  pendingImages = [];
+  renderImgPreview();
+
+  const tempIds = [];
+  const tempTextId = text ? genId() : null;
+
+  for (let i = 0; i < currentImages.length; i++) {
+      const tempId = genId();
+      tempIds.push(tempId);
+      localMessages.push({
+          id: tempId,
+          from: currentUser.username,
+          to: activeContact.username,
+          type: 'image',
+          text: '',
+          photoId: null,
+          dataUrl: currentImages[i].dataUrl,
+          at: new Date().toISOString(),
+          edited: false,
+          isRead: false
+      });
+  }
+
+  if (text) {
+      localMessages.push({
+          id: tempTextId,
+          from: currentUser.username,
+          to: activeContact.username,
+          type: 'text',
+          text: text,
+          photoId: null,
+          dataUrl: null,
+          at: new Date().toISOString(),
+          edited: false,
+          isRead: false
+      });
+  }
+
+  refreshFeed(true);
+  refreshContacts();
+  refreshInfoPanel();
+
+  if (currentImages.length > 0) {
+    for(let i = 0; i < currentImages.length; i++) {
+        const { dataUrl } = currentImages[i];
         try {
-            await fetch(`${API_URL}/api/messenger/send`, {
+            const res = await fetch(`${API_URL}/api/messenger/send`, {
                 method: 'POST',
                 headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
                 credentials: "include",
                 body: JSON.stringify({ receiverId, type: 'image', fileData: dataUrl })
             });
+            if(res.ok) {
+                const savedMsg = await res.json();
+                const m = localMessages.find(msg => msg.id === tempIds[i]);
+                if (m) {
+                    m.id = savedMsg._id;
+                    m.photoId = savedMsg.photoId;
+                }
+            }
         } catch(e) { console.error("Send image error", e); }
     }
-    pendingImages = [];
-    renderImgPreview();
   }
+
   if (text) {
     try {
-        await fetch(`${API_URL}/api/messenger/send`, {
+        const res = await fetch(`${API_URL}/api/messenger/send`, {
             method: 'POST',
             headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             credentials: "include",
             body: JSON.stringify({ receiverId, type: 'text', text })
         });
-        if (input) {
-          input.value = "";
-          autoResizeInput();
+        if(res.ok) {
+            const savedMsg = await res.json();
+            const m = localMessages.find(msg => msg.id === tempTextId);
+            if (m) {
+                m.id = savedMsg._id;
+            }
         }
     } catch(e) { console.error("Send text error", e); }
   }
 
-  // Refresh messages
-  await loadMessengerData();
   updateSendBtn();
-  refreshFeed(true);
-  refreshContacts();
-  refreshInfoPanel();
+  refreshFeed(false);
 };
 
 const deleteMsg = async (mid) => {
@@ -1325,6 +1379,7 @@ const handleIncomingPusherMessage = (data, action) => {
             if (typingUsers.has(senderUid)) {
                 clearTimeout(typingUsers.get(senderUid));
                 typingUsers.delete(senderUid);
+                updateTypingUI();
             }
         }
         
