@@ -354,7 +354,11 @@ export const InfoPortalPage = () => `
 
     <div class="cal-grid-wrapper" id="cal-grid-wrapper">
         <div class="cal-weekdays" id="cal-weekdays"></div>
-        <div class="cal-grid" id="cal-grid"></div>
+        <div class="cal-grid" id="cal-grid">
+            <div style="display:flex;align-items:center;justify-content:center;grid-column:1/-1;min-height:300px;width:100%;">
+                <div class="global-spinner"></div>
+            </div>
+        </div>
     </div>
 
     <div class="cal-events-panel" id="cal-events-panel">

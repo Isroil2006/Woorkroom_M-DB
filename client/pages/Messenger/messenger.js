@@ -232,7 +232,11 @@ const getFreshUser = (username) => {
 const avatarHtmlFromUser = (user, size = 34) =>
   avatarHtml(getFreshUser(user?.username) || user, size);
 
-export const MassangerPage = `<div class="messenger-wrap" id="messenger-root"></div>`;
+export const MassangerPage = `<div class="messenger-wrap" id="messenger-root">
+    <div style="display:flex;align-items:center;justify-content:center;height:100%;width:100%;">
+        <div class="global-spinner"></div>
+    </div>
+</div>`;
 
 // ─── STATE (UI) ─────────────────────────────────
 let currentLang = "uz";
