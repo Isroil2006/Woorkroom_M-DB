@@ -564,6 +564,13 @@ const initNavigation = async () => {
     // 5. Ruxsatnomalarni qo'llash
     await applyPermissions(cu.userId || cu._id);
   }
+
+  // 6. Global loader ni o'chirish
+  const loader = document.getElementById("global-loader");
+  if (loader) {
+    loader.classList.add("hidden");
+    setTimeout(() => loader.remove(), 400);
+  }
 };
 
 const handleLanguageChange = () => {
