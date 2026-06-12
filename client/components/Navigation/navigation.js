@@ -387,9 +387,9 @@ const attachProfileEvents = () => {
     navigateTo("/profile");
   };
 
-  document.getElementById("sidebar-logout").onclick = () => {
-    clearAuth();
-    window.location.href = "login.html";
+  document.getElementById("sidebar-logout").onclick = async () => {
+    await clearAuth();
+    window.location.href = "/login.html";
   };
 
   document.addEventListener("click", (e) => {

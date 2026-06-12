@@ -139,4 +139,20 @@ app.get(["/employees", "/tasks", "/calendar", "/messenger", "/payments", "/vacat
   res.sendFile(path.join(__dirname, "../client/index.html"));
 });
 
+// Auth himoyasi bilan, lekin permission tekshirmasdan
+const jwt = require("jsonwebtoken");
+app.get(["/", "/profile", "/super-settings", "/index.html"], (req, res) => {
+  const token = req.cookies.token;
+  if (!token) {
+    return res.redirect("/login.html");
+  }
+  try {
+    const secret = process.env.JWT_SECRET || "fallback_secret_for_dev_only";
+    jwt.verify(token, secret);
+    res.sendFile(path.join(__dirname, "../client/index.html"));
+  } catch (e) {
+    return res.redirect("/login.html");
+  }
+});
+
 module.exports = app;
