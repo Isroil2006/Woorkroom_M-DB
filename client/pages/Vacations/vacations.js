@@ -8,14 +8,20 @@ import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js
 const t = createTranslationHelper(vacTranslations);
 
 // ─── DATA ─────────────────────────────────────
-const getToursKey = () => "vac_tours_v2";
-const getTours = () => {
-    const s = localStorage.getItem(getToursKey());
-    if (s) return JSON.parse(s);
-    saveTours(SAMPLE_TOURS);
-    return SAMPLE_TOURS;
+let toursData = [];
+const getTours = () => toursData;
+
+const fetchToursAPI = async () => {
+    try {
+        const res = await fetch(`${API_URL}/api/vacations`, { headers: getAuthHeaders(), credentials: "include" });
+        const json = await res.json();
+        if (json.success) toursData = json.data;
+    } catch (e) {
+        console.error("fetchToursAPI error:", e);
+    }
 };
-const saveTours = (t) => localStorage.setItem(getToursKey(), JSON.stringify(t));
+
+const saveTours = () => {};
 const genTourId = () => `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
 // helper: get multilang field
@@ -694,9 +700,18 @@ const attachRootEvents = () => {
     document.querySelectorAll(".vac-del-btn").forEach((b) =>
         b.addEventListener("click", (e) => {
             e.stopPropagation();
-            openDeleteModal(b.dataset.id, () => {
-                saveTours(getTours().filter((t) => t.id !== b.dataset.id));
-                refreshGrid();
+            openDeleteModal(b.dataset.id, async () => {
+                try {
+                    const res = await fetch(`${API_URL}/api/vacations/${b.dataset.id}`, {
+                        method: "DELETE",
+                        headers: getAuthHeaders(),
+                        credentials: "include"
+                    });
+                    if (res.ok) {
+                        toursData = toursData.filter((t) => t.id !== b.dataset.id);
+                        refreshGrid();
+                    }
+                } catch (e) { console.error(e); }
             });
         }),
     );
@@ -1006,7 +1021,7 @@ const attachBookModalEvents = () => {
     }
 };
 
-const processTourPayment = () => {
+const processTourPayment = async () => {
     const t = getTours().find(x => x.id === detailTourId);
     if (!t) return;
     const totalCost = Number(t.price) * bookGuests;
@@ -1057,22 +1072,21 @@ const processTourPayment = () => {
             method: method.type
         });
 
-        // Save booking for calendar
-        const bookings = JSON.parse(localStorage.getItem("vac_bookings") || "[]");
-        const bookingId = `booking_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-        const bookDate = new Date();
-        bookings.push({
-            id: bookingId,
-            username: cu.username,
-            tourId: t.id,
-            tourName: name,
-            guests: bookGuests,
-            totalCost: totalCost,
-            bookedAt: bookDate.toISOString().split('T')[0],
-            bookedAtFull: bookDate.toISOString(),
-            tourDays: t.days || 7
-        });
-        localStorage.setItem("vac_bookings", JSON.stringify(bookings));
+        // Save booking to backend API
+        try {
+            await fetch(`${API_URL}/api/vacations/${t.id}/book`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+                credentials: "include",
+                body: JSON.stringify({
+                    guests: bookGuests,
+                    totalCost,
+                    paymentMethod: { type: method.type, number: method.number || method.displayNumber }
+                })
+            });
+        } catch (e) {
+            console.error("Booking API error:", e);
+        }
 
         // Save back
         localStorage.setItem("users", JSON.stringify(users));
@@ -1290,16 +1304,25 @@ const attachGridOnlyEvents = () => {
     document.querySelectorAll(".vac-del-btn").forEach((b) =>
         b.addEventListener("click", (e) => {
             e.stopPropagation();
-            openDeleteModal(b.dataset.id, () => {
-                saveTours(getTours().filter((t) => t.id !== b.dataset.id));
-                refreshGrid();
+            openDeleteModal(b.dataset.id, async () => {
+                try {
+                    const res = await fetch(`${API_URL}/api/vacations/${b.dataset.id}`, {
+                        method: "DELETE",
+                        headers: getAuthHeaders(),
+                        credentials: "include"
+                    });
+                    if (res.ok) {
+                        toursData = toursData.filter((t) => t.id !== b.dataset.id);
+                        refreshGrid();
+                    }
+                } catch (e) { console.error(e); }
             });
         }),
     );
 };
 
 // ─── SAVE FORM ────────────────────────────────
-const saveTourForm = () => {
+const saveTourForm = async () => {
     saveLangTabValues();
     const buf = window._vacFormBuffer || {};
     const cl = formContentLang;
@@ -1357,7 +1380,6 @@ const saveTourForm = () => {
     };
 
     const tour = {
-        id: editTourId || genTourId(),
         name: mergeLang(buf.name, oldTour?.name),
         country: mergeLang(buf.country, oldTour?.country),
         city: mergeLang(buf.city, oldTour?.city),
@@ -1372,14 +1394,36 @@ const saveTourForm = () => {
         images: images.length ? images : oldTour?.images || [],
         lat: parseFloat($v("vf-lat")?.value) || null,
         lng: parseFloat($v("vf-lng")?.value) || null,
-        createdAt: oldTour?.createdAt || new Date().toISOString(),
     };
 
-    let tours = getTours();
-    tours = editTourId ? tours.map((t) => (t.id === editTourId ? tour : t)) : [tour, ...tours];
-    saveTours(tours);
-    clearUiState();
-    closeAddModal();
+    try {
+        const url = editTourId ? `${API_URL}/api/vacations/${editTourId}` : `${API_URL}/api/vacations`;
+        const method = editTourId ? "PUT" : "POST";
+        const res = await fetch(url, {
+            method,
+            headers: {
+                "Content-Type": "application/json",
+                ...getAuthHeaders()
+            },
+            credentials: "include",
+            body: JSON.stringify(tour)
+        });
+        if (res.ok) {
+            const json = await res.json();
+            let tours = getTours();
+            if (editTourId) {
+                tours = tours.map((t) => (t.id === editTourId ? json.data : t));
+            } else {
+                tours = [json.data, ...tours];
+            }
+            toursData = tours;
+            refreshGrid();
+            clearUiState();
+            closeAddModal();
+        }
+    } catch (e) {
+        console.error(e);
+    }
 };
 
 // ─── LEAFLET MAP (pick location in form) ───────
@@ -1597,7 +1641,8 @@ const clearUiState = () => {
 const autosave = () => saveUiState();
 
 // ─── INIT ─────────────────────────────────────
-export const initVacationsLogic = () => {
+export const initVacationsLogic = async () => {
+    await fetchToursAPI();
     const cu = getCurrentUser();
     const vacLang = getCurrentLang();
     // Restore UI state from before refresh

@@ -1,4 +1,5 @@
 import { PAY_TR } from "./translations.js";
+import { API_URL, getAuthHeaders, getCurrentUser } from "../../assets/js/api.js";
 
 const _fmt = (n) => "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -29,124 +30,136 @@ const _esc = (s) =>
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
+// Cached users from server (loaded in _computeStats)
+let _cachedUsers = [];
+
 const _avatarEl = (user, size = 32) => {
     if (!user) return `<div class="pay-an-avatar" style="width:${size}px;height:${size}px;background:#e2e8f0;"></div>`;
     const u = typeof user === "string" ? { username: user } : user;
-    const fresh = JSON.parse(localStorage.getItem("users") || "[]").find((x) => x.username === u.username) || u;
-    if (fresh.avatar && fresh.avatar !== "./assets/images/User-avatar.png") return `<img src="${fresh.avatar}" class="pay-an-avatar" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;"/>`;
+    const fresh = _cachedUsers.find((x) => x.username === u.username) || u;
+    if (fresh.avatar && fresh.avatar !== "./assets/images/User-avatar.png" && fresh.avatar !== "/assets/images/User-avatar.png") return `<img src="${fresh.avatar}" class="pay-an-avatar" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;"/>`;
     return `<div class="pay-an-avatar" style="width:${size}px;height:${size}px;background:${_avColor(fresh.username)};font-size:${Math.round(size * 0.35)}px;">${_initials(fresh.username)}</div>`;
 };
 
-// ── Sana parse helper (DD.MM.YYYY yoki ISO ikkalasini ham qo'llab-quvvatlaydi) ──
-const _parseDate = (raw) => {
-    if (!raw) return null;
-    if (/^\d{2}\.\d{2}\.\d{4}$/.test(raw)) {
-        const [d, m, y] = raw.split(".");
-        return new Date(Number(y), Number(m) - 1, Number(d));
-    }
-    const pd = new Date(raw);
-    return isNaN(pd.getTime()) ? null : pd;
+const _apiFetch = async (url) => {
+    const res = await fetch(`${API_URL}${url}`, {
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        credentials: "include",
+    });
+    if (!res.ok) throw new Error("API error");
+    return res.json();
 };
 
-const _computeStats = () => {
-    const currentUser = JSON.parse(localStorage.getItem("currentUser"));
-    const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
-    const me = allUsers.find((u) => u.username === currentUser?.username) || currentUser;
+const _computeStats = async () => {
+    const me = getCurrentUser();
     if (!me) return null;
+    const userId = me.userId || me._id;
 
-    const myPayments = me.payments || [];
-    const myMethods = me.paymentMethods || [];
+    try {
+        const [myMethods, myTransactions, allUsers] = await Promise.all([
+            _apiFetch("/api/payments/methods"),
+            _apiFetch("/api/payments/transactions"),
+            _apiFetch("/api/payments/users"),
+        ]);
 
-    const totalBalance = myMethods.reduce((s, m) => s + Number(m.balance || 0), 0);
-    const totalPaid = myPayments.filter((p) => p.status === "paid" && !p.isIncoming).reduce((s, p) => s + Number(p.amount || 0), 0);
-    const totalWaiting = myPayments.filter((p) => p.status === "waiting" && !p.isIncoming).reduce((s, p) => s + Number(p.amount || 0), 0);
-    const totalIncoming = myPayments.filter((p) => p.isIncoming).reduce((s, p) => s + Number(p.amount || 0), 0);
-    const totalDocs = myPayments.length;
-    const paidCount = myPayments.filter((p) => p.status === "paid" && !p.isIncoming).length;
-    const waitingCount = myPayments.filter((p) => p.status === "waiting" && !p.isIncoming).length;
-    const incomingCount = myPayments.filter((p) => p.isIncoming).length;
+        _cachedUsers = allUsers;
 
-    // Per-recipient
-    const perUserPay = {};
-    myPayments
-        .filter((p) => !p.isIncoming && p.recipientName)
-        .forEach((p) => {
-            if (!perUserPay[p.recipientName]) perUserPay[p.recipientName] = { total: 0, count: 0 };
-            perUserPay[p.recipientName].total += Number(p.amount || 0);
-            perUserPay[p.recipientName].count++;
+        const totalBalance = myMethods.reduce((s, m) => s + Number(m.balance || 0), 0);
+
+        const outgoing = myTransactions.filter((t) => t.senderId === userId);
+        const incoming = myTransactions.filter((t) => t.receiverId === userId && t.status === "paid");
+
+        const totalPaid = outgoing.filter((t) => t.status === "paid").reduce((s, t) => s + Number(t.amount || 0), 0);
+        const totalWaiting = outgoing.filter((t) => t.status === "waiting").reduce((s, t) => s + Number(t.amount || 0), 0);
+        const totalIncoming = incoming.reduce((s, t) => s + Number(t.amount || 0), 0);
+
+        const totalDocs = myTransactions.length;
+        const paidCount = outgoing.filter((t) => t.status === "paid").length;
+        const waitingCount = outgoing.filter((t) => t.status === "waiting").length;
+        const incomingCount = incoming.length;
+
+        // Per-recipient
+        const perUserPay = {};
+        outgoing.filter((t) => t.receiverName).forEach((t) => {
+            if (!perUserPay[t.receiverName]) perUserPay[t.receiverName] = { total: 0, count: 0 };
+            perUserPay[t.receiverName].total += Number(t.amount || 0);
+            perUserPay[t.receiverName].count++;
         });
-    const topRecipients = Object.entries(perUserPay)
-        .sort((a, b) => b[1].total - a[1].total)
-        .slice(0, 5)
-        .map(([username, data]) => ({
-            username,
-            ...data,
-            user: allUsers.find((u) => u.username === username) || { username },
-        }));
+        const topRecipients = Object.entries(perUserPay)
+            .sort((a, b) => b[1].total - a[1].total)
+            .slice(0, 5)
+            .map(([username, data]) => ({
+                username,
+                ...data,
+                user: allUsers.find((u) => u.username === username) || { username },
+            }));
 
-    // Monthly last 6 — to'g'irlangan
-    const now = new Date();
-    const monthLabels = [],
-        monthTotals = [];
-    for (let i = 5; i >= 0; i--) {
-        const targetYear = now.getMonth() - i < 0 ? now.getFullYear() - 1 : now.getFullYear();
-        const targetMonth = (now.getMonth() - i + 12) % 12;
-        const d = new Date(targetYear, targetMonth, 1);
-        monthLabels.push(d.toLocaleString("default", { month: "short" }));
+        // Monthly last 6
+        const now = new Date();
+        const monthLabels = [], monthTotals = [];
+        for (let i = 5; i >= 0; i--) {
+            const targetYear = now.getMonth() - i < 0 ? now.getFullYear() - 1 : now.getFullYear();
+            const targetMonth = (now.getMonth() - i + 12) % 12;
+            const d = new Date(targetYear, targetMonth, 1);
+            monthLabels.push(d.toLocaleString("default", { month: "short" }));
+            const total = outgoing
+                .filter((t) => t.status === "paid")
+                .filter((t) => {
+                    const pd = new Date(t.paidAt || t.createdAt);
+                    return pd.getFullYear() === targetYear && pd.getMonth() === targetMonth;
+                })
+                .reduce((s, t) => s + Number(t.amount || 0), 0);
+            monthTotals.push(total);
+        }
+        if (!monthTotals.some((v) => v > 0) && totalPaid > 0) {
+            monthTotals[monthTotals.length - 1] = totalPaid;
+        }
 
-        const total = myPayments
-            .filter((p) => !p.isIncoming && p.status === "paid")
-            .filter((p) => {
-                const pd = _parseDate(p.createDate || p.date);
-                if (!pd) return false;
-                return pd.getFullYear() === targetYear && pd.getMonth() === targetMonth;
-            })
-            .reduce((s, p) => s + Number(p.amount || 0), 0);
-        monthTotals.push(total);
+        // Card vs Bank
+        const cardBal = myMethods.filter((m) => m.type === "card").reduce((s, m) => s + Number(m.balance || 0), 0);
+        const bankBal = myMethods.filter((m) => m.type !== "card").reduce((s, m) => s + Number(m.balance || 0), 0);
+        const cardCount = myMethods.filter((m) => m.type === "card").length;
+        const bankCount = myMethods.filter((m) => m.type !== "card").length;
+
+        // Recent 6 transactions
+        const recentTxns = [...myTransactions]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 6)
+            .map((t) => ({
+                ...t,
+                isIncoming: t.receiverId === userId && t.status === "paid",
+                desc: t.description,
+                recipientName: t.senderId === userId ? t.receiverName : t.senderName,
+                date: new Date(t.createdAt).toLocaleDateString(),
+            }));
+
+        const paidPayments = outgoing.filter((t) => t.status === "paid");
+        const avgTxn = paidPayments.length ? paidPayments.reduce((s, t) => s + Number(t.amount || 0), 0) / paidPayments.length : 0;
+
+        return {
+            totalBalance,
+            totalPaid,
+            totalWaiting,
+            totalIncoming,
+            totalDocs,
+            paidCount,
+            waitingCount,
+            incomingCount,
+            topRecipients,
+            monthLabels,
+            monthTotals,
+            cardBal,
+            bankBal,
+            cardCount,
+            bankCount,
+            recentTxns,
+            avgTxn,
+            me,
+        };
+    } catch (e) {
+        console.error("Analytics data load error:", e);
+        return null;
     }
-    // Agar hech qaysi oyda data yo'q bo'lsa — to'langan summani joriy oyga qo'yish
-    if (!monthTotals.some((v) => v > 0) && totalPaid > 0) {
-        monthTotals[monthTotals.length - 1] = totalPaid;
-    }
-
-    // Card vs Bank
-    const cardBal = myMethods.filter((m) => m.type === "card").reduce((s, m) => s + Number(m.balance || 0), 0);
-    const bankBal = myMethods.filter((m) => m.type !== "card").reduce((s, m) => s + Number(m.balance || 0), 0);
-    const cardCount = myMethods.filter((m) => m.type === "card").length;
-    const bankCount = myMethods.filter((m) => m.type !== "card").length;
-
-    // Recent 6 — to'g'irlangan sort
-    const recentTxns = [...myPayments]
-        .sort((a, b) => {
-            const da = _parseDate(a.createDate || a.date)?.getTime() || 0;
-            const db = _parseDate(b.createDate || b.date)?.getTime() || 0;
-            return db - da;
-        })
-        .slice(0, 6);
-
-    const paidPayments = myPayments.filter((p) => p.status === "paid" && !p.isIncoming);
-    const avgTxn = paidPayments.length ? paidPayments.reduce((s, p) => s + Number(p.amount || 0), 0) / paidPayments.length : 0;
-
-    return {
-        totalBalance,
-        totalPaid,
-        totalWaiting,
-        totalIncoming,
-        totalDocs,
-        paidCount,
-        waitingCount,
-        incomingCount,
-        topRecipients,
-        monthLabels,
-        monthTotals,
-        cardBal,
-        bankBal,
-        cardCount,
-        bankCount,
-        recentTxns,
-        avgTxn,
-        me,
-    };
 };
 
 const _renderPanel = (s, lang) => {
@@ -405,8 +418,8 @@ const _animate = () => {
     }, 350);
 };
 
-const _openPanel = (lang) => {
-    const stats = _computeStats(),
+const _openPanel = async (lang) => {
+    const stats = await _computeStats(),
         tr = PAY_TR[lang] || PAY_TR.en;
     const overlay = document.createElement("div");
     overlay.className = "pay-an-overlay";

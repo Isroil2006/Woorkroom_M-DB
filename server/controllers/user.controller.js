@@ -2,6 +2,7 @@ const User = require("../models/User");
 const UserPhoto = require("../models/UserPhoto");
 const Permission = require("../models/Permission");
 const NavItem = require("../models/NavItem");
+const PaymentMethod = require("../models/PaymentMethod");
 
 const jwt = require("jsonwebtoken");
 
@@ -48,6 +49,26 @@ exports.register = async (req, res) => {
       perms: permsObject,
     });
     await defaultPerms.save();
+
+    // Foydalanuvchi uchun default bank hisob yaratish ($10,000 boshlang'ich balans)
+    const userIdStr = newUser.userId || newUser._id.toString();
+    const BANK_CODE = "2020";
+    const userIdPart = String(userIdStr).padStart(6, "0").slice(-6);
+    const randomPart = Array.from({ length: 10 }, () => Math.floor(Math.random() * 10)).join("");
+    const accountNumber = BANK_CODE + userIdPart + randomPart;
+    const displayAccNum = accountNumber.replace(/(.{4})/g, "$1 ").trim();
+
+    const defaultMethod = new PaymentMethod({
+      userId: userIdStr,
+      type: "bank",
+      number: accountNumber,
+      displayNumber: displayAccNum,
+      holder: newUser.username,
+      bank: "Woorkroom Bank",
+      balance: 10000,
+      isDefault: true,
+    });
+    await defaultMethod.save();
 
     // Return user without password
     const userObj = newUser.toObject();

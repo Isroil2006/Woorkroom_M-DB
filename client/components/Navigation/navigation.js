@@ -17,8 +17,8 @@ import { SuperSettingsPage, initSuperSettingsLogic } from "../../pages/SuperSett
 // To'liq tayyor bo'lmagan sahifalarni true qilib qoyiladi
 const UNDER_CONSTRUCTION = {
   Tests: false,
-  Payments: true,
-  Vacations: true,
+  Payments: false,
+  Vacations: false,
   Messenger: false,
   Infoportal: false,
 };
@@ -448,7 +448,7 @@ const renderPage = (pageName, force = false) => {
     }
   } else if (pageName === "Vacations") {
     if (!skipRender) {
-      contentArea.innerHTML = '<div class="vac-wrap"></div>';
+      contentArea.innerHTML = VacationsPage;
       initVacationsLogic();
     }
   } else if (pageName === "Employees") {

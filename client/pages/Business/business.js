@@ -1,48 +1,67 @@
 import { createPayAnalyticsBtn, initPayAnalytics } from "./analytics.js";
 import { translations } from "./translations.js";
-import { getCurrentUser, getAuthHeaders } from "../../assets/js/api.js";
-import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
-
-const getUsers = () => JSON.parse(localStorage.getItem("users")) || [];
-const saveUsers = (u) => localStorage.setItem("users", JSON.stringify(u));
-const getCurrent = () => getCurrentUser();
+import { getCurrentUser, getAuthHeaders, fetchCurrentUser, API_URL } from "../../assets/js/api.js";
+import { getCurrentLang, createTranslationHelper, LANGUAGE_CHANGED_EVENT } from "../../assets/js/i18n.js";
 
 const t = createTranslationHelper(translations);
+const getCurrent = () => getCurrentUser();
 
-const syncMe = () => {
-    const cu = getCurrent();
-    if (!cu) return cu;
-    const fresh = getUsers().find((u) => u.username === cu.username);
-    // Note: We don't save to localStorage anymore as per JWT requirements, 
-    // we rely on the in-memory cache or server re-fetch.
-    return fresh || cu;
+// ─── DATA (server-dan yuklanadi) ────────────────────────────────
+let myMethods = [];
+let myTransactions = [];
+let paymentUsers = [];
+let myStats = {};
+let pusherChannel = null;
+
+// ─── API HELPERS ─────────────────────────────────────────────────
+const apiFetch = async (url, options = {}) => {
+  const res = await fetch(`${API_URL}${url}`, {
+    headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+    credentials: "include",
+    ...options,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: "Xatolik" }));
+    throw new Error(err.message || "Server xatosi");
+  }
+  return res.json();
 };
 
+const loadPaymentData = async () => {
+  try {
+    const [methods, transactions, stats, users] = await Promise.all([
+      apiFetch("/api/payments/methods"),
+      apiFetch("/api/payments/transactions"),
+      apiFetch("/api/payments/stats"),
+      apiFetch("/api/payments/users"),
+    ]);
+    myMethods = methods;
+    myTransactions = transactions;
+    myStats = stats;
+    paymentUsers = users;
+  } catch (e) {
+    console.error("Payment data load error:", e);
+  }
+};
+
+// ─── FORMAT HELPERS ─────────────────────────────────────────────
 const fmt = (n) => "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-const initials = (name = "") =>
-    name
-        .split(" ")
-        .slice(0, 2)
-        .map((w) => w[0] || "")
-        .join("")
-        .toUpperCase();
-
+const initials = (name = "") => name.split(" ").slice(0, 2).map((w) => w[0] || "").join("").toUpperCase();
 const avatarColor = (name = "") => {
-    const colors = ["#5b6ef5", "#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#ec4899"];
-    let h = 0;
-    for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-    return colors[Math.abs(h) % colors.length];
+  const colors = ["#5b6ef5", "#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#ec4899"];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return colors[Math.abs(h) % colors.length];
 };
-
 const avatarHTML = (user, size = 34) => {
-    const name = user?.username || "";
-    if (user?.avatar && user.avatar !== "./assets/images/User-avatar.png") {
-        return `<img src="${user.avatar}" alt="${name}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`;
-    }
-    return `<div class="biz-avatar" style="background:${avatarColor(name)};width:${size}px;height:${size}px;font-size:${Math.round(size * 0.35)}px">${initials(name)}</div>`;
+  const name = user?.username || "";
+  if (user?.avatar && user.avatar !== "./assets/images/User-avatar.png" && user.avatar !== "/assets/images/User-avatar.png") {
+    return `<img src="${user.avatar}" alt="${name}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`;
+  }
+  return `<div class="biz-avatar" style="background:${avatarColor(name)};width:${size}px;height:${size}px;font-size:${Math.round(size * 0.35)}px">${initials(name)}</div>`;
 };
 
+// ─── PAGE TEMPLATE ──────────────────────────────────────────────
 export const BusinessPage = () => `
 <div class="biz-container">
 <div class="biz-root">
@@ -272,6 +291,8 @@ export const BusinessPage = () => `
     <input class="biz-input" type="number" id="dm-amount" placeholder="0" />
     <label class="biz-label">${t("recipient")}</label>
     <select class="biz-input" id="dm-recipient" style="max-height:180px;overflow-y:auto"><option value="">${t("select_default")}</option></select>
+    <label class="biz-label">${t("description")}</label>
+    <input class="biz-input" id="dm-desc" placeholder="${t("write_description")}" />
     <div style="display:flex;gap:10px;margin-top:4px">
       <button class="biz-btn-secondary" id="dm-cancel" style="flex:1">${t("cancel")}</button>
       <button class="biz-btn-primary" id="dm-save" style="flex:1">${t("create_btn")}</button>
@@ -312,757 +333,644 @@ export const BusinessPage = () => `
     </div>
   </div>
 </div>
+
+<!-- ══ NOTIFICATION TOAST ══ -->
+<div id="biz-toast" class="biz-toast" style="display:none"></div>
 `;
 
 const $ = (id) => document.getElementById(id);
 const PAGE = 5;
 
-const refreshStats = (me) => {
-    const payments = me?.payments || [];
-    const waiting = payments.filter((p) => p.status === "waiting" && !p.isIncoming).reduce((s, p) => s + Number(p.amount), 0);
-    const paid = payments.filter((p) => p.status === "paid" && !p.isIncoming).reduce((s, p) => s + Number(p.amount), 0);
-    const allUsers = getUsers();
-    const usersCount = allUsers.filter((u) => u.username !== me?.username).length;
-    const balance = (me?.paymentMethods || []).reduce((s, m) => s + Number(m.balance || 0), 0);
-
-    if ($("stat-waiting")) $("stat-waiting").textContent = fmt(waiting);
-    if ($("stat-paid")) $("stat-paid").textContent = fmt(paid);
-    if ($("stat-clients")) $("stat-clients").textContent = usersCount;
-    if ($("stat-balance")) $("stat-balance").textContent = fmt(balance);
-    if ($("biz-username")) $("biz-username").textContent = me?.username || "User";
-    if ($("drawer-my-balance")) $("drawer-my-balance").textContent = fmt(balance);
+// ─── TOAST ──────────────────────────────────────────────────────
+const showToast = (msg, type = "info") => {
+  const toast = $("biz-toast");
+  if (!toast) return;
+  toast.textContent = msg;
+  toast.className = `biz-toast biz-toast-${type}`;
+  toast.style.display = "block";
+  setTimeout(() => { toast.style.display = "none"; }, 4000);
 };
 
-const renderAccounts = (me) => {
-    const el = $("accounts-list");
-    if (!el) return;
-    const methods = me?.paymentMethods || [];
-    el.innerHTML = methods.length
-        ? methods
-              .map((m, i) => {
-                  const rawNum = (m.number || "").replace(/\s/g, "");
-                  const isDefaultAccount = rawNum.length === 20;
-                  return `
-          <div class="biz-acc-card ${m.type === "card" ? "card-grad" : "bank-grad"}">
-            ${!isDefaultAccount ? `<button class="biz-acc-del" data-mi="${i}">✕</button>` : ""}
-            <div class="biz-acc-top">
-              <span class="biz-acc-badge">${m.type === "card" ? t("card_type") : t("bank_type")}</span>
-              ${m.isDefault ? `<span class="biz-acc-badge" style="background:rgba(255,255,255,.35)">${t("default_label")}</span>` : ""}
-            </div>
-            <p class="biz-acc-num">${m.displayNumber || m.number}</p>
-            <p class="biz-acc-holder">${m.holder || m.beneficiary || "—"}</p>
-            <div class="biz-acc-foot">
-              <div><p class="biz-acc-bal-label">${t("balance")}</p><p class="biz-acc-bal">${fmt(m.balance)}</p></div>
-              <span style="font-size:11px;opacity:.65">${m.expiry || m.bank || ""}</span>
-            </div>
-          </div>`;
-              })
-              .join("")
-        : `<p class="biz-empty">${t("no_accounts")}</p>`;
+// ─── RENDER FUNCTIONS ───────────────────────────────────────────
+const refreshStats = () => {
+  const me = getCurrent();
+  const totalBalance = myMethods.reduce((s, m) => s + (m.balance || 0), 0);
+  const userId = me?.userId || me?._id;
+  const outgoing = myTransactions.filter((t) => t.senderId === userId);
+  const waiting = outgoing.filter((t) => t.status === "waiting").reduce((s, t) => s + t.amount, 0);
+  const paid = outgoing.filter((t) => t.status === "paid").reduce((s, t) => s + t.amount, 0);
 
-    el.querySelectorAll(".biz-acc-del").forEach((btn) => {
-        btn.onclick = () => {
-            const idx = +btn.dataset.mi;
-            $("del-card-title").textContent = t("delete_card_title");
-            $("del-card-desc").textContent = t("delete_card_desc");
-            $("del-card-cancel").textContent = t("cancel");
-            $("del-card-confirm").textContent = t("delete_confirm_btn");
-            $("del-card-modal").style.display = "flex";
-            const confirmBtn = $("del-card-confirm");
-            const newConfirm = confirmBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
-            newConfirm.onclick = () => {
-                $("del-card-modal").style.display = "none";
-                const us = getUsers();
-                const m = us.find((u) => u.username === me.username);
-                if (m) {
-                    m.paymentMethods.splice(idx, 1);
-                    saveUsers(us);
-                }
-                const fresh = syncMe();
-                renderAccounts(fresh);
-                refreshStats(fresh);
-            };
-        };
-    });
+  if ($("stat-waiting")) $("stat-waiting").textContent = fmt(waiting);
+  if ($("stat-paid")) $("stat-paid").textContent = fmt(paid);
+  if ($("stat-clients")) $("stat-clients").textContent = paymentUsers.length;
+  if ($("stat-balance")) $("stat-balance").textContent = fmt(totalBalance);
+  if ($("biz-username")) $("biz-username").textContent = me?.username || "User";
+  if ($("drawer-my-balance")) $("drawer-my-balance").textContent = fmt(totalBalance);
 };
 
-const renderClientsMini = (me) => {
-    const el = $("clients-mini");
-    if (!el) return;
-    const allUsers = getUsers()
-        .filter((u) => u.username !== me?.username)
-        .slice(0, 3);
-    el.innerHTML = allUsers.length
-        ? allUsers
-              .map((u) => {
-                  const bal = (u.paymentMethods || []).reduce((s, m) => s + Number(m.balance || 0), 0);
-                  return `
-          <div class="biz-mini-row">
-            <div class="biz-user-cell">
-              ${avatarHTML(u, 34)}
-              <div>
-                <p class="biz-user-name">${u.username || "—"}</p>
-                <p class="biz-user-phone">${u.tel || u.email || "—"}</p>
-              </div>
-            </div>
-            <span style="margin-left:auto;font-size:12px;font-weight:700;color:#5b6ef5">${fmt(bal)}</span>
-          </div>`;
-              })
-              .join("")
-        : `<p class="biz-empty">${t("no_users_yet")}</p>`;
-};
+const renderAccounts = () => {
+  const el = $("accounts-list");
+  if (!el) return;
+  el.innerHTML = myMethods.length
+    ? myMethods.map((m) => {
+        return `
+        <div class="biz-acc-card ${m.type === "card" ? "card-grad" : "bank-grad"}">
+          ${!m.isDefault ? `<button class="biz-acc-del" data-mid="${m._id}">✕</button>` : ""}
+          <div class="biz-acc-top">
+            <span class="biz-acc-badge">${m.type === "card" ? t("card_type") : t("bank_type")}</span>
+            ${m.isDefault ? `<span class="biz-acc-badge" style="background:rgba(255,255,255,.35)">${t("default_label")}</span>` : ""}
+          </div>
+          <p class="biz-acc-num">${m.displayNumber || m.number}</p>
+          <p class="biz-acc-holder">${m.holder || "—"}</p>
+          <div class="biz-acc-foot">
+            <div><p class="biz-acc-bal-label">${t("balance")}</p><p class="biz-acc-bal">${fmt(m.balance)}</p></div>
+            <span style="font-size:11px;opacity:.65">${m.expiry || m.bank || ""}</span>
+          </div>
+        </div>`;
+      }).join("")
+    : `<p class="biz-empty">${t("no_accounts")}</p>`;
 
-const renderDocsMini = (me) => {
-    const el = $("docs-mini");
-    if (!el) return;
-    const payments = (me?.payments || []).slice(-6).reverse();
-    el.innerHTML = payments.length
-        ? payments
-              .map((p) => {
-                  const isIn = p.isIncoming;
-                  let color;
-                  if (isIn) color = "#22c55e";
-                  else if (p.status === "paid") color = "#ef4444";
-                  else if (p.status === "waiting") color = "#f59e0b";
-                  else color = "#5b6ef5";
-                  const sign = isIn ? "+" : "-";
-                  const fromToLabel = isIn ? t("label_from") : t("label_to");
-                  return `
-            <div class="biz-doc-mini-row">
-              <div style="display:flex;align-items:center;gap:10px;flex:1">
-                <div class="biz-doc-mini-icon"><img src="/pages/Business/images/folder icon.svg" alt=""></div>
-                <div>
-                  <p class="biz-user-name">${p.desc || t("documents")}</p>
-                  <p class="biz-user-phone">${fromToLabel} ${p.recipientName || "—"} · ${p.date || "—"}</p>
-                </div>
-              </div>
-              <span style="font-weight:700;color:${color};font-size:13px">${sign}${fmt(p.amount)}</span>
-            </div>`;
-              })
-              .join("")
-        : `<p class="biz-empty">${t("no_docs_yet")}</p>`;
-};
-
-let cPage = 1,
-    cFiltered = [];
-const renderClientsFull = (me, query = "") => {
-    const allUsers = getUsers().filter((u) => u.username !== me?.username);
-    cFiltered = query ? allUsers.filter((u) => u.username?.toLowerCase().includes(query.toLowerCase()) || u.email?.toLowerCase().includes(query.toLowerCase()) || u.tel?.includes(query)) : [...allUsers];
-    const total = cFiltered.length;
-    const pages = Math.max(1, Math.ceil(total / PAGE));
-    if (cPage > pages) cPage = pages;
-    const start = (cPage - 1) * PAGE,
-        slice = cFiltered.slice(start, start + PAGE);
-    const el = $("clients-full-list");
-    if (!el) return;
-    el.innerHTML = slice.length
-        ? slice
-              .map((u) => {
-                  const pmts = u.payments || [];
-                  const bal = (u.paymentMethods || []).reduce((s, m) => s + Number(m.balance || 0), 0);
-                  return `
-            <div class="biz-row clients-cols">
-              <div class="biz-user-cell">
-                ${avatarHTML(u, 34)}
-                <div>
-                  <p class="biz-user-name">${u.username || "—"}</p>
-                  <p class="biz-user-phone">${u.tel || u.email || "—"}</p>
-                </div>
-              </div>
-              <span class="biz-cell">${pmts.filter((p) => !p.isIncoming).length}</span>
-              <span class="biz-cell" style="color:#22c55e">${pmts.filter((p) => p.status === "paid" && !p.isIncoming).length}</span>
-              <span class="biz-cell" style="font-weight:700;color:#5b6ef5">${fmt(bal)}</span>
-              <span class="biz-cell biz-small">${u.tel || u.email || "—"}</span>
-              <div class="biz-row-actions"></div>
-            </div>`;
-              })
-              .join("")
-        : `<p class="biz-empty">${t("no_users_found")}</p>`;
-    if ($("cp-info")) $("cp-info").textContent = `${total === 0 ? 0 : start + 1}–${Math.min(start + PAGE, total)} ${t("of")} ${total}`;
-    if ($("cp-num")) $("cp-num").textContent = cPage;
-};
-
-let dPage = 1,
-    dFiltered = [];
-const renderDocsFull = (me, statusF = "", numF = "") => {
-    const payments = me?.payments || [];
-    dFiltered = payments.filter((p) => {
-        const matchS = !statusF || (statusF === "incoming" ? p.isIncoming : p.status === statusF && !p.isIncoming);
-        const matchN = !numF || (p.docNumber || "").toLowerCase().includes(numF.toLowerCase()) || (p.desc || "").toLowerCase().includes(numF.toLowerCase());
-        return matchS && matchN;
-    });
-    const total = dFiltered.length;
-    const pages = Math.max(1, Math.ceil(total / PAGE));
-    if (dPage > pages) dPage = pages;
-    const start = (dPage - 1) * PAGE,
-        slice = dFiltered.slice(start, start + PAGE);
-    const el = $("docs-full-list");
-    if (!el) return;
-    el.innerHTML = slice.length
-        ? slice
-              .map((p) => {
-                  const ri = payments.indexOf(p);
-                  const isIn = p.isIncoming;
-                  const isWait = p.status === "waiting" && !isIn;
-                  const allUsers = getUsers();
-                  const recipUser = allUsers.find((u) => u.username === p.recipientName);
-                  const badgeClass = isIn ? "biz-badge-incoming" : isWait ? "biz-badge-pending" : "biz-badge-confirmed";
-                  const badgeText = isIn ? t("badge_incoming") : isWait ? t("badge_pending") : t("badge_confirmed");
-                  const fromToLabel = isIn ? t("label_from") : t("label_to");
-                  const fromToName = p.recipientName || "—";
-                  return `
-            <div class="biz-doc-row-wrap${p._expanded ? " expanded" : ""}">
-              <div class="biz-row docs-cols">
-                <div class="biz-desc-cell"><span class="${badgeClass}">${badgeText}</span></div>
-                <div class="biz-user-cell">
-                  ${recipUser ? avatarHTML(recipUser, 28) : `<div class="biz-avatar" style="background:${avatarColor(fromToName || "")};width:28px;height:28px;font-size:11px">${initials(fromToName || "?")}</div>`}
-                  <div style="display:flex;flex-direction:column;gap:1px">
-                    <span class="biz-small" style="font-size:10px;color:#8892a4">${fromToLabel}</span>
-                    <span class="biz-small" style="font-weight:600">${fromToName}</span>
-                  </div>
-                </div>
-                <span class="biz-cell" style="font-weight:700;color:${isIn ? "#22c55e" : "#1a1d2e"}">${isIn ? "+" : ""}${fmt(p.amount)}</span>
-                <span class="biz-cell biz-small">${p.date || "—"}</span>
-                <span class="biz-cell biz-small" style="color:#5b6ef5;font-weight:600">${p.time || "—"}</span>
-                <span class="${badgeClass}">${badgeText}</span>
-                <div style="display:flex;gap:5px;align-items:center">
-                  ${isWait ? `<button class="biz-icon-btn send-btn" data-pi="${ri}" style="background:#5b6ef5;color:#fff;width:auto;padding:0 9px;font-size:11px;font-weight:700">${t("send")}</button>` : ""}
-                  <button class="biz-icon-btn expand-btn" data-pi="${ri}" style="background:#f1f3fa;color:#5a6279">
-                    <svg width="11" height="11" fill="none" viewBox="0 0 24 24"><path d="${p._expanded ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"}" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                  </button>
-                </div>
-              </div>
-              ${
-                  p._expanded
-                      ? `
-              <div class="biz-doc-expanded">
-                <div class="biz-exp-footer">
-                  <div class="biz-exp-footer-item">
-                    <span class="biz-exp-label">${t("create_time")}</span>
-                    <span class="biz-exp-val">
-                      <span class="biz-exp-date-badge">📅 ${p.createDate || p.date || "—"}</span>
-                      <span class="biz-exp-time-badge">🕐 ${p.createTime || "—"}</span>
-                    </span>
-                  </div>
-                  <div class="biz-exp-footer-item">
-                    <span class="biz-exp-label">${t("description")}</span>
-                    <span class="biz-exp-val biz-exp-desc-text">${p.desc || t("documents")}</span>
-                  </div>
-                  <div class="biz-exp-footer-item">
-                    <span class="biz-exp-label">${isIn ? t("label_from") : t("label_to")}</span>
-                    <span class="biz-exp-val">${p.recipientName || "—"}</span>
-                  </div>
-                  <div class="biz-exp-footer-item biz-exp-total">
-                    <span class="biz-exp-label">${t("total_amount")}</span>
-                    <span class="biz-exp-total-val" style="color:${isIn ? "#22c55e" : "#5b6ef5"}">${isIn ? "+" : ""}${fmt(p.amount)}</span>
-                  </div>
-                </div>
-              </div>`
-                      : ""
-              }
-            </div>`;
-              })
-              .join("")
-        : `<p class="biz-empty">${t("no_docs_found")}</p>`;
-
-    if ($("dp-info")) $("dp-info").textContent = `${total === 0 ? 0 : start + 1}–${Math.min(start + PAGE, total)} ${t("of")} ${total}`;
-    if ($("dp-num")) $("dp-num").textContent = dPage;
-
-    el.querySelectorAll(".expand-btn").forEach(
-        (btn) =>
-            (btn.onclick = (e) => {
-                e.stopPropagation();
-                const us = getUsers();
-                const m = us.find((u) => u.username === me.username);
-                if (m?.payments) {
-                    const clickedIdx = +btn.dataset.pi;
-                    const isCurrentlyOpen = !!m.payments[clickedIdx]?._expanded;
-                    m.payments.forEach((p) => {
-                        p._expanded = false;
-                    });
-                    if (!isCurrentlyOpen && m.payments[clickedIdx]) m.payments[clickedIdx]._expanded = true;
-                    saveUsers(us);
-                }
-                renderDocsFull(syncMe(), statusF, numF);
-            }),
-    );
-
-    el.querySelectorAll(".send-btn").forEach(
-        (btn) =>
-            (btn.onclick = (e) => {
-                e.stopPropagation();
-                openSendDrawer(syncMe(), +btn.dataset.pi);
-            }),
-    );
-};
-
-const showView = (name) => {
-    const dashboard = $("view-dashboard");
-    const clients = $("view-clients");
-    const docs = $("view-docs");
-    const dashRight = document.querySelector(".biz-dash-right");
-    const bizRoot = document.querySelector(".biz-root");
-    const statsRow = document.querySelector(".biz-stats-row");
-    const header = document.querySelector(".biz-header");
-    if (name === "view-dashboard") {
-        dashboard.style.display = "";
-        clients.style.display = "none";
-        docs.style.display = "none";
-        if (dashRight) dashRight.style.display = "";
-        if (bizRoot) bizRoot.classList.remove("full-width");
-        if (statsRow) statsRow.style.display = "";
-        if (header) header.style.display = "";
-    } else if (name === "view-clients") {
-        dashboard.style.display = "none";
-        clients.style.display = "flex";
-        docs.style.display = "none";
-        if (dashRight) dashRight.style.display = "none";
-        if (bizRoot) bizRoot.classList.add("full-width");
-        if (statsRow) statsRow.style.display = "none";
-        if (header) header.style.display = "none";
-    } else if (name === "view-docs") {
-        dashboard.style.display = "none";
-        clients.style.display = "none";
-        docs.style.display = "flex";
-        if (dashRight) dashRight.style.display = "none";
-        if (bizRoot) bizRoot.classList.add("full-width");
-        if (statsRow) statsRow.style.display = "none";
-        if (header) header.style.display = "none";
-    }
-};
-
-let activePIdx = null,
-    selRecipMethodIdx = null,
-    pendingPayment = null;
-
-const openSendDrawer = (me, pIdx) => {
-    activePIdx = pIdx;
-    selRecipMethodIdx = null;
-    const payment = me?.payments?.[pIdx];
-    if (!payment) return;
-    const totalBal = (me?.paymentMethods || []).reduce((s, m) => s + Number(m.balance || 0), 0);
-    $("drawer-my-balance").textContent = fmt(totalBal);
-    $("d-amount").value = payment.amount || "";
-    $("d-desc").value = payment.desc || "";
-    $("d-beneficiary").value = payment.recipientName || "";
-    $("d-error").textContent = "";
-    renderMyMethods(me);
-    const users = getUsers();
-    $("d-recipient").innerHTML =
-        `<option value="">${t("select_user")}</option>` +
-        users
-            .filter((u) => u.username !== me.username)
-            .map((u) => `<option value="${u.username}" ${u.username === payment.recipientName ? "selected" : ""}>${u.username} (${u.tel || u.email || ""})</option>`)
-            .join("");
-    if (payment.recipientName) {
-        const rec = users.find((u) => u.username === payment.recipientName);
-        if (rec) renderRecipMethods(rec, payment.recipientMethodIdx ?? null);
-    }
-    $("drawer-form").style.display = "flex";
-    $("drawer-success").style.display = "none";
-    $("drawer-sms").style.display = "none";
-    $("send-drawer-overlay").style.display = "flex";
-    $("d-recipient").onchange = () => {
-        const rec = users.find((u) => u.username === $("d-recipient").value);
-        $("d-beneficiary").value = rec?.username || "";
-        selRecipMethodIdx = null;
-        if (rec) renderRecipMethods(rec, null);
-        else {
-            $("recipient-methods-wrap").style.display = "none";
-            $("recipient-methods-list").innerHTML = "";
+  el.querySelectorAll(".biz-acc-del").forEach((btn) => {
+    btn.onclick = () => {
+      const mid = btn.dataset.mid;
+      $("del-card-title").textContent = t("delete_card_title");
+      $("del-card-desc").textContent = t("delete_card_desc");
+      $("del-card-cancel").textContent = t("cancel");
+      $("del-card-confirm").textContent = t("delete_confirm_btn");
+      $("del-card-modal").style.display = "flex";
+      const confirmBtn = $("del-card-confirm");
+      const newConfirm = confirmBtn.cloneNode(true);
+      confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
+      newConfirm.onclick = async () => {
+        $("del-card-modal").style.display = "none";
+        try {
+          await apiFetch(`/api/payments/methods/${mid}`, { method: "DELETE" });
+          myMethods = myMethods.filter((m) => m._id !== mid);
+          renderAccounts();
+          refreshStats();
+        } catch (e) {
+          showToast(e.message, "error");
         }
+      };
     };
+  });
 };
 
-const renderMyMethods = (me) => {
-    const methods = me?.paymentMethods || [];
-    const type = document.querySelector('input[name="pay-type"]:checked')?.value || "bank";
-    const filtered = methods.filter((m) => m.type === (type === "bank" ? "bank" : "card"));
-    $("my-methods-list").innerHTML = filtered.length
-        ? filtered
-              .map(
-                  (m) => `
-          <label class="biz-method-radio">
-            <input type="radio" name="my-method" value="${methods.indexOf(m)}" />
-            <div class="biz-method-content">
-              <span>${m.type === "card" ? "💳" : "🏦"}</span>
-              <div>
-                <p style="font-weight:600;font-size:13px;margin:0">${m.displayNumber || m.number}</p>
-                <p style="font-size:11px;color:#8892a4;margin:0">${m.bank || m.expiry || ""} — ${fmt(m.balance)}</p>
-              </div>
+const renderClientsMini = () => {
+  const el = $("clients-mini");
+  if (!el) return;
+  const users = paymentUsers.slice(0, 3);
+  el.innerHTML = users.length
+    ? users.map((u) => {
+        const bal = u.totalBalance || 0;
+        return `
+        <div class="biz-mini-row">
+          <div class="biz-user-cell">
+            ${avatarHTML(u, 34)}
+            <div>
+              <p class="biz-user-name">${u.username || "—"}</p>
+              <p class="biz-user-phone">${u.tel || u.email || "—"}</p>
             </div>
-          </label>`,
-              )
-              .join("")
-        : `<p style="color:#8892a4;font-size:13px">${t("no_type_methods")}</p>`;
+          </div>
+          <span style="margin-left:auto;font-size:12px;font-weight:700;color:#5b6ef5">${fmt(bal)}</span>
+        </div>`;
+      }).join("")
+    : `<p class="biz-empty">${t("no_users_yet")}</p>`;
 };
 
-const renderRecipMethods = (rec, selIdx) => {
-    const methods = rec?.paymentMethods || [];
-    $("recipient-methods-wrap").style.display = "block";
-    $("recipient-methods-list").innerHTML = methods.length
-        ? methods
-              .map(
-                  (m, i) => `
-          <label class="biz-method-radio ${selIdx === i ? "cardselected" : ""}">
-            <input type="radio" name="rec-method" value="${i}" ${selIdx === i ? "checked" : ""}/>
-            <div class="biz-method-content">
-              <span>${m.type === "card" ? "💳" : "🏦"}</span>
-              <div>
-                <p style="font-weight:600;font-size:13px;margin:0">${m.displayNumber || m.number}</p>
-                <p style="font-size:11px;color:#8892a4;margin:0">${m.bank || m.expiry || ""} — ${fmt(m.balance)}</p>
+const renderDocsMini = () => {
+  const el = $("docs-mini");
+  if (!el) return;
+  const me = getCurrent();
+  const userId = me?.userId || me?._id;
+  const payments = myTransactions.slice(-6).reverse();
+  el.innerHTML = payments.length
+    ? payments.map((p) => {
+        const isIn = p.receiverId === userId && p.status === "paid";
+        let color;
+        if (isIn) color = "#22c55e";
+        else if (p.status === "paid") color = "#ef4444";
+        else color = "#f59e0b";
+        const sign = isIn ? "+" : "-";
+        const fromToLabel = isIn ? t("label_from") : t("label_to");
+        const name = isIn ? p.senderName : p.receiverName;
+        return `
+        <div class="biz-doc-mini-row">
+          <div style="display:flex;align-items:center;gap:10px;flex:1">
+            <div class="biz-doc-mini-icon"><img src="/pages/Business/images/folder icon.svg" alt=""></div>
+            <div>
+              <p class="biz-user-name">${p.description || t("documents")}</p>
+              <p class="biz-user-phone">${fromToLabel} ${name || "—"} · ${new Date(p.createdAt).toLocaleDateString()}</p>
+            </div>
+          </div>
+          <span style="font-weight:700;color:${color};font-size:13px">${sign}${fmt(p.amount)}</span>
+        </div>`;
+      }).join("")
+    : `<p class="biz-empty">${t("no_docs_yet")}</p>`;
+};
+
+// ─── FULL VIEWS ─────────────────────────────────────────────────
+let cPage = 1, cFiltered = [];
+const renderClientsFull = () => {
+  cFiltered = [...paymentUsers];
+  const total = cFiltered.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE));
+  if (cPage > pages) cPage = pages;
+  const start = (cPage - 1) * PAGE, slice = cFiltered.slice(start, start + PAGE);
+  const el = $("clients-full-list");
+  if (!el) return;
+  el.innerHTML = slice.length
+    ? slice.map((u) => `
+      <div class="biz-row clients-cols">
+        <div class="biz-user-cell">
+          ${avatarHTML(u, 34)}
+          <div>
+            <p class="biz-user-name">${u.username || "—"}</p>
+            <p class="biz-user-phone">${u.tel || u.email || "—"}</p>
+          </div>
+        </div>
+        <span class="biz-cell">${u.transactionsCount || 0}</span>
+        <span class="biz-cell" style="color:#22c55e">${u.paidCount || 0}</span>
+        <span class="biz-cell" style="font-weight:700;color:#5b6ef5">${fmt(u.totalBalance)}</span>
+        <span class="biz-cell biz-small">${u.tel || u.email || "—"}</span>
+        <div class="biz-row-actions"></div>
+      </div>`).join("")
+    : `<p class="biz-empty">${t("no_users_found")}</p>`;
+  if ($("cp-info")) $("cp-info").textContent = `${total === 0 ? 0 : start + 1}–${Math.min(start + PAGE, total)} ${t("of")} ${total}`;
+  if ($("cp-num")) $("cp-num").textContent = cPage;
+};
+
+let dPage = 1, dFiltered = [];
+const expandedTxIds = new Set();
+
+const renderDocsFull = (statusF = "", numF = "") => {
+  const me = getCurrent();
+  const userId = me?.userId || me?._id;
+  dFiltered = myTransactions.filter((p) => {
+    const isIn = p.receiverId === userId && p.status === "paid";
+    const matchS = !statusF || (statusF === "incoming" ? isIn : (statusF === "waiting" ? p.status === "waiting" && p.senderId === userId : p.status === statusF && p.senderId === userId));
+    const matchN = !numF || (p.description || "").toLowerCase().includes(numF.toLowerCase()) || (p.receiverName || "").toLowerCase().includes(numF.toLowerCase());
+    return matchS && matchN;
+  });
+  const total = dFiltered.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE));
+  if (dPage > pages) dPage = pages;
+  const start = (dPage - 1) * PAGE, slice = dFiltered.slice(start, start + PAGE);
+  const el = $("docs-full-list");
+  if (!el) return;
+
+  el.innerHTML = slice.length
+    ? slice.map((p) => {
+        const isIn = p.receiverId === userId && p.status === "paid";
+        const isWait = p.status === "waiting" && p.senderId === userId;
+        const expanded = expandedTxIds.has(p._id);
+        const badgeClass = isIn ? "biz-badge-incoming" : isWait ? "biz-badge-pending" : "biz-badge-confirmed";
+        const badgeText = isIn ? t("badge_incoming") : isWait ? t("badge_pending") : t("badge_confirmed");
+        const fromToLabel = isIn ? t("label_from") : t("label_to");
+        const fromToName = isIn ? p.senderName : p.receiverName;
+        const date = new Date(p.createdAt).toLocaleDateString();
+        const time = new Date(p.createdAt).toLocaleTimeString();
+        return `
+        <div class="biz-doc-row-wrap${expanded ? " expanded" : ""}">
+          <div class="biz-row docs-cols">
+            <div class="biz-desc-cell"><span class="${badgeClass}">${badgeText}</span></div>
+            <div class="biz-user-cell">
+              <div class="biz-avatar" style="background:${avatarColor(fromToName || "")};width:28px;height:28px;font-size:11px">${initials(fromToName || "?")}</div>
+              <div style="display:flex;flex-direction:column;gap:1px">
+                <span class="biz-small" style="font-size:10px;color:#8892a4">${fromToLabel}</span>
+                <span class="biz-small" style="font-weight:600">${fromToName || "—"}</span>
               </div>
             </div>
-          </label>`,
-              )
-              .join("")
-        : `<p style="color:#8892a4;font-size:13px">${t("no_type_methods")}</p>`;
-    $("recipient-methods-list")
-        .querySelectorAll('input[name="rec-method"]')
-        .forEach((inp) => {
-            if (inp.checked) selRecipMethodIdx = +inp.value;
-            inp.onchange = () => {
-                selRecipMethodIdx = +inp.value;
-                $("recipient-methods-list")
-                    .querySelectorAll(".biz-method-radio")
-                    .forEach((l) => l.classList.remove("cardselected"));
-                inp.closest(".biz-method-radio").classList.add("cardselected");
-            };
-        });
+            <span class="biz-cell" style="font-weight:700;color:${isIn ? "#22c55e" : "#1a1d2e"}">${isIn ? "+" : ""}${fmt(p.amount)}</span>
+            <span class="biz-cell biz-small">${date}</span>
+            <span class="biz-cell biz-small" style="color:#5b6ef5;font-weight:600">${time}</span>
+            <span class="${badgeClass}">${badgeText}</span>
+            <div style="display:flex;gap:5px;align-items:center">
+              ${isWait ? `<button class="biz-icon-btn send-btn" data-tid="${p._id}" style="background:#5b6ef5;color:#fff;width:auto;padding:0 9px;font-size:11px;font-weight:700">${t("send")}</button>` : ""}
+              <button class="biz-icon-btn expand-btn" data-tid="${p._id}" style="background:#f1f3fa;color:#5a6279">
+                <svg width="11" height="11" fill="none" viewBox="0 0 24 24"><path d="${expanded ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"}" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+          ${expanded ? `
+          <div class="biz-doc-expanded">
+            <div class="biz-exp-footer">
+              <div class="biz-exp-footer-item">
+                <span class="biz-exp-label">${t("create_time")}</span>
+                <span class="biz-exp-val">
+                  <span class="biz-exp-date-badge">📅 ${date}</span>
+                  <span class="biz-exp-time-badge">🕐 ${time}</span>
+                </span>
+              </div>
+              <div class="biz-exp-footer-item">
+                <span class="biz-exp-label">${t("description")}</span>
+                <span class="biz-exp-val biz-exp-desc-text">${p.description || t("documents")}</span>
+              </div>
+              <div class="biz-exp-footer-item">
+                <span class="biz-exp-label">${isIn ? t("label_from") : t("label_to")}</span>
+                <span class="biz-exp-val">${fromToName || "—"}</span>
+              </div>
+              <div class="biz-exp-footer-item biz-exp-total">
+                <span class="biz-exp-label">${t("total_amount")}</span>
+                <span class="biz-exp-total-val" style="color:${isIn ? "#22c55e" : "#5b6ef5"}">${isIn ? "+" : ""}${fmt(p.amount)}</span>
+              </div>
+            </div>
+          </div>` : ""}
+        </div>`;
+      }).join("")
+    : `<p class="biz-empty">${t("no_docs_found")}</p>`;
+
+  if ($("dp-info")) $("dp-info").textContent = `${total === 0 ? 0 : start + 1}–${Math.min(start + PAGE, total)} ${t("of")} ${total}`;
+  if ($("dp-num")) $("dp-num").textContent = dPage;
+
+  el.querySelectorAll(".expand-btn").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const tid = btn.dataset.tid;
+      if (expandedTxIds.has(tid)) expandedTxIds.delete(tid);
+      else { expandedTxIds.clear(); expandedTxIds.add(tid); }
+      renderDocsFull(statusF, numF);
+    };
+  });
+
+  el.querySelectorAll(".send-btn").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      openSendDrawer(btn.dataset.tid);
+    };
+  });
+};
+
+// ─── VIEW SWITCHER ──────────────────────────────────────────────
+const showView = (name) => {
+  const dashboard = $("view-dashboard");
+  const clients = $("view-clients");
+  const docs = $("view-docs");
+  const dashRight = document.querySelector(".biz-dash-right");
+  const bizRoot = document.querySelector(".biz-root");
+  const statsRow = document.querySelector(".biz-stats-row");
+  const header = document.querySelector(".biz-header");
+  if (name === "view-dashboard") {
+    dashboard.style.display = "";
+    clients.style.display = "none";
+    docs.style.display = "none";
+    if (dashRight) dashRight.style.display = "";
+    if (bizRoot) bizRoot.classList.remove("full-width");
+    if (statsRow) statsRow.style.display = "";
+    if (header) header.style.display = "";
+  } else if (name === "view-clients") {
+    dashboard.style.display = "none";
+    clients.style.display = "flex";
+    docs.style.display = "none";
+    if (dashRight) dashRight.style.display = "none";
+    if (bizRoot) bizRoot.classList.add("full-width");
+    if (statsRow) statsRow.style.display = "none";
+    if (header) header.style.display = "none";
+  } else if (name === "view-docs") {
+    dashboard.style.display = "none";
+    clients.style.display = "none";
+    docs.style.display = "flex";
+    if (dashRight) dashRight.style.display = "none";
+    if (bizRoot) bizRoot.classList.add("full-width");
+    if (statsRow) statsRow.style.display = "none";
+    if (header) header.style.display = "none";
+  }
+};
+
+// ─── SEND DRAWER ────────────────────────────────────────────────
+let activeTransactionId = null;
+let selRecipMethodId = null;
+let pendingPayment = null;
+
+const openSendDrawer = (txId) => {
+  activeTransactionId = txId;
+  selRecipMethodId = null;
+  const tx = myTransactions.find((t) => t._id === txId);
+  if (!tx) return;
+
+  const totalBal = myMethods.reduce((s, m) => s + (m.balance || 0), 0);
+  $("drawer-my-balance").textContent = fmt(totalBal);
+  $("d-amount").value = tx.amount || "";
+  $("d-desc").value = tx.description || "";
+  $("d-beneficiary").value = tx.receiverName || "";
+  $("d-error").textContent = "";
+  renderMyMethods();
+
+  $("d-recipient").innerHTML =
+    `<option value="">${t("select_user")}</option>` +
+    paymentUsers.map((u) => {
+      const uid = u.userId || u._id;
+      return `<option value="${uid}" ${uid === tx.receiverId ? "selected" : ""}>${u.username} (${u.tel || u.email || ""})</option>`;
+    }).join("");
+
+  if (tx.receiverId) {
+    const rec = paymentUsers.find((u) => (u.userId || u._id) === tx.receiverId);
+    if (rec) renderRecipMethods(rec, null);
+  }
+
+  $("drawer-form").style.display = "flex";
+  $("drawer-success").style.display = "none";
+  $("drawer-sms").style.display = "none";
+  $("send-drawer-overlay").style.display = "flex";
+
+  $("d-recipient").onchange = () => {
+    const recId = $("d-recipient").value;
+    const rec = paymentUsers.find((u) => (u.userId || u._id) === recId);
+    $("d-beneficiary").value = rec?.username || "";
+    selRecipMethodId = null;
+    if (rec) renderRecipMethods(rec, null);
+    else {
+      $("recipient-methods-wrap").style.display = "none";
+      $("recipient-methods-list").innerHTML = "";
+    }
+  };
+};
+
+const renderMyMethods = () => {
+  const type = document.querySelector('input[name="pay-type"]:checked')?.value || "bank";
+  const filtered = myMethods.filter((m) => m.type === type);
+  $("my-methods-list").innerHTML = filtered.length
+    ? filtered.map((m) => `
+      <label class="biz-method-radio">
+        <input type="radio" name="my-method" value="${m._id}" />
+        <div class="biz-method-content">
+          <span>${m.type === "card" ? "💳" : "🏦"}</span>
+          <div>
+            <p style="font-weight:600;font-size:13px;margin:0">${m.displayNumber || m.number}</p>
+            <p style="font-size:11px;color:#8892a4;margin:0">${m.bank || m.expiry || ""} — ${fmt(m.balance)}</p>
+          </div>
+        </div>
+      </label>`).join("")
+    : `<p style="color:#8892a4;font-size:13px">${t("no_type_methods")}</p>`;
+};
+
+const renderRecipMethods = (rec, selId) => {
+  const methods = rec?.paymentMethods || [];
+  $("recipient-methods-wrap").style.display = "block";
+  $("recipient-methods-list").innerHTML = methods.length
+    ? methods.map((m) => `
+      <label class="biz-method-radio ${selId === m._id ? "cardselected" : ""}">
+        <input type="radio" name="rec-method" value="${m._id}" ${selId === m._id ? "checked" : ""}/>
+        <div class="biz-method-content">
+          <span>${m.type === "card" ? "💳" : "🏦"}</span>
+          <div>
+            <p style="font-weight:600;font-size:13px;margin:0">${m.displayNumber || m.number}</p>
+            <p style="font-size:11px;color:#8892a4;margin:0">${m.bank || m.expiry || ""} — ${fmt(m.balance)}</p>
+          </div>
+        </div>
+      </label>`).join("")
+    : `<p style="color:#8892a4;font-size:13px">${t("no_type_methods")}</p>`;
+
+  $("recipient-methods-list").querySelectorAll('input[name="rec-method"]').forEach((inp) => {
+    if (inp.checked) selRecipMethodId = inp.value;
+    inp.onchange = () => {
+      selRecipMethodId = inp.value;
+      $("recipient-methods-list").querySelectorAll(".biz-method-radio").forEach((l) => l.classList.remove("cardselected"));
+      inp.closest(".biz-method-radio").classList.add("cardselected");
+    };
+  });
 };
 
 // ─── SMS VERIFICATION ─────────────────────────────────────────
-const showSmsStep = (me) => {
-    const phone = me?.tel || me?.phone || me?.email || "***";
-    const masked = phone.length > 4 ? phone.slice(0, -4).replace(/./g, "*") + phone.slice(-4) : "****";
-    $("sms-title").textContent = t("sms_title") || "SMS tasdiqlash";
-    $("sms-desc").textContent = (t("sms_desc") || "Raqamingizga SMS yuborildi:") + " " + masked;
-    $("sms-confirm-btn").textContent = t("sms_confirm") || "Tasdiqlash";
-    $("sms-back-btn").textContent = t("cancel") || "Bekor qilish";
-    $("sms-error").textContent = "";
-    ["sms-d1", "sms-d2", "sms-d3", "sms-d4"].forEach((id) => {
-        $(id).value = "";
-        $(id).style.borderColor = "";
-    });
-    $("drawer-form").style.display = "none";
-    $("drawer-sms").style.display = "flex";
-    setTimeout(() => $("sms-d1").focus(), 100);
+const showSmsStep = () => {
+  const me = getCurrent();
+  const phone = me?.tel || me?.email || "***";
+  const masked = phone.length > 4 ? phone.slice(0, -4).replace(/./g, "*") + phone.slice(-4) : "****";
+  $("sms-title").textContent = t("sms_title") || "SMS tasdiqlash";
+  $("sms-desc").textContent = (t("sms_desc") || "Raqamingizga SMS yuborildi:") + " " + masked;
+  $("sms-confirm-btn").textContent = t("sms_confirm") || "Tasdiqlash";
+  $("sms-back-btn").textContent = t("cancel") || "Bekor qilish";
+  $("sms-error").textContent = "";
+  ["sms-d1", "sms-d2", "sms-d3", "sms-d4"].forEach((id) => { $(id).value = ""; $(id).style.borderColor = ""; });
+  $("drawer-form").style.display = "none";
+  $("drawer-sms").style.display = "flex";
+  setTimeout(() => $("sms-d1").focus(), 100);
 
-    const inputs = ["sms-d1", "sms-d2", "sms-d3", "sms-d4"].map((id) => $(id));
-    inputs.forEach((inp, i) => {
-        inp.oninput = () => {
-            inp.value = inp.value.replace(/\D/, "");
-            if (inp.value && i < 3) inputs[i + 1].focus();
-        };
-        inp.onkeydown = (e) => {
-            if (e.key === "Backspace" && !inp.value && i > 0) inputs[i - 1].focus();
-        };
-    });
+  const inputs = ["sms-d1", "sms-d2", "sms-d3", "sms-d4"].map((id) => $(id));
+  inputs.forEach((inp, i) => {
+    inp.oninput = () => { inp.value = inp.value.replace(/\D/, ""); if (inp.value && i < 3) inputs[i + 1].focus(); };
+    inp.onkeydown = (e) => { if (e.key === "Backspace" && !inp.value && i > 0) inputs[i - 1].focus(); };
+  });
 };
 
-const applyPendingPayment = (me) => {
-    const { amount, recipUser, desc, myMethodIdx } = pendingPayment;
-    const us = getUsers();
-    const myUser = us.find((u) => u.username === me.username);
-    const senderMethod = myUser?.paymentMethods?.[myMethodIdx];
-    senderMethod.balance = Number(senderMethod.balance) - amount;
-    const recUser = us.find((u) => u.username === recipUser);
-    recUser.paymentMethods[selRecipMethodIdx].balance = Number(recUser.paymentMethods[selRecipMethodIdx].balance) + amount;
-    if (!recUser.payments) recUser.payments = [];
-    recUser.payments.push({
-        docNumber: `INCOME/${Date.now()}`,
-        desc: desc || `${t("transfer_from")} ${me.username}`,
-        amount,
-        recipientName: me.username,
-        status: "paid",
-        date: new Date().toLocaleDateString(),
-        time: new Date().toLocaleTimeString(),
-        createDate: new Date().toLocaleDateString(),
-        createTime: new Date().toLocaleTimeString(),
-        method: recUser.paymentMethods[selRecipMethodIdx].type,
-        isIncoming: true,
+const executePayment = async () => {
+  const { amount, desc, senderMethodId, receiverMethodId } = pendingPayment;
+  try {
+    $("sms-confirm-btn").classList.add("loading");
+    await apiFetch(`/api/payments/send/${activeTransactionId}`, {
+      method: "POST",
+      body: JSON.stringify({ senderMethodId, receiverMethodId, amount, description: desc }),
     });
-    if (activePIdx !== null && myUser?.payments?.[activePIdx]) {
-        const p = myUser.payments[activePIdx];
-        p.status = "paid";
-        p.amount = amount;
-        p.desc = desc || p.desc;
-        p.date = new Date().toLocaleDateString();
-        p.time = new Date().toLocaleTimeString();
-        p.method = senderMethod.type;
-        p.recipientName = recipUser;
-        p.recipientMethodIdx = selRecipMethodIdx;
-    }
-    // Update the local storage of users (the mocked backend for payments)
-    saveUsers(us);
-    
-    // We don't update localStorage for 'currentUser' anymore.
-    // Instead, we just refresh the local 'me' reference from the cache.
+    // Reload data
+    await loadPaymentData();
+    $("drawer-sms").style.display = "none";
+    $("drawer-success").style.display = "block";
     pendingPayment = null;
+  } catch (e) {
+    $("sms-error").textContent = e.message;
+  } finally {
+    $("sms-confirm-btn").classList.remove("loading");
+  }
 };
 
 const closeSendDrawer = () => {
-    $("send-drawer-overlay").style.display = "none";
-    $("drawer-sms").style.display = "none";
-    $("drawer-form").style.display = "flex";
-    $("drawer-success").style.display = "none";
-    activePIdx = null;
-    selRecipMethodIdx = null;
-    pendingPayment = null;
+  $("send-drawer-overlay").style.display = "none";
+  $("drawer-sms").style.display = "none";
+  $("drawer-form").style.display = "flex";
+  $("drawer-success").style.display = "none";
+  activeTransactionId = null;
+  selRecipMethodId = null;
+  pendingPayment = null;
 };
 
-export const initBusinessLogic = () => {
-    // initBusinessLogic() boshiga:
-    const header = document.querySelector(".biz-header");
-    if (header) header.insertAdjacentHTML("beforeend", createPayAnalyticsBtn(currentLang));
+// ─── PUSHER REAL-TIME ───────────────────────────────────────────
+const initPusher = () => {
+  const me = getCurrent();
+  if (!me || !window.Pusher || pusherChannel) return;
 
-    let me = syncMe();
-    refreshStats(me);
-    renderAccounts(me);
-    renderClientsMini(me);
-    renderDocsMini(me);
+  const userId = me.userId || me._id;
+  const client = new window.Pusher("a1030ba785c6160c84e2", { cluster: "ap2" });
+  pusherChannel = client.subscribe(`user-${userId}`);
 
-    $("btn-view-clients")?.addEventListener("click", () => {
-        showView("view-clients");
-        cPage = 1;
-        renderClientsFull(syncMe());
-    });
-    $("back-clients")?.addEventListener("click", () => {
-        showView("view-dashboard");
-        renderClientsMini(syncMe());
-    });
-    $("btn-view-docs")?.addEventListener("click", () => {
-        showView("view-docs");
-        dPage = 1;
-        renderDocsFull(syncMe());
-    });
-    $("back-docs")?.addEventListener("click", () => {
-        showView("view-dashboard");
-        renderDocsMini(syncMe());
-    });
-    $("cp-prev")?.addEventListener("click", () => {
-        if (cPage > 1) {
-            cPage--;
-            renderClientsFull(syncMe());
-        }
-    });
-    $("cp-next")?.addEventListener("click", () => {
-        const tp = Math.ceil(cFiltered.length / PAGE);
-        if (cPage < tp) {
-            cPage++;
-            renderClientsFull(syncMe());
-        }
-    });
-    $("biz-search-input")?.addEventListener("input", (e) => {
-        cPage = 1;
-        renderClientsFull(syncMe(), e.target.value);
-    });
-    $("doc-status-filter")?.addEventListener("change", (e) => {
-        dPage = 1;
-        renderDocsFull(syncMe(), e.target.value, $("doc-num-search")?.value || "");
-    });
-    $("doc-num-search")?.addEventListener("input", (e) => {
-        dPage = 1;
-        renderDocsFull(syncMe(), $("doc-status-filter")?.value || "", e.target.value);
-    });
-    $("dp-prev")?.addEventListener("click", () => {
-        if (dPage > 1) {
-            dPage--;
-            renderDocsFull(syncMe());
-        }
-    });
-    $("dp-next")?.addEventListener("click", () => {
-        const tp = Math.ceil(dFiltered.length / PAGE);
-        if (dPage < tp) {
-            dPage++;
-            renderDocsFull(syncMe());
-        }
-    });
+  pusherChannel.bind("new-transaction", (data) => {
+    showToast(`💰 ${data.transaction.senderName} ${fmt(data.transaction.amount)} to'lov yaratdi`, "success");
+    loadPaymentData().then(() => { refreshStats(); renderDocsMini(); renderAccounts(); });
+  });
 
-    $("create-doc-btn")?.addEventListener("click", () => {
-        const users = getUsers();
-        $("dm-recipient").innerHTML =
-            `<option value="">${t("select_default")}</option>` +
-            users
-                .filter((u) => u.username !== me.username)
-                .map((u) => `<option value="${u.username}">${u.username}</option>`)
-                .join("");
-        $("dm-amount").value = "";
-        $("doc-modal").style.display = "flex";
-    });
-    $("dm-cancel")?.addEventListener("click", () => ($("doc-modal").style.display = "none"));
-    $("doc-modal")?.addEventListener("click", (e) => {
-        if (e.target === e.currentTarget) e.currentTarget.style.display = "none";
-    });
-    $("dm-save")?.addEventListener("click", () => {
-        const desc = $("dm-desc")?.value?.trim() || "";
-        const amount = parseFloat($("dm-amount").value);
-        const rec = $("dm-recipient").value;
-        if (isNaN(amount) || amount <= 0) return alert(t("alert_enter_amount"));
-        if (!rec) return alert(t("alert_select_recipient"));
-        const now = new Date();
-        const us = getUsers();
-        const m = us.find((u) => u.username === me.username);
-        if (!m.payments) m.payments = [];
-        m.payments.push({
-            docNumber: `PROFORMA/${Date.now()}`,
-            desc,
-            amount,
-            recipientName: rec,
-            status: "waiting",
-            date: now.toLocaleDateString(),
-            time: now.toLocaleTimeString(),
-            createDate: now.toLocaleDateString(),
-            createTime: now.toLocaleTimeString(),
-            method: "—",
-        });
-        saveUsers(us);
-        me = syncMe();
-        $("doc-modal").style.display = "none";
-        renderDocsFull(me);
-        renderDocsMini(me);
-        refreshStats(me);
-    });
+  pusherChannel.bind("transaction-completed", (data) => {
+    showToast(`✅ ${fmt(data.transaction.amount)} to'lov amalga oshirildi`, "success");
+    loadPaymentData().then(() => { refreshStats(); renderDocsMini(); renderAccounts(); });
+  });
 
-    $("drawer-back")?.addEventListener("click", closeSendDrawer);
-    $("drawer-close")?.addEventListener("click", closeSendDrawer);
-    $("send-drawer-overlay")?.addEventListener("click", (e) => {
-        if (e.target === e.currentTarget) closeSendDrawer();
-    });
+  pusherChannel.bind("method-added", () => {
+    loadPaymentData().then(() => { renderAccounts(); refreshStats(); });
+  });
 
-    $("d-return")?.addEventListener("click", () => {
-        closeSendDrawer();
-        me = syncMe();
-        refreshStats(me);
-        renderDocsFull(me);
-        renderDocsMini(me);
-        renderAccounts(me);
-    });
+  pusherChannel.bind("method-deleted", () => {
+    loadPaymentData().then(() => { renderAccounts(); refreshStats(); });
+  });
+};
 
-    document.querySelectorAll('input[name="pay-type"]').forEach((inp) => {
-        inp.onchange = () => renderMyMethods(syncMe());
-    });
+// ─── INIT ───────────────────────────────────────────────────────
+export const initBusinessLogic = async () => {
+  const currentLang = getCurrentLang();
 
-    $("d-proceed")?.addEventListener("click", () => {
-        const errEl = $("d-error");
-        errEl.textContent = "";
-        const amount = parseFloat($("d-amount").value);
-        const recipUser = $("d-recipient").value;
-        const desc = $("d-desc").value;
-        const myMethodIdx = parseInt(document.querySelector('input[name="my-method"]:checked')?.value ?? "x");
-        if (isNaN(amount) || amount <= 0) {
-            errEl.textContent = t("err_valid_amount");
-            return;
-        }
-        if (!recipUser) {
-            errEl.textContent = t("err_select_recipient");
-            return;
-        }
-        if (isNaN(myMethodIdx)) {
-            errEl.textContent = t("err_select_method");
-            return;
-        }
-        if (selRecipMethodIdx === null) {
-            errEl.textContent = t("err_select_rec_method");
-            return;
-        }
-        const us = getUsers();
-        const myUser = us.find((u) => u.username === me.username);
-        const senderMethod = myUser?.paymentMethods?.[myMethodIdx];
-        if (!senderMethod) {
-            errEl.textContent = t("err_invalid_sender");
-            return;
-        }
-        if (Number(senderMethod.balance) < amount) {
-            errEl.textContent = t("err_insufficient");
-            return;
-        }
-        const recUser = us.find((u) => u.username === recipUser);
-        if (!recUser?.paymentMethods?.[selRecipMethodIdx]) {
-            errEl.textContent = t("err_rec_not_found");
-            return;
-        }
+  // Header analytics button
+  const header = document.querySelector(".biz-header");
+  if (header) header.insertAdjacentHTML("beforeend", createPayAnalyticsBtn(currentLang));
 
-        // Validatsiya o'tdi — SMS stepga o'tamiz
-        pendingPayment = { amount, recipUser, desc, myMethodIdx };
-        showSmsStep(me);
-    });
+  // Load all data from server
+  await loadPaymentData();
 
-    // ── SMS step listeners ──
-    $("sms-back-btn")?.addEventListener("click", () => {
-        $("drawer-sms").style.display = "none";
-        $("drawer-form").style.display = "flex";
-        pendingPayment = null;
-    });
-    $("sms-confirm-btn")?.addEventListener("click", () => {
-        const code = ["sms-d1", "sms-d2", "sms-d3", "sms-d4"].map((id) => $(id).value).join("");
-        if (code !== "1234") {
-            $("sms-error").textContent = t("sms_wrong_code") || "Kod noto'g'ri. 1234 kiriting.";
-            ["sms-d1", "sms-d2", "sms-d3", "sms-d4"].forEach((id) => ($(id).style.borderColor = "#ef4444"));
-            return;
-        }
-        applyPendingPayment(me);
-        me = syncMe();
-        $("drawer-sms").style.display = "none";
-        $("drawer-success").style.display = "block";
-    });
+  refreshStats();
+  renderAccounts();
+  renderClientsMini();
+  renderDocsMini();
 
-    $("add-card-btn")?.addEventListener("click", () => {
-        ["cm-number", "cm-holder", "cm-expiry", "cm-balance"].forEach((id) => {
-            $(id).value = "";
-            $(id).style.borderColor = "";
-        });
-        $("card-modal").style.display = "flex";
-    });
-    $("cm-number")?.addEventListener("input", (e) => {
-        const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
-        e.target.value = raw.match(/.{1,4}/g)?.join(" ") || raw;
-    });
-    $("cm-expiry")?.addEventListener("input", (e) => {
-        const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
-        e.target.value = raw.length >= 3 ? raw.slice(0, 2) + "/" + raw.slice(2) : raw;
-    });
-    $("cm-cancel")?.addEventListener("click", () => ($("card-modal").style.display = "none"));
-    $("del-card-cancel")?.addEventListener("click", () => ($("del-card-modal").style.display = "none"));
-    $("del-card-modal")?.addEventListener("click", (e) => {
-        if (e.target === e.currentTarget) $("del-card-modal").style.display = "none";
-    });
-    $("card-modal")?.addEventListener("click", (e) => {
-        if (e.target === e.currentTarget) e.currentTarget.style.display = "none";
-    });
-    $("cm-save")?.addEventListener("click", () => {
-        const raw = $("cm-number").value.trim().replace(/\s/g, "");
-        const holder = $("cm-holder").value.trim();
-        const expiry = $("cm-expiry").value.trim();
+  // Initialize Pusher
+  initPusher();
 
-        let hasError = false;
-        // Karta raqami 16ta raqam bo'lishi kerak
-        if (raw.length !== 16) { $("cm-number").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-number").style.borderColor = ""; }
-        // Ism 3ta harfdan kam bo'lmasligi kerak
-        if (holder.length < 3) { $("cm-holder").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-holder").style.borderColor = ""; }
-        // Amal qilish muddati MM/YY formatida, ya'ni "/" bilan birga 5ta belgi (4ta raqam)
-        if (expiry.length !== 5) { $("cm-expiry").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-expiry").style.borderColor = ""; }
+  // ── View navigation ──
+  $("btn-view-clients")?.addEventListener("click", () => { showView("view-clients"); cPage = 1; renderClientsFull(); });
+  $("back-clients")?.addEventListener("click", () => { showView("view-dashboard"); renderClientsMini(); });
+  $("btn-view-docs")?.addEventListener("click", () => { showView("view-docs"); dPage = 1; renderDocsFull(); });
+  $("back-docs")?.addEventListener("click", () => { showView("view-dashboard"); renderDocsMini(); });
+  $("cp-prev")?.addEventListener("click", () => { if (cPage > 1) { cPage--; renderClientsFull(); } });
+  $("cp-next")?.addEventListener("click", () => { if (cPage < Math.ceil(cFiltered.length / PAGE)) { cPage++; renderClientsFull(); } });
+  $("doc-status-filter")?.addEventListener("change", (e) => { dPage = 1; renderDocsFull(e.target.value, $("doc-num-search")?.value || ""); });
+  $("doc-num-search")?.addEventListener("input", (e) => { dPage = 1; renderDocsFull($("doc-status-filter")?.value || "", e.target.value); });
+  $("dp-prev")?.addEventListener("click", () => { if (dPage > 1) { dPage--; renderDocsFull(); } });
+  $("dp-next")?.addEventListener("click", () => { if (dPage < Math.ceil(dFiltered.length / PAGE)) { dPage++; renderDocsFull(); } });
 
-        if (hasError) return;
+  // ── Create document ──
+  $("create-doc-btn")?.addEventListener("click", () => {
+    $("dm-recipient").innerHTML =
+      `<option value="">${t("select_default")}</option>` +
+      paymentUsers.map((u) => `<option value="${u.userId || u._id}">${u.username}</option>`).join("");
+    $("dm-amount").value = "";
+    if ($("dm-desc")) $("dm-desc").value = "";
+    $("doc-modal").style.display = "flex";
+  });
+  $("dm-cancel")?.addEventListener("click", () => ($("doc-modal").style.display = "none"));
+  $("doc-modal")?.addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.style.display = "none"; });
+  $("dm-save")?.addEventListener("click", async () => {
+    const amount = parseFloat($("dm-amount").value);
+    const rec = $("dm-recipient").value;
+    const desc = $("dm-desc")?.value?.trim() || "";
+    if (isNaN(amount) || amount <= 0) return alert(t("alert_enter_amount"));
+    if (!rec) return alert(t("alert_select_recipient"));
+    try {
+      await apiFetch("/api/payments/transactions", {
+        method: "POST",
+        body: JSON.stringify({ receiverId: rec, amount, description: desc }),
+      });
+      await loadPaymentData();
+      $("doc-modal").style.display = "none";
+      renderDocsFull();
+      renderDocsMini();
+      refreshStats();
+      showToast("Hujjat yaratildi ✓", "success");
+    } catch (e) {
+      alert(e.message);
+    }
+  });
 
-        const us = getUsers();
-        const m = us.find((u) => u.username === me.username);
-        if (!m.paymentMethods) m.paymentMethods = [];
-        m.paymentMethods.push({
-            type: "card",
-            number: raw.replace(/(.{4})/g, "$1 ").trim(),
-            displayNumber: raw.slice(0, 4) + " **** **** " + raw.slice(-4),
-            holder: holder,
-            expiry: expiry,
-            balance: parseFloat($("cm-balance").value) || 0,
-        });
-        saveUsers(us);
-        me = syncMe();
-        $("card-modal").style.display = "none";
-        renderAccounts(me);
-        refreshStats(me);
-    });
+  // ── Send drawer ──
+  $("drawer-back")?.addEventListener("click", closeSendDrawer);
+  $("drawer-close")?.addEventListener("click", closeSendDrawer);
+  $("send-drawer-overlay")?.addEventListener("click", (e) => { if (e.target === e.currentTarget) closeSendDrawer(); });
 
-    initPayAnalytics(currentLang);
+  $("d-return")?.addEventListener("click", () => {
+    closeSendDrawer();
+    refreshStats();
+    renderDocsFull();
+    renderDocsMini();
+    renderAccounts();
+  });
+
+  document.querySelectorAll('input[name="pay-type"]').forEach((inp) => { inp.onchange = () => renderMyMethods(); });
+
+  $("d-proceed")?.addEventListener("click", () => {
+    const errEl = $("d-error");
+    errEl.textContent = "";
+    const amount = parseFloat($("d-amount").value);
+    const desc = $("d-desc").value;
+    const senderMethodId = document.querySelector('input[name="my-method"]:checked')?.value;
+    if (isNaN(amount) || amount <= 0) { errEl.textContent = t("err_valid_amount"); return; }
+    if (!$("d-recipient").value) { errEl.textContent = t("err_select_recipient"); return; }
+    if (!senderMethodId) { errEl.textContent = t("err_select_method"); return; }
+    if (!selRecipMethodId) { errEl.textContent = t("err_select_rec_method"); return; }
+
+    const senderMethod = myMethods.find((m) => m._id === senderMethodId);
+    if (!senderMethod) { errEl.textContent = t("err_invalid_sender"); return; }
+    if (senderMethod.balance < amount) { errEl.textContent = t("err_insufficient"); return; }
+
+    pendingPayment = { amount, desc, senderMethodId, receiverMethodId: selRecipMethodId };
+    showSmsStep();
+  });
+
+  // ── SMS step ──
+  $("sms-back-btn")?.addEventListener("click", () => { $("drawer-sms").style.display = "none"; $("drawer-form").style.display = "flex"; pendingPayment = null; });
+  $("sms-confirm-btn")?.addEventListener("click", () => {
+    const code = ["sms-d1", "sms-d2", "sms-d3", "sms-d4"].map((id) => $(id).value).join("");
+    if (code !== "1234") {
+      $("sms-error").textContent = t("sms_wrong_code") || "Kod noto'g'ri. 1234 kiriting.";
+      ["sms-d1", "sms-d2", "sms-d3", "sms-d4"].forEach((id) => ($(id).style.borderColor = "#ef4444"));
+      return;
+    }
+    executePayment();
+  });
+
+  // ── Add card ──
+  $("add-card-btn")?.addEventListener("click", () => {
+    ["cm-number", "cm-holder", "cm-expiry", "cm-balance"].forEach((id) => { $(id).value = ""; $(id).style.borderColor = ""; });
+    $("card-modal").style.display = "flex";
+  });
+  $("cm-number")?.addEventListener("input", (e) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
+    e.target.value = raw.match(/.{1,4}/g)?.join(" ") || raw;
+  });
+  $("cm-expiry")?.addEventListener("input", (e) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
+    e.target.value = raw.length >= 3 ? raw.slice(0, 2) + "/" + raw.slice(2) : raw;
+  });
+  $("cm-cancel")?.addEventListener("click", () => ($("card-modal").style.display = "none"));
+  $("del-card-cancel")?.addEventListener("click", () => ($("del-card-modal").style.display = "none"));
+  $("del-card-modal")?.addEventListener("click", (e) => { if (e.target === e.currentTarget) $("del-card-modal").style.display = "none"; });
+  $("card-modal")?.addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.style.display = "none"; });
+
+  $("cm-save")?.addEventListener("click", async () => {
+    const raw = $("cm-number").value.trim().replace(/\s/g, "");
+    const holder = $("cm-holder").value.trim();
+    const expiry = $("cm-expiry").value.trim();
+
+    let hasError = false;
+    if (raw.length !== 16) { $("cm-number").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-number").style.borderColor = ""; }
+    if (holder.length < 3) { $("cm-holder").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-holder").style.borderColor = ""; }
+    if (expiry.length !== 5) { $("cm-expiry").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-expiry").style.borderColor = ""; }
+    if (hasError) return;
+
+    try {
+      const newMethod = await apiFetch("/api/payments/methods", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "card",
+          number: raw.replace(/(.{4})/g, "$1 ").trim(),
+          displayNumber: raw.slice(0, 4) + " **** **** " + raw.slice(-4),
+          holder,
+          expiry,
+          balance: parseFloat($("cm-balance").value) || 0,
+        }),
+      });
+      myMethods.push(newMethod);
+      $("card-modal").style.display = "none";
+      renderAccounts();
+      refreshStats();
+      showToast("Karta qo'shildi ✓", "success");
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+
+  initPayAnalytics(currentLang);
 };
