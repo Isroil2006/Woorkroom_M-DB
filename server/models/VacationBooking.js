@@ -10,6 +10,10 @@ const vacationBookingSchema = new mongoose.Schema(
       type: { type: String, enum: ["card", "bank"], default: "card" },
       number: { type: String }, // e.g. masked card number or account number
     },
+    selectedDate: {
+      start: { type: Date },
+      end: { type: Date }
+    },
     status: { type: String, enum: ["pending", "confirmed", "cancelled"], default: "confirmed" },
   },
   { timestamps: true }

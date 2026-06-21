@@ -33,6 +33,10 @@ const vacationSchema = new mongoose.Schema(
     images: [{ type: String }],
     lat: { type: Number },
     lng: { type: Number },
+    dates: [{
+      start: { type: Date, required: true },
+      end: { type: Date, required: true }
+    }],
   },
   { timestamps: true }
 );

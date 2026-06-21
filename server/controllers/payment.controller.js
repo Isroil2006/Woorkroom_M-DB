@@ -28,11 +28,12 @@ exports.getMethods = async (req, res) => {
 exports.addMethod = async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
-    const { type, number, displayNumber, holder, expiry, bank, balance } = req.body;
+    const { type, cardName, number, displayNumber, holder, expiry, bank, balance } = req.body;
 
     const method = new PaymentMethod({
       userId,
       type: type || "card",
+      cardName: cardName || "",
       number,
       displayNumber: displayNumber || "",
       holder: holder || "",
@@ -89,7 +90,10 @@ exports.getTransactions = async (req, res) => {
     const userId = req.user.userId || req.user.id;
     const transactions = await Transaction.find({
       $or: [{ senderId: userId }, { receiverId: userId }],
-    }).sort({ createdAt: 1 });
+    })
+      .populate("senderMethodId", "number type")
+      .populate("receiverMethodId", "number type")
+      .sort({ createdAt: 1 });
     res.status(200).json(transactions);
   } catch (error) {
     res.status(500).json({ message: "Tranzaksiyalarni yuklashda xatolik", error: error.message });
@@ -100,23 +104,26 @@ exports.getTransactions = async (req, res) => {
 exports.createTransaction = async (req, res) => {
   try {
     const senderId = req.user.userId || req.user.id;
-    const { receiverId, amount, description } = req.body;
+    let { receiverId, amount, description } = req.body;
 
-    if (!receiverId || !amount || amount <= 0) {
-      return res.status(400).json({ message: "Qabul qiluvchi va summa ko'rsatilishi kerak" });
-    }
-
+    // Draft mode: if receiverId is not provided or "draft", it's a draft document.
+    const isDraft = !receiverId || receiverId === "draft";
+    
     const sender = await User.findOne({ $or: [{ userId: senderId }, { _id: senderId }] }).select("username");
-    const receiver = await User.findOne({ $or: [{ userId: receiverId }, { _id: receiverId }] }).select("username");
-    if (!receiver) return res.status(404).json({ message: "Qabul qiluvchi topilmadi" });
+    
+    let receiver = null;
+    if (!isDraft) {
+      receiver = await User.findOne({ $or: [{ userId: receiverId }, { _id: receiverId }] }).select("username");
+      if (!receiver) return res.status(404).json({ message: "Qabul qiluvchi topilmadi" });
+    }
 
     const transaction = new Transaction({
       senderId,
       senderName: sender?.username || "Unknown",
-      receiverId: receiver.userId || receiver._id.toString(),
-      receiverName: receiver.username,
-      amount,
-      description: description || "",
+      receiverId: receiver ? (receiver.userId || receiver._id.toString()) : "draft",
+      receiverName: receiver ? receiver.username : "-",
+      amount: amount || 0,
+      description: description || "-",
       status: "waiting",
     });
 
@@ -140,12 +147,37 @@ exports.executeTransaction = async (req, res) => {
   try {
     const senderId = req.user.userId || req.user.id;
     const { transactionId } = req.params;
-    const { senderMethodId, receiverMethodId, amount, description } = req.body;
+    const { senderMethodId, receiverMethodId, amount, description, receiverId } = req.body;
 
-    const transaction = await Transaction.findById(transactionId);
-    if (!transaction) return res.status(404).json({ message: "Tranzaksiya topilmadi" });
-    if (transaction.senderId !== senderId) return res.status(403).json({ message: "Ruxsat yo'q" });
-    if (transaction.status === "paid") return res.status(400).json({ message: "Bu tranzaksiya allaqachon to'langan" });
+    let transaction;
+    if (transactionId === "new") {
+      const sender = await User.findOne({ $or: [{ userId: senderId }, { _id: senderId }] }).select("username");
+      transaction = new Transaction({
+        senderId,
+        senderName: sender?.username || "Unknown",
+        status: "waiting"
+      });
+    } else {
+      transaction = await Transaction.findById(transactionId);
+      if (!transaction) return res.status(404).json({ message: "Tranzaksiya topilmadi" });
+      if (transaction.senderId !== senderId) return res.status(403).json({ message: "Ruxsat yo'q" });
+      if (transaction.status === "paid") return res.status(400).json({ message: "Bu tranzaksiya allaqachon to'langan" });
+    }
+
+    // Update receiverId if provided (for draft execution)
+    let actualReceiverId = transaction.receiverId;
+    if (receiverId && receiverId !== "draft") {
+      actualReceiverId = receiverId;
+      const recUser = await User.findOne({ $or: [{ userId: receiverId }, { _id: receiverId }] }).select("username");
+      if (recUser) {
+        transaction.receiverId = recUser.userId || recUser._id.toString();
+        transaction.receiverName = recUser.username;
+      }
+    }
+
+    if (!actualReceiverId || actualReceiverId === "draft") {
+      return res.status(400).json({ message: "Qabul qiluvchi tanlanmagan" });
+    }
 
     // Jo'natuvchi va qabul qiluvchi hisoblarini tekshirish
     const senderMethod = await PaymentMethod.findById(senderMethodId);
@@ -156,6 +188,9 @@ exports.executeTransaction = async (req, res) => {
     if (!receiverMethod) return res.status(404).json({ message: "Qabul qiluvchi hisob topilmadi" });
 
     const txAmount = amount || transaction.amount;
+    if (!txAmount || txAmount <= 0) {
+      return res.status(400).json({ message: "Noto'g'ri summa" });
+    }
     if (senderMethod.balance < txAmount) {
       return res.status(400).json({ message: "Balans yetarli emas" });
     }
@@ -175,11 +210,17 @@ exports.executeTransaction = async (req, res) => {
     transaction.paidAt = new Date();
     await transaction.save();
 
+    await transaction.populate("senderMethodId", "number type");
+    await transaction.populate("receiverMethodId", "number type");
+
     // Har ikkala foydalanuvchiga real-time bildirishnoma
     const eventData = { transaction, senderBalance: senderMethod.balance, receiverBalance: receiverMethod.balance };
     try {
       await pusher.trigger(`user-${transaction.senderId}`, "transaction-completed", eventData);
-      await pusher.trigger(`user-${transaction.receiverId}`, "transaction-completed", eventData);
+      // Only send to receiver if it's a different user (avoid double event for self-transfers)
+      if (transaction.senderId !== transaction.receiverId) {
+        await pusher.trigger(`user-${transaction.receiverId}`, "transaction-completed", eventData);
+      }
     } catch (err) {
       console.error("Pusher error:", err);
     }
@@ -187,6 +228,34 @@ exports.executeTransaction = async (req, res) => {
     res.status(200).json(transaction);
   } catch (error) {
     res.status(500).json({ message: "To'lovni amalga oshirishda xatolik", error: error.message });
+  }
+};
+
+// 7. Kutilayotgan tranzaksiyani bekor qilish (o'chirish)
+exports.deleteTransaction = async (req, res) => {
+  try {
+    const senderId = req.user.userId || req.user.id;
+    const { transactionId } = req.params;
+
+    const transaction = await Transaction.findById(transactionId);
+    if (!transaction) return res.status(404).json({ message: "Tranzaksiya topilmadi" });
+    if (transaction.senderId !== senderId) return res.status(403).json({ message: "Ruxsat yo'q" });
+    if (transaction.status !== "waiting") return res.status(400).json({ message: "Faqat kutilayotgan to'lovni o'chirish mumkin" });
+
+    await Transaction.findByIdAndDelete(transactionId);
+
+    // Xabar yuborish agar qabul qiluvchi aniq bo'lsa
+    if (transaction.receiverId !== "draft" && transaction.receiverId !== senderId) {
+       try {
+         await pusher.trigger(`user-${transaction.receiverId}`, "transaction-deleted", { transactionId });
+       } catch (err) {
+         console.error("Pusher error:", err);
+       }
+    }
+
+    res.status(200).json({ message: "Tranzaksiya o'chirildi" });
+  } catch (error) {
+    res.status(500).json({ message: "O'chirishda xatolik", error: error.message });
   }
 };
 

@@ -1482,7 +1482,7 @@
 
 /* ═══ BOOKING MODAL ═══ */
 .vac-book-modal-box {
-    max-width: 440px !important;
+    max-width: 600px !important;
     padding: 0 !important;
     max-height: 90vh;
     overflow-y: auto;
@@ -1754,4 +1754,56 @@
 
 .vac-book-login-btn {
     margin-top: 20px;
+}
+
+
+/* Tabs for modal */
+.vac-modal-tabs {
+    display: flex;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 20px;
+    gap: 16px;
+}
+.vac-modal-tab {
+    padding: 12px 16px;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    font-weight: 600;
+    color: #8892a4;
+    border-bottom: 2px solid transparent;
+    font-size: 15px;
+    transition: all 0.2s;
+}
+.vac-modal-tab:hover {
+    color: #1a1d2e;
+}
+.vac-modal-tab.active {
+    color: #5b6ef5;
+    border-bottom-color: #5b6ef5;
+}
+
+/* Hotel & Room UI */
+.vac-hotels-tab-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+.vac-hotel-edit-btn, .vac-room-edit-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    height: auto;
+}
+.vac-hotel-remove-btn, .vac-room-remove-btn {
+    border: none;
+    background: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 12px;
+}
+.vac-hotel-remove-btn:hover, .vac-room-remove-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 6px;
 }

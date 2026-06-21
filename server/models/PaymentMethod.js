@@ -4,6 +4,7 @@ const paymentMethodSchema = new mongoose.Schema(
   {
     userId: { type: String, required: true, index: true },
     type: { type: String, enum: ["card", "bank"], required: true },
+    cardName: { type: String, default: "" },
     number: { type: String, required: true },
     displayNumber: { type: String, default: "" },
     holder: { type: String, default: "" },

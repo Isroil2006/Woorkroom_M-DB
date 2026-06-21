@@ -1,9 +1,29 @@
 const Vacation = require("../models/Vacation");
 const VacationBooking = require("../models/VacationBooking");
+const PaymentMethod = require("../models/PaymentMethod");
+const Transaction = require("../models/Transaction");
+const User = require("../models/User");
+
+const today = new Date();
+const getDates = (pastDays, durationDays, futureDays1, futureDays2) => [
+  {
+    start: new Date(today.getTime() - pastDays * 86400000),
+    end: new Date(today.getTime() - pastDays * 86400000 + durationDays * 86400000)
+  },
+  {
+    start: new Date(today.getTime() + futureDays1 * 86400000),
+    end: new Date(today.getTime() + futureDays1 * 86400000 + durationDays * 86400000)
+  },
+  {
+    start: new Date(today.getTime() + futureDays2 * 86400000),
+    end: new Date(today.getTime() + futureDays2 * 86400000 + durationDays * 86400000)
+  }
+];
 
 // Fallback seed data if DB is empty
 const SAMPLE_TOURS = [
   {
+    dates: getDates(10, 7, 5, 20),
     name: { uz: "Maldiv orollari turi", ru: "Тур на Мальдивы", en: "Maldives Islands Tour" },
     country: { uz: "Maldiv", ru: "Мальдивы", en: "Maldives" },
     city: { uz: "Malé atoll", ru: "Атолл Мале", en: "Malé Atoll" },
@@ -28,6 +48,7 @@ const SAMPLE_TOURS = [
     lng: 73.5093,
   },
   {
+    dates: getDates(15, 8, 10, 30),
     name: { uz: "Shveytsariya tog' safari", ru: "Горный сафари Швейцарии", en: "Switzerland Mountain Safari" },
     country: { uz: "Shveytsariya", ru: "Швейцария", en: "Switzerland" },
     city: { uz: "Interlaken", ru: "Интерлакен", en: "Interlaken" },
@@ -52,6 +73,7 @@ const SAMPLE_TOURS = [
     lng: 7.8632,
   },
   {
+    dates: getDates(5, 5, 3, 15),
     name: { uz: "Dubay Premium turi", ru: "Тур Дубай Премиум", en: "Dubai Premium Tour" },
     country: { uz: "BAA", ru: "ОАЭ", en: "UAE" },
     city: { uz: "Dubay", ru: "Дубай", en: "Dubai" },
@@ -76,6 +98,7 @@ const SAMPLE_TOURS = [
     lng: 55.2708,
   },
   {
+    dates: getDates(20, 10, 12, 40),
     name: { uz: "Bali — Tabiat va Meditatsiya", ru: "Бали — Природа и Медитация", en: "Bali — Nature & Meditation" },
     country: { uz: "Indoneziya", ru: "Индонезия", en: "Indonesia" },
     city: { uz: "Ubud, Bali", ru: "Убуд, Бали", en: "Ubud, Bali" },
@@ -184,12 +207,39 @@ exports.deleteVacation = async (req, res) => {
 exports.bookVacation = async (req, res) => {
   try {
     const { vacationId } = req.params;
-    const { guests, totalCost, paymentMethod } = req.body;
-    const userId = req.user.userId; // Provided by auth middleware
+    const { guests, totalCost, paymentMethod, paymentMethodId, selectedDate } = req.body;
+    const userId = req.user.userId || req.user.id; // Provided by auth middleware
 
     const vacation = await Vacation.findById(vacationId);
     if (!vacation) {
       return res.status(404).json({ success: false, message: "Vacation not found" });
+    }
+
+    if (paymentMethodId) {
+      const pm = await PaymentMethod.findById(paymentMethodId);
+      if (!pm) {
+        return res.status(404).json({ success: false, message: "To'lov usuli topilmadi" });
+      }
+      if (pm.balance < totalCost) {
+        return res.status(400).json({ success: false, message: "Balans yetarli emas" });
+      }
+      pm.balance -= totalCost;
+      await pm.save();
+
+      const user = await User.findOne({ $or: [{ userId }, { _id: userId }] });
+
+      const tx = new Transaction({
+        senderId: user ? (user.userId || user._id) : userId,
+        senderName: user ? user.username : "Unknown",
+        receiverId: "system_tour",
+        receiverName: "Workroom Agency",
+        senderMethodId: paymentMethodId,
+        amount: totalCost,
+        description: `Tur xaridi: ${vacation.name.uz || vacation.name} (${guests} kishi)`,
+        status: "paid",
+        paidAt: new Date()
+      });
+      await tx.save();
     }
 
     const booking = new VacationBooking({
@@ -198,6 +248,7 @@ exports.bookVacation = async (req, res) => {
       guests,
       totalCost,
       paymentMethod,
+      selectedDate,
       status: "confirmed"
     });
 
@@ -206,6 +257,17 @@ exports.bookVacation = async (req, res) => {
     res.status(201).json({ success: true, data: booking });
   } catch (error) {
     console.error("Book vacation error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+exports.getMyBookings = async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const bookings = await VacationBooking.find({ userId }).populate("vacationId");
+    res.json({ success: true, data: bookings });
+  } catch (error) {
+    console.error("Get my bookings error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };

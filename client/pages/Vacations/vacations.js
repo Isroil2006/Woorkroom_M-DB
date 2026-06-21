@@ -1,4 +1,4 @@
-import { createAnalyticsButton, initAnalytics } from "./analiytics.js";
+
 import { API_URL, getCurrentUser, getAuthHeaders } from "../../assets/js/api.js";
 import { vacTranslations } from "./translations.js";
 import { SAMPLE_TOURS } from "./card-default-data.js";
@@ -47,11 +47,13 @@ let pickMarker = null;
 let formCoverDataUrl = null; // base64 or url
 let formGalleryImages = []; // [{dataUrl, isFile}]
 let formContentLang = "uz"; // which lang tab is active in form
+let formDates = []; // array of {start, end}
 
 // booking state
 let bookModalOpen = false;
 let bookGuests = 1;
 let bookSelectedMethodIdx = 0;
+let bookSelectedDateIdx = null;
 let bookStep = 1; // 1: payment form, 2: success
 
 const $v = (id) => document.getElementById(id);
@@ -79,7 +81,6 @@ const renderRoot = () => {
         <div class="vac-header">
             <h1 class="vac-title">${tr.title}</h1>
             <div class="vac-header-btns">
-                ${createAnalyticsButton(getCurrentLang())}
                 <button data-perm="vac_add_tour" class="vac-add-btn" id="vac-add-btn">
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
                     ${tr.add_btn}
@@ -107,7 +108,7 @@ const renderRoot = () => {
     `;
     attachRootEvents();
 
-    const cu = JSON.parse(localStorage.getItem("currentUser") || "null");
+    const cu = getCurrentUser();
     if (cu) applyPermissions(cu.userId || cu._id);
 };
 
@@ -307,6 +308,29 @@ const renderDetailInline = () => {
                         : ""
                 }
                 ${
+                    t.dates && t.dates.length
+                        ? `
+                <div class="vac-detail-dates-section" style="margin-top:24px;">
+                    <div class="vac-detail-section-title" style="font-size:18px; font-weight:600; color:#1e293b; margin-bottom:12px;">Mavjud sanalar</div>
+                    <div class="vac-dates-grid" style="display:flex; flex-wrap:wrap; gap:12px;">
+                        ${t.dates.map(d => {
+                            const sd = new Date(d.start);
+                            const ed = new Date(d.end);
+                            const fmt = dt => dt.toLocaleDateString("ru-RU", { day:"2-digit", month:"2-digit", year:"numeric" });
+                            const isPast = ed < new Date();
+                            return `
+                            <div class="vac-detail-date-badge" style="padding:10px 14px; border:1px solid ${isPast ? '#e2e8f0' : '#bae6fd'}; border-radius:8px; background:${isPast ? '#f8fafc' : '#f0f9ff'}; color:${isPast ? '#94a3b8' : '#0369a1'}; font-weight:500; font-size:14px; display:flex; align-items:center; gap:8px;">
+                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                <span>${fmt(sd)} - ${fmt(ed)}</span>
+                                ${isPast ? '<span style="font-size:12px; color:#ef4444; margin-left:4px; font-weight:600;">(Tugagan)</span>' : ''}
+                            </div>
+                            `;
+                        }).join("")}
+                    </div>
+                </div>`
+                        : ""
+                }
+                ${
                     t.lat && t.lng
                         ? `
                 <div class="vac-detail-map-section">
@@ -353,7 +377,7 @@ const getBookModalHTML = () => {
     const t = getTours().find(x => x.id === detailTourId);
     if (!t) return "";
 
-    const cu = JSON.parse(localStorage.getItem("currentUser")) || null;
+    const cu = getCurrentUser();
     if (!cu) {
         return `
             <div class="vac-book-box-center">
@@ -388,8 +412,8 @@ const getBookModalHTML = () => {
             </div>`;
     }
 
-    const methods = cu.paymentMethods || [];
-    const fmt = n => "$" + Number(n||0).toLocaleString("en-US", {minimumFractionDigits:2});
+    const methods = myCards || [];
+    const fmt = n => Number(n||0).toLocaleString("en-US", {minimumFractionDigits:2}) + " UZS";
 
     return `
             <div class="vac-add-modal-header vac-book-header">
@@ -404,7 +428,30 @@ const getBookModalHTML = () => {
                     <div>
                         <h4 class="vac-book-tour-title">${name}</h4>
                         ${city ? `<div class="vac-book-tour-city">${city}</div>` : ''}
-                        <div class="vac-book-tour-price">$${Number(t.price).toLocaleString()} <span class="vac-book-tour-price-per">${tr.per_person}</span></div>
+                        <div class="vac-book-tour-price">${Number(t.price).toLocaleString()} UZS <span class="vac-book-tour-price-per">${tr.per_person}</span></div>
+                    </div>
+                </div>
+
+                <div class="vac-book-section">
+                    <label class="vac-book-label">Sanani tanlang</label>
+                    <div class="vac-book-dates-list" style="display:flex; flex-direction:column; gap:8px;">
+                        ${(t.dates || []).length ? t.dates.map((d, i) => {
+                            const sd = new Date(d.start);
+                            const ed = new Date(d.end);
+                            const isPast = ed < new Date();
+                            const fmt = dt => dt.toLocaleDateString("ru-RU", { day:"2-digit", month:"2-digit", year:"numeric" });
+                            return `
+                            <label class="vac-book-method-item vac-book-date-item ${bookSelectedDateIdx === i ? 'active' : ''} ${isPast ? 'disabled' : ''}" style="${isPast ? 'opacity:0.6; cursor:not-allowed;' : ''}">
+                                <input type="radio" name="b-date" value="${i}" ${bookSelectedDateIdx === i ? 'checked' : ''} ${isPast ? 'disabled' : ''} class="vac-book-method-radio"/>
+                                <div class="vac-book-method-info">
+                                    <div class="vac-book-method-top">
+                                        <span class="vac-book-method-name">${fmt(sd)} - ${fmt(ed)}</span>
+                                        ${isPast ? '<span class="vac-book-date-ended" style="color:#ef4444; font-size:12px; font-weight:600;">Tugagan</span>' : ''}
+                                    </div>
+                                </div>
+                            </label>
+                            `;
+                        }).join("") : `<div class="vac-book-no-methods" style="color:#f59e0b;">Ushbu tur uchun sanalar kiritilmagan</div>`}
                     </div>
                 </div>
 
@@ -425,10 +472,10 @@ const getBookModalHTML = () => {
                             <input type="radio" name="b-method" value="${i}" ${bookSelectedMethodIdx === i ? 'checked' : ''} class="vac-book-method-radio"/>
                             <div class="vac-book-method-info">
                                 <div class="vac-book-method-top">
-                                    <span class="vac-book-method-name">${m.type==='card'?'💳':'🏦'} ${m.displayNumber || m.number}</span>
+                                    <span class="vac-book-method-name">${m.cardName || m.type} ${m.displayNumber || m.number}</span>
                                     <span class="vac-book-method-bal ${Number(m.balance)<totalCost ? 'error' : ''}">${fmt(m.balance)}</span>
                                 </div>
-                                <span class="vac-book-method-sub">${m.bank || m.expiry || ''}</span>
+                                <span class="vac-book-method-sub">${m.holder || ''}</span>
                             </div>
                         </label>
                         `).join("") : `<div class="vac-book-no-methods">${tr.book_no_methods}</div>`}
@@ -563,6 +610,21 @@ const renderAddModal = () => {
                         <label class="vac-label">${tr.field_included}</label>
                         <textarea id="vf-included" class="vac-input vac-textarea" rows="3" placeholder="${tr.ph_included}">${esc(fIncStr)}</textarea>
                     </div>
+                    <!-- DATES -->
+                    <div class="vac-form-group">
+                        <label class="vac-label">Sanalar (Qachondan - Qachongacha)</label>
+                        <div id="vac-dates-list" class="vac-dates-list">
+                            ${formDates.map((d, i) => `
+                            <div class="vac-date-row" data-idx="${i}" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                                <input type="date" class="vac-input vac-date-input" value="${d.start ? new Date(d.start).toISOString().substring(0,10) : ''}" data-field="start" data-idx="${i}"/>
+                                <span style="color:#8a99af">-</span>
+                                <input type="date" class="vac-input vac-date-input" value="${d.end ? new Date(d.end).toISOString().substring(0,10) : ''}" data-field="end" data-idx="${i}"/>
+                                <button type="button" class="vac-btn-icon vac-date-remove" data-idx="${i}" style="width:32px; height:32px; border-radius:4px; border:1px solid #e2e8f0; background:#fff; color:#ef4444; cursor:pointer;">✕</button>
+                            </div>
+                            `).join("")}
+                        </div>
+                        <button type="button" class="vac-btn-secondary vac-date-add" id="vac-date-add" style="margin-top: 8px; font-size: 12px; padding: 6px 12px;">+ Sana qo'shish</button>
+                    </div>
                 </div>
 
                 <!-- ═══ RIGHT: IMAGES + MAP ═══ -->
@@ -641,6 +703,35 @@ const renderAddModal = () => {
     </div>`;
 };
 
+const renderDatesListUI = () => {
+    const list = document.getElementById("vac-dates-list");
+    if (!list) return;
+    list.innerHTML = formDates.map((d, i) => `
+        <div class="vac-date-row" data-idx="${i}" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+            <input type="date" class="vac-input vac-date-input" value="${d.start ? new Date(d.start).toISOString().substring(0,10) : ''}" data-field="start" data-idx="${i}"/>
+            <span style="color:#8a99af">-</span>
+            <input type="date" class="vac-input vac-date-input" value="${d.end ? new Date(d.end).toISOString().substring(0,10) : ''}" data-field="end" data-idx="${i}"/>
+            <button type="button" class="vac-btn-icon vac-date-remove" data-idx="${i}" style="width:32px; height:32px; border-radius:4px; border:1px solid #e2e8f0; background:#fff; color:#ef4444; cursor:pointer;">✕</button>
+        </div>
+    `).join("");
+
+    list.querySelectorAll(".vac-date-remove").forEach(btn => {
+        btn.addEventListener("click", () => {
+            formDates.splice(parseInt(btn.dataset.idx), 1);
+            renderDatesListUI();
+        });
+    });
+    list.querySelectorAll(".vac-date-input").forEach(inp => {
+        inp.addEventListener("change", (e) => {
+            const idx = parseInt(e.target.dataset.idx);
+            const field = e.target.dataset.field;
+            if (formDates[idx]) {
+                formDates[idx][field] = e.target.value;
+            }
+        });
+    });
+};
+
 // ─── EVENTS ───────────────────────────────────
 const attachRootEvents = () => {
     $v("vac-add-btn")?.addEventListener("click", () => {
@@ -649,6 +740,7 @@ const attachRootEvents = () => {
         formCoverDataUrl = null;
         formGalleryImages = [];
         formContentLang = "uz";
+        formDates = [];
         autosave();
         renderRoot();
         setTimeout(() => initPickMap(), 120);
@@ -692,6 +784,7 @@ const attachRootEvents = () => {
             formCoverDataUrl = t.coverImage || null;
             formGalleryImages = (t.images || []).map((u) => ({ dataUrl: u, isFile: false }));
             formContentLang = "uz";
+            formDates = t.dates ? JSON.parse(JSON.stringify(t.dates)) : [];
             autosave();
             renderRoot();
             setTimeout(() => initPickMap(editTourId), 120);
@@ -735,7 +828,7 @@ const attachRootEvents = () => {
             const modalBody = document.querySelector(".vac-add-modal-body");
             if (!modalBody) return;
             // re-build only left column content (lang-sensitive fields)
-            const tr = vacTranslations[vacLang] || vacTranslations.uz;
+            const tr = vacTranslations[getCurrentLang()] || vacTranslations.uz;
             const cl = formContentLang;
             let t2 = editTourId ? getTours().find((x) => x.id === editTourId) : null;
             const buf = window._vacFormBuffer || {};
@@ -822,7 +915,30 @@ const attachRootEvents = () => {
     $v("vf-lat")?.addEventListener("change", updateMarkerFromInputs);
     $v("vf-lng")?.addEventListener("change", updateMarkerFromInputs);
 
-    initAnalytics(getTours, vacLang);
+    // Dates
+    $v("vac-date-add")?.addEventListener("click", () => {
+        formDates.push({ start: "", end: "" });
+        renderDatesListUI();
+    });
+    // initial attach for dates rendered by renderAddModal
+    const initialDatesList = $v("vac-dates-list");
+    if (initialDatesList) {
+        initialDatesList.querySelectorAll(".vac-date-remove").forEach(btn => {
+            btn.addEventListener("click", () => {
+                formDates.splice(parseInt(btn.dataset.idx), 1);
+                renderDatesListUI();
+            });
+        });
+        initialDatesList.querySelectorAll(".vac-date-input").forEach(inp => {
+            inp.addEventListener("change", (e) => {
+                const idx = parseInt(e.target.dataset.idx);
+                const field = e.target.dataset.field;
+                if (formDates[idx]) {
+                    formDates[idx][field] = e.target.value;
+                }
+            });
+        });
+    }
 };
 
 // Save current lang-tab values before switching tab
@@ -847,7 +963,7 @@ const saveLangTabValues = () => {
 };
 
 const rerenderImgArea = () => {
-    const tr = vacTranslations[vacLang] || vacTranslations.uz;
+    const tr = vacTranslations[getCurrentLang()] || vacTranslations.uz;
     // re-render cover
     const coverZone = $v("vac-cover-zone");
     if (coverZone) {
@@ -969,15 +1085,20 @@ const closeBookModal = () => {
 const updateBookModalUI = () => {
     const box = document.getElementById("vac-book-modal-box");
     if (box) {
+        const scrollTop = box.scrollTop;
         box.innerHTML = getBookModalHTML();
         attachBookModalEvents();
+        box.scrollTop = scrollTop;
     }
 };
 
-const openBookModal = () => {
+let myCards = [];
+
+const openBookModal = async () => {
     bookModalOpen = true;
     bookGuests = 1;
     bookSelectedMethodIdx = 0;
+    bookSelectedDateIdx = null;
     bookStep = 1;
 
     let ol = document.getElementById("vac-book-modal-container");
@@ -991,6 +1112,14 @@ const openBookModal = () => {
         ol.appendChild(inner);
         document.body.appendChild(ol);
     }
+    
+    try {
+        const res = await fetch(`${API_URL}/api/payments/methods`, { headers: getAuthHeaders(), credentials: "include" });
+        if (res.ok) {
+            myCards = await res.json();
+        }
+    } catch(e) {}
+
     updateBookModalUI();
 };
 
@@ -1017,6 +1146,13 @@ const attachBookModalEvents = () => {
             });
         });
 
+        document.querySelectorAll('input[name="b-date"]').forEach(r => {
+            r.addEventListener("change", (e) => {
+                bookSelectedDateIdx = parseInt(e.target.value);
+                updateBookModalUI();
+            });
+        });
+
         $v("vac-book-confirm")?.addEventListener("click", processTourPayment);
     }
 };
@@ -1027,18 +1163,11 @@ const processTourPayment = async () => {
     const totalCost = Number(t.price) * bookGuests;
 
     try {
-        const users = JSON.parse(localStorage.getItem("users")) || [];
-        const cu = getCurrentUser();
-        if (!cu) return;
-
-        const myUser = users.find(u => u.username === cu.username);
-        if (!myUser) return;
-
-        const method = myUser.paymentMethods && myUser.paymentMethods[bookSelectedMethodIdx];
+        const method = myCards[bookSelectedMethodIdx];
         if (!method) return;
 
         if (Number(method.balance) < totalCost) {
-            const btn = $v("vac-book-confirm");
+            const btn = document.getElementById("vac-book-confirm");
             if (btn) {
                 const oldHtml = btn.innerHTML;
                 const oldBg = btn.style.backgroundColor;
@@ -1052,47 +1181,39 @@ const processTourPayment = async () => {
             return;
         }
 
-        // Deduct balance
-        method.balance = Number(method.balance) - totalCost;
+        if ((t.dates && t.dates.length > 0) && bookSelectedDateIdx === null) {
+            alert("Iltimos, borish sanasini tanlang");
+            return;
+        }
 
-        // Add payment record
-        if (!myUser.payments) myUser.payments = [];
-        const name = ml(t.name, vacLang);
-        myUser.payments.push({
-            docNumber: `TOUR/${Date.now()}`,
-            desc: `Tur to'lovi: ${name} (${bookGuests} kishi)`,
-            amount: totalCost,
-            recipientName: "Workroom Agency",
-            status: "paid",
-            isIncoming: false,
-            date: new Date().toLocaleDateString(),
-            time: new Date().toLocaleTimeString(),
-            createDate: new Date().toLocaleDateString(),
-            createTime: new Date().toLocaleTimeString(),
-            method: method.type
-        });
+        let selectedDateObj = null;
+        if (t.dates && t.dates[bookSelectedDateIdx]) {
+            selectedDateObj = t.dates[bookSelectedDateIdx];
+        }
 
         // Save booking to backend API
         try {
-            await fetch(`${API_URL}/api/vacations/${t.id}/book`, {
+            const res = await fetch(`${API_URL}/api/vacations/${t.id}/book`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...getAuthHeaders() },
                 credentials: "include",
                 body: JSON.stringify({
                     guests: bookGuests,
                     totalCost,
-                    paymentMethod: { type: method.type, number: method.number || method.displayNumber }
+                    paymentMethod: { type: method.type, number: method.number || method.displayNumber },
+                    paymentMethodId: method._id,
+                    selectedDate: selectedDateObj
                 })
             });
+            if (!res.ok) {
+                const err = await res.json();
+                alert(err.message || "Xatolik yuz berdi");
+                return;
+            }
         } catch (e) {
             console.error("Booking API error:", e);
+            return;
         }
-
-        // Save back
-        localStorage.setItem("users", JSON.stringify(users));
-        
-        // We don't save to localStorage anymore as per JWT requirements.
-        // The current user state is managed in the API cache.
 
         bookStep = 2; // Success step
         updateBookModalUI();
@@ -1120,7 +1241,7 @@ const attachDetailEvents = () => {
 
     const t = getTours().find((x) => x.id === detailTourId);
     const imgs = t?.images && t.images.length ? t.images : [t?.coverImage || ""];
-    const name = ml(t?.name || "", vacLang);
+    const name = ml(t?.name || "", getCurrentLang());
 
     // Prev / Next arrows on main image
     const updateMainImg = () => {
@@ -1394,6 +1515,7 @@ const saveTourForm = async () => {
         images: images.length ? images : oldTour?.images || [],
         lat: parseFloat($v("vf-lat")?.value) || null,
         lng: parseFloat($v("vf-lng")?.value) || null,
+        dates: formDates.filter(d => d.start && d.end)
     };
 
     try {
@@ -1672,6 +1794,7 @@ export const initVacationsLogic = async () => {
 
 // ─── DELETE CONFIRM MODAL ─────────────────────
 const openDeleteModal = (tourId, onConfirm) => {
+    const vacLang = getCurrentLang();
     const tr = vacTranslations[vacLang] || vacTranslations.uz;
     const tour = getTours().find((t) => t.id === tourId);
 

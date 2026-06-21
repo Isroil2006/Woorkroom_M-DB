@@ -94,6 +94,11 @@ const translations = {
     high: "Yuqori",
     medium: "O'rta",
     low: "Past",
+    all_events: "Barchasi",
+    tasks: "Vazifalar",
+    tests: "Testlar",
+    vacations: "Sayohatlar",
+    payments: "To'lovlar",
   },
   ru: {
     title: "Календарь",
@@ -132,6 +137,11 @@ const translations = {
     high: "Высокий",
     medium: "Средний",
     low: "Низкий",
+    all_events: "Все",
+    tasks: "Задачи",
+    tests: "Тесты",
+    vacations: "Путешествия",
+    payments: "Платежи",
   },
   en: {
     title: "Calendar",
@@ -170,6 +180,11 @@ const translations = {
     high: "High",
     medium: "Medium",
     low: "Low",
+    all_events: "All Events",
+    tasks: "Tasks",
+    tests: "Tests",
+    vacations: "Vacations",
+    payments: "Payments",
   },
 };
 
@@ -278,6 +293,94 @@ const collectAllEvents = async () => {
     console.error("Failed to fetch calendar events:", err);
   }
 
+  // To'lovlarni yuklab olish
+  try {
+    const resPmt = await fetch(`${BASE_URL}/api/payments/transactions`, {
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
+    if (resPmt.ok) {
+      const pmtData = await resPmt.json();
+      if (Array.isArray(pmtData)) {
+        pmtData.forEach((pmt) => {
+          const pmtDate = parseDate(pmt.createdAt || pmt.date);
+          if (pmtDate) {
+            events.push({
+              id: `pmt_${pmt._id}`,
+              type: pmt.amount >= 0 ? EVENT_TYPES.PAYMENT_RECEIVED : EVENT_TYPES.PAYMENT_SENT,
+              title: pmt.desc || pmt.description || `To'lov: ${pmt.amount} UZS`,
+              startDate: pmtDate,
+              endDate: pmtDate,
+              date: dateToString(pmtDate),
+              dateObj: pmtDate,
+              timeStr: "",
+              status: "done",
+              priority: "medium",
+              project: "To'lovlar",
+              assignees: [],
+            });
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Failed to fetch payments for calendar:", err);
+  }
+
+  // Sayohatlarni yuklab olish
+  try {
+    const resVac = await fetch(`${BASE_URL}/api/vacations/my-bookings`, {
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
+    if (resVac.ok) {
+      const vacData = await resVac.json();
+      if (vacData && vacData.success && Array.isArray(vacData.data)) {
+        vacData.data.forEach((booking) => {
+          let startDate, endDate;
+          if (booking.selectedDate && booking.selectedDate.start && booking.selectedDate.end) {
+              startDate = parseDate(booking.selectedDate.start);
+              endDate = parseDate(booking.selectedDate.end);
+          } else {
+              startDate = parseDate(booking.createdAt);
+              if (startDate && booking.vacationId) {
+                  endDate = new Date(startDate);
+                  endDate.setDate(endDate.getDate() + (booking.vacationId.days || 1) - 1);
+              }
+          }
+
+          if (startDate && endDate && booking.vacationId) {
+            const vacName = booking.vacationId.name;
+            const title = typeof vacName === 'object' ? (vacName[currentLangLocal] || vacName.uz || "Sayohat") : (vacName || "Sayohat");
+            
+            const now = new Date();
+            now.setHours(0,0,0,0);
+            const endCompare = new Date(endDate);
+            endCompare.setHours(0,0,0,0);
+            const isFinished = now > endCompare;
+
+            events.push({
+              id: `vac_${booking._id}`,
+              type: EVENT_TYPES.VACATION_BOOKED,
+              title: title,
+              startDate: startDate,
+              endDate: endDate,
+              date: dateToString(startDate),
+              dateObj: startDate,
+              timeStr: "",
+              status: isFinished ? "done" : (booking.status === "confirmed" ? "progress" : "todo"),
+              priority: "high",
+              project: "Sayohatlar",
+              assignees: [],
+            });
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Failed to fetch vacations for calendar:", err);
+  }
+
   return events;
 };
 
@@ -337,6 +440,19 @@ export const InfoPortalPage = () => `
                     <button class="cal-view-option ${currentView === 'horizontal' ? 'active' : ''}" data-view="horizontal">${t("horizontal")}</button>
                 </div>
             </div>
+            <div class="cal-view-dropdown" id="cal-filter-dropdown" style="margin-left: 10px;">
+                <button class="cal-view-btn" id="cal-filter-btn">
+                    <span id="cal-filter-label">${t(currentFilter === 'all' ? 'all_events' : currentFilter)}</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="cal-view-menu" id="cal-filter-menu">
+                    <button class="cal-filter-option ${currentFilter === 'all' ? 'active' : ''}" data-filter="all">${t("all_events")}</button>
+                    <button class="cal-filter-option ${currentFilter === 'tasks' ? 'active' : ''}" data-filter="tasks">${t("tasks")}</button>
+                    <button class="cal-filter-option ${currentFilter === 'tests' ? 'active' : ''}" data-filter="tests">${t("tests")}</button>
+                    <button class="cal-filter-option ${currentFilter === 'vacations' ? 'active' : ''}" data-filter="vacations">${t("vacations")}</button>
+                    <button class="cal-filter-option ${currentFilter === 'payments' ? 'active' : ''}" data-filter="payments">${t("payments")}</button>
+                </div>
+            </div>
         </div>
         <div class="cal-header-right">
             <button class="cal-today-btn" id="cal-today-btn">${t("today")}</button>
@@ -376,6 +492,7 @@ export const InfoPortalPage = () => `
 
 let viewDate = new Date();
 let currentView = "month";
+let currentFilter = "all";
 let selectedDate = null;
 let cachedEvents = null;
 let expandedDate = null; // Google style popover date
@@ -391,8 +508,20 @@ const invalidateCache = () => {
   cachedEvents = null;
 };
 
-const getEventsForDate = async (dateStr) => {
+const getFilteredEvents = async () => {
   const allEvents = await getCachedEvents();
+  if (currentFilter === "all") return allEvents;
+  return allEvents.filter(e => {
+    if (currentFilter === 'tasks') return e.type === EVENT_TYPES.TASK_DUE || e.type === EVENT_TYPES.TASK_ASSIGNED;
+    if (currentFilter === 'tests') return e.type === EVENT_TYPES.TEST_COMPLETED;
+    if (currentFilter === 'vacations') return e.type === EVENT_TYPES.VACATION_BOOKED;
+    if (currentFilter === 'payments') return e.type === EVENT_TYPES.PAYMENT_RECEIVED || e.type === EVENT_TYPES.PAYMENT_SENT;
+    return true;
+  });
+};
+
+const getEventsForDate = async (dateStr) => {
+  const allEvents = await getFilteredEvents();
   const targetDate = parseDate(dateStr);
   return allEvents.filter((e) => {
     const start = e.startDate || e.dateObj || parseDate(e.date);
@@ -487,8 +616,8 @@ const renderMonthView = async () => {
         return bLen - aLen;
       });
 
-      // Show tasks on all days between start and end
-      const filteredEvents = sortedEvents;
+      // Show tasks on all days between start and end (filter out payments from being shown as bars)
+      const filteredEvents = sortedEvents.filter(e => e.type !== EVENT_TYPES.PAYMENT_RECEIVED && e.type !== EVENT_TYPES.PAYMENT_SENT);
 
       if (filteredEvents.length > 0) {
         const maxVisible = 2;
@@ -520,7 +649,8 @@ const renderMonthView = async () => {
           }
 
           let cfg = statusColors[visibleStatus] || statusColors.todo;
-          if (isEnd) cfg = { bg: "#fff5f5", border: "#fecaca", text: "#991b1b" };
+          if (e.type === EVENT_TYPES.VACATION_BOOKED) cfg = eventColors[e.type] || cfg;
+          else if (isEnd) cfg = { bg: "#fff5f5", border: "#fecaca", text: "#991b1b" };
 
           const isDone = visibleStatus === "done";
           const classes = ["cal-task-bar", isEnd ? "is-deadline" : "", isDone ? "is-done" : ""].join(" ");
@@ -572,9 +702,15 @@ const renderMonthView = async () => {
       }
     }
 
+    const hasPayments = dayEvents.some(e => e.type === EVENT_TYPES.PAYMENT_RECEIVED || e.type === EVENT_TYPES.PAYMENT_SENT);
+    const moneyIconHtml = hasPayments ? `<span style="color:#10b981; margin-left:5px; display:inline-flex; align-items:center; width:14px; height:14px;" title="To'lovlar mavjud">${eventIcons[EVENT_TYPES.PAYMENT_RECEIVED] || "💰"}</span>` : "";
+
     html += `
             <div class="${dayClasses}" data-date="${dateStr}">
-                <span class="cal-day-number">${day}</span>
+                <div style="display:flex;align-items:center;margin-bottom:6px;">
+                   <span class="cal-day-number" style="margin-bottom:0;">${day}</span>
+                   ${moneyIconHtml}
+                </div>
                 <div class="cal-day-tasks">${barsHtml}</div>
             </div>
         `;
@@ -745,12 +881,13 @@ const renderHorizontalView = async () => {
   const lastDay = new Date(year, month + 1, 0);
   const daysInMonth = lastDay.getDate();
 
-  const allEvents = await getCachedEvents();
+  const allEvents = await getFilteredEvents();
   
   const projects = {};
   const oneDayTasksSet = new Set();
   
   allEvents.forEach(e => {
+      if (e.type === EVENT_TYPES.PAYMENT_RECEIVED || e.type === EVENT_TYPES.PAYMENT_SENT) return;
       const start = e.startDate || e.dateObj || parseDate(e.date);
       const end = e.endDate || e.dateObj || parseDate(e.date);
       if (!start || !end) return;
@@ -835,7 +972,8 @@ const renderHorizontalView = async () => {
             done: { bg: "#f0fdf4", border: "#bbf7d0", text: "#15803d" },
             cancelled: { bg: "#fef2f2", border: "#fecaca", text: "#b91c1c" },
           };
-          const cfg = statusColors[visibleStatus] || statusColors.todo;
+          let cfg = statusColors[visibleStatus] || statusColors.todo;
+          if (task.type === EVENT_TYPES.VACATION_BOOKED) cfg = eventColors[task.type] || cfg;
 
           html += `<div class="gantt-task-row" style="grid-template-columns: ${gridColumnsStr};">
               <div class="gantt-task-title" title="${task.title}">
@@ -877,8 +1015,6 @@ const renderHorizontalView = async () => {
 
 const showEventDetails = async (dateStr) => {
   const currentLang = getCurrentLang();
-  invalidateCache();
-  const events = await getEventsForDate(dateStr);
   const panel = document.getElementById("cal-events-panel");
   const dateHeader = document.getElementById("cal-events-date");
   const eventsList = document.getElementById("cal-events-list");
@@ -887,6 +1023,22 @@ const showEventDetails = async (dateStr) => {
 
   selectedDate = dateStr;
   dateHeader.textContent = dateStr;
+
+  panel.classList.add("active");
+  document.getElementById("cal-panel-overlay")?.classList.add("active");
+  
+  eventsList.innerHTML = `
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 200px;">
+        <div style="width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #5b6ef5; border-radius: 50%; animation: cal-spin 0.8s linear infinite;"></div>
+        <style>@keyframes cal-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+    </div>
+  `;
+
+  // Start rendering calendar in background to show selected state immediately
+  renderCalendar();
+
+  invalidateCache();
+  const events = await getEventsForDate(dateStr);
 
   if (events.length === 0) {
     eventsList.innerHTML = `<div class="cal-no-events"><p>${t("noEvents")}</p></div>`;
@@ -901,6 +1053,15 @@ const showEventDetails = async (dateStr) => {
       .map((e) => {
         const color = eventColors[e.type] || eventColors[EVENT_TYPES.TASK_DUE];
         const isTask = e.type === EVENT_TYPES.TASK_DUE || e.type === EVENT_TYPES.TASK_ASSIGNED;
+
+        const isPayment = e.type === EVENT_TYPES.PAYMENT_RECEIVED || e.type === EVENT_TYPES.PAYMENT_SENT;
+        const isVacation = e.type === EVENT_TYPES.VACATION_BOOKED;
+
+        let typeLabel = "task";
+        if (isVacation) typeLabel = "vacationBooked";
+        else if (e.type === EVENT_TYPES.PAYMENT_SENT) typeLabel = "paymentSent";
+        else if (e.type === EVENT_TYPES.PAYMENT_RECEIVED) typeLabel = "paymentReceived";
+        else if (e.type === EVENT_TYPES.TEST_COMPLETED) typeLabel = "testCompleted";
 
         // Assignee avatars
         const allUsers = getUsers();
@@ -934,40 +1095,52 @@ const showEventDetails = async (dateStr) => {
         const borderColor = isDone ? "#22c55e" : color.border;
         const badgeColors = isDone ? { bg: "#dcfce7", text: "#16a34a" } : color;
 
+        let projectIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="M3 9V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4"/></svg>`;
+        if (isPayment) projectIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>`;
+        if (isVacation) projectIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
+
+        let extraStyles = "";
+        if (isPayment) {
+            extraStyles = `border-left: 4px solid ${color.border}; background: ${color.bg}33;`;
+        } else if (isVacation) {
+            extraStyles = `border-left: 4px solid ${color.border}; background: ${color.bg}40; border-radius: 12px;`;
+        }
+
         return `
-                <div class="cal-event-item ${isDone ? "is-done" : ""}">
+                <div class="cal-event-item ${isDone ? "is-done" : ""}" style="${extraStyles}">
                     <div class="cal-event-item-top">
                         <div class="cal-event-type-badge" style="background: ${badgeColors.bg}; color: ${badgeColors.text}">
                              ${eventIcons[e.type] || eventIcons[EVENT_TYPES.TASK_DUE]}
-                             <span>${t("task")}</span>
+                             <span>${t(typeLabel)}</span>
                         </div>
-                        <div class="cal-event-time">${e.timeStr || ""}</div>
+                        <div class="cal-event-time">${e.timeStr || (isPayment ? dateToString(e.startDate) : "")}</div>
                     </div>
 
-                    <h4 class="cal-event-item-title">${e.title}</h4>
+                    <h4 class="cal-event-item-title" style="${isPayment || isVacation ? 'font-size: 15px; margin-bottom: 8px;' : ''}">${e.title}</h4>
                     
                     <div class="cal-event-item-project">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="M3 9V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4"/></svg>
+                        ${projectIcon}
                         <span>${e.project || "No Project"}</span>
                     </div>
 
+                    ${!isPayment && !isVacation ? `
                     <div class="cal-event-item-footer">
                         <div class="cal-event-meta-group">
                             ${e.priority ? `<span class="cal-priority-tag" style="background: ${pColor.bg}; color: ${pColor.text}" title="${t("priority")}">${t("priority")}: ${t(e.priority.toLowerCase())}</span>` : ""}
                             ${e.status ? `<span class="cal-status-tag" title="${t("status")}">${t("status")}: ${t(e.status.toLowerCase())}</span>` : ""}
                         </div>
+                        ${assigneeAvatars ? `
                         <div class="cal-event-assignees">
                             ${assigneeAvatars}
-                        </div>
-                    </div>
+                        </div>` : ""}
+                    </div>` : ""}
                 </div>
             `;
       })
       .join("");
   }
-
-  panel.classList.add("active");
-  document.getElementById("cal-panel-overlay")?.classList.add("active");
+  // Update the calendar again if needed, but it was already called with cache invalidation above
+  // so `events` fetch updated the cache. We can just call it once more to ensure everything is perfect.
   renderCalendar();
 };
 
@@ -1020,6 +1193,15 @@ export const initInfoPortalLogic = async () => {
       }
     });
 
+    const filterLabel = document.getElementById("cal-filter-label");
+    if (filterLabel) filterLabel.textContent = t(currentFilter === 'all' ? 'all_events' : currentFilter);
+
+    document.querySelectorAll(".cal-filter-option").forEach((opt) => {
+      if (opt.dataset.filter) {
+        opt.textContent = t(opt.dataset.filter === 'all' ? 'all_events' : opt.dataset.filter);
+      }
+    });
+
     animateAndRenderCalendar();
     if (selectedDate) {
       showEventDetails(selectedDate);
@@ -1045,6 +1227,27 @@ export const initInfoPortalLogic = async () => {
       currentView = opt.dataset.view;
       document.getElementById("cal-view-label").textContent = t(currentView);
       viewMenu?.classList.remove("active");
+      animateAndRenderCalendar();
+    });
+  });
+
+  const filterBtn = document.getElementById("cal-filter-btn");
+  const filterMenu = document.getElementById("cal-filter-menu");
+
+  filterBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    filterMenu?.classList.toggle("active");
+  });
+
+  document.addEventListener("click", () => filterMenu?.classList.remove("active"));
+
+  document.querySelectorAll(".cal-filter-option").forEach((opt) => {
+    opt.addEventListener("click", () => {
+      document.querySelectorAll(".cal-filter-option").forEach((o) => o.classList.remove("active"));
+      opt.classList.add("active");
+      currentFilter = opt.dataset.filter;
+      document.getElementById("cal-filter-label").textContent = t(currentFilter === 'all' ? 'all_events' : currentFilter);
+      filterMenu?.classList.remove("active");
       animateAndRenderCalendar();
     });
   });

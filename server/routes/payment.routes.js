@@ -12,6 +12,7 @@ router.delete("/methods/:id", auth, paymentController.deleteMethod);
 router.get("/transactions", auth, paymentController.getTransactions);
 router.post("/transactions", auth, paymentController.createTransaction);
 router.post("/send/:transactionId", auth, paymentController.executeTransaction);
+router.delete("/transactions/:transactionId", auth, paymentController.deleteTransaction);
 
 // ─── STATS & USERS ─────────────────────────────────────────────
 router.get("/stats", auth, paymentController.getStats);
