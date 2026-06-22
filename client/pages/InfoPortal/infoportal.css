@@ -42,6 +42,7 @@
 
 .cal-view-dropdown {
     position: relative;
+    margin-left: 0 !important;
 }
 
 .cal-view-btn {

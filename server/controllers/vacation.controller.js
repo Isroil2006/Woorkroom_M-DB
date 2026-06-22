@@ -31,7 +31,7 @@ const SAMPLE_TOURS = [
     price: 2400,
     days: 7,
     nights: 6,
-    rating: 4,
+    rating: 5,
     description: {
       uz: "Tinch okeaning musaffo suvlari, oq qumli plyajlar va suv osti dunyosining go'zalligini his eting.",
       ru: "Кристально чистые воды Тихого океана, белоснежные пляжи и красота подводного мира.",
@@ -46,6 +46,33 @@ const SAMPLE_TOURS = [
     images: ["https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=800&q=80", "https://images.unsplash.com/photo-1573843981267-be1ceee2e0e3?w=800&q=80", "https://images.unsplash.com/photo-1541480551145-2370a440d585?w=800&q=80"],
     lat: 4.1755,
     lng: 73.5093,
+    hotels: [
+      {
+        id: "h_maldives_1",
+        name: { uz: "Soneva Fushi Resort & Spa", ru: "Soneva Fushi Resort & Spa", en: "Soneva Fushi Resort & Spa" },
+        country: { uz: "Maldiv", ru: "Мальдивы", en: "Maldives" },
+        city: { uz: "Baa Atoll", ru: "Баа Атолл", en: "Baa Atoll" },
+        rating: 5,
+        description: { uz: "Haqiqiy jannatmakon orolda joylashgan 5 yulduzli premium mehmonxona. Suv ustidagi villalar va shaxsiy plyaj.", ru: "5-звездочный отель премиум-класса на райском острове.", en: "5-star premium resort located on a paradise island." },
+        included: { uz: ["Pool", "Spa", "Wi-Fi", "Beach"], ru: ["Pool", "Spa", "Wi-Fi", "Beach"], en: ["Pool", "Spa", "Wi-Fi", "Beach"] },
+        coverImage: "https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=800&q=80",
+        images: ["https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=800&q=80", "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800&q=80"],
+        rooms: [
+          {
+            id: "r_maldives_1_1",
+            name: { uz: "Standart Villa", ru: "Стандартная Вилла", en: "Standard Villa" },
+            images: ["https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&q=80"],
+            prices: [{ beds: 1, price: 150 }, { beds: 2, price: 250 }]
+          },
+          {
+            id: "r_maldives_1_2",
+            name: { uz: "Premium Suv Usti Villasi", ru: "Премиум Вилла на Воде", en: "Premium Water Villa" },
+            images: ["https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&q=80"],
+            prices: [{ beds: 2, price: 450 }, { beds: 3, price: 600 }]
+          }
+        ]
+      }
+    ]
   },
   {
     dates: getDates(15, 8, 10, 30),
@@ -71,6 +98,27 @@ const SAMPLE_TOURS = [
     images: ["https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80", "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=800&q=80", "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80"],
     lat: 46.6863,
     lng: 7.8632,
+    hotels: [
+      {
+        id: "h_swiss_1",
+        name: { uz: "Alpenrose Hotel & Gardens", ru: "Alpenrose Hotel & Gardens", en: "Alpenrose Hotel & Gardens" },
+        country: { uz: "Shveytsariya", ru: "Швейцария", en: "Switzerland" },
+        city: { uz: "Interlaken", ru: "Интерлакен", en: "Interlaken" },
+        rating: 4,
+        description: { uz: "Ajoyib Alp tog'lari manzarasi ostida joylashgan klassik Shveytsariya mehmonxonasi.", ru: "Классический швейцарский отель с великолепным видом на Альпы.", en: "Classic Swiss hotel with magnificent Alpine views." },
+        included: { uz: ["Wi-Fi", "Breakfast", "Heater"], ru: ["Wi-Fi", "Breakfast", "Heater"], en: ["Wi-Fi", "Breakfast", "Heater"] },
+        coverImage: "https://images.unsplash.com/photo-1548625361-b4844ce4a643?w=800&q=80",
+        images: ["https://images.unsplash.com/photo-1548625361-b4844ce4a643?w=800&q=80"],
+        rooms: [
+          {
+            id: "r_swiss_1_1",
+            name: { uz: "Tog' Manzarali Xona", ru: "Номер с видом на горы", en: "Mountain View Room" },
+            images: ["https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&q=80"],
+            prices: [{ beds: 1, price: 120 }, { beds: 2, price: 200 }, { beds: 3, price: 270 }]
+          }
+        ]
+      }
+    ]
   },
   {
     dates: getDates(5, 5, 3, 15),
@@ -81,7 +129,7 @@ const SAMPLE_TOURS = [
     price: 1850,
     days: 5,
     nights: 4,
-    rating: 4,
+    rating: 5,
     description: {
       uz: "Zamonaviy me'morchilik, hashamatli xarid markazlari va Burj Khalifa.",
       ru: "Современная архитектура, роскошные торговые центры и Бурдж-Халифа.",
@@ -96,6 +144,27 @@ const SAMPLE_TOURS = [
     images: ["https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=800&q=80", "https://images.unsplash.com/photo-1582672060674-bc2bd808a8b5?w=800&q=80", "https://images.unsplash.com/photo-1526495124232-a04e1849168c?w=800&q=80"],
     lat: 25.2048,
     lng: 55.2708,
+    hotels: [
+      {
+        id: "h_dubai_1",
+        name: { uz: "Burj Al Arab Jumeirah", ru: "Бурдж-эль-Араб Джумейра", en: "Burj Al Arab Jumeirah" },
+        country: { uz: "BAA", ru: "ОАЭ", en: "UAE" },
+        city: { uz: "Dubay", ru: "Дубай", en: "Dubai" },
+        rating: 5,
+        description: { uz: "Dunyoning eng hashamatli mehmonxonasida beqiyos xizmat va qulayliklar.", ru: "Непревзойденный сервис в самом роскошном отеле мира.", en: "Unmatched service and facilities in the world's most luxurious hotel." },
+        included: { uz: ["Wi-Fi", "Pool", "Gym", "Breakfast"], ru: ["Wi-Fi", "Pool", "Gym", "Breakfast"], en: ["Wi-Fi", "Pool", "Gym", "Breakfast"] },
+        coverImage: "https://images.unsplash.com/photo-1582672060674-bc2bd808a8b5?w=800&q=80",
+        images: ["https://images.unsplash.com/photo-1582672060674-bc2bd808a8b5?w=800&q=80"],
+        rooms: [
+          {
+            id: "r_dubai_1_1",
+            name: { uz: "Royal Suite", ru: "Королевский Люкс", en: "Royal Suite" },
+            images: ["https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=800&q=80"],
+            prices: [{ beds: 2, price: 1000 }, { beds: 4, price: 1800 }]
+          }
+        ]
+      }
+    ]
   },
   {
     dates: getDates(20, 10, 12, 40),
@@ -121,8 +190,30 @@ const SAMPLE_TOURS = [
     images: ["https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&q=80", "https://images.unsplash.com/photo-1552733407-5d5c46c3bb3b?w=800&q=80", "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80"],
     lat: -8.5069,
     lng: 115.2625,
+    hotels: [
+      {
+        id: "h_bali_1",
+        name: { uz: "Ubud Eco Resort", ru: "Убуд Эко Резорт", en: "Ubud Eco Resort" },
+        country: { uz: "Indoneziya", ru: "Индонезия", en: "Indonesia" },
+        city: { uz: "Ubud", ru: "Убуд", en: "Ubud" },
+        rating: 4,
+        description: { uz: "Tabiat qo'ynidagi tinchlantiruvchi ekologik toza maskan.", ru: "Успокаивающий экологичный курорт на лоне природы.", en: "Relaxing eco-friendly resort surrounded by nature." },
+        included: { uz: ["Yoga", "Vegan Breakfast", "Wi-Fi"], ru: ["Yoga", "Vegan Breakfast", "Wi-Fi"], en: ["Yoga", "Vegan Breakfast", "Wi-Fi"] },
+        coverImage: "https://images.unsplash.com/photo-1552733407-5d5c46c3bb3b?w=800&q=80",
+        images: ["https://images.unsplash.com/photo-1552733407-5d5c46c3bb3b?w=800&q=80"],
+        rooms: [
+          {
+            id: "r_bali_1_1",
+            name: { uz: "Bambuk Uycha", ru: "Бамбуковый Домик", en: "Bamboo Hut" },
+            images: ["https://images.unsplash.com/photo-1587061949409-02df41d5e562?w=800&q=80"],
+            prices: [{ beds: 1, price: 80 }, { beds: 2, price: 130 }]
+          }
+        ]
+      }
+    ]
   },
 ];
+
 
 exports.getAllVacations = async (req, res) => {
   try {
@@ -131,6 +222,22 @@ exports.getAllVacations = async (req, res) => {
     // Seed initial data if db is empty
     if (vacations.length === 0) {
       vacations = await Vacation.insertMany(SAMPLE_TOURS);
+    } else {
+      // Automatically patch missing hotels for existing tours
+      let needsRefresh = false;
+      for (let v of vacations) {
+        if (!v.hotels || v.hotels.length === 0) {
+          const sample = SAMPLE_TOURS.find(s => s.category === v.category);
+          if (sample && sample.hotels) {
+            v.hotels = sample.hotels;
+            await v.save();
+            needsRefresh = true;
+          }
+        }
+      }
+      if (needsRefresh) {
+        vacations = await Vacation.find();
+      }
     }
     
     // Convert to frontend expected format mapping _id to id

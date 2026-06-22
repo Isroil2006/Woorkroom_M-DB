@@ -249,31 +249,41 @@ exports.getTasks = async (req, res) => {
 
 exports.createTask = async (req, res) => {
   try {
+    const assignees = req.body.assignees && req.body.assignees.length > 0 
+      ? req.body.assignees 
+      : [req.user.userId];
+
     const taskData = {
       ...req.body,
+      assignees,
       createdBy: req.user.userId // Tokendan avtomatik olish
     };
     const task = new Task(taskData);
     const saved = await task.save();
 
+    const populated = await Task.findById(saved._id)
+      .populate("assignees", "username avatar email")
+      .populate("createdBy", "username avatar")
+      .populate("files", "fileName fileType fileSize");
+
     // Log history
     try {
       const projHistory = new ProjectHistory({
         action: "task_created",
-        projectId: saved.project,
+        projectId: populated.project,
         user: req.user.userId,
         details: {
-          task: saved._id,
-          taskTitle: saved.title
+          task: populated._id,
+          taskTitle: populated.title
         }
       });
       await projHistory.save();
 
       const taskHistory = new TaskHistory({
         action: "created",
-        taskId: saved._id,
-        taskTitle: saved.title,
-        projectId: saved.project,
+        taskId: populated._id,
+        taskTitle: populated.title,
+        projectId: populated.project,
         user: req.user.userId,
       });
       await taskHistory.save();
@@ -281,7 +291,7 @@ exports.createTask = async (req, res) => {
       console.error("Failed to save task history log:", errHistory);
     }
 
-    res.status(201).json(saved);
+    res.status(201).json(populated);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }

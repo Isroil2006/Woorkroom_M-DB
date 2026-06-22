@@ -524,6 +524,11 @@ window.addEventListener("popstate", (e) => {
 });
 
 const initNavigation = async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has("receiptData")) {
+    return;
+  }
+
   // 0. Initialize sidebar state and events
   updateSidebarUI();
   attachHoverEvents();

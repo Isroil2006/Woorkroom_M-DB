@@ -14,6 +14,12 @@ const vacationBookingSchema = new mongoose.Schema(
       start: { type: Date },
       end: { type: Date }
     },
+    hotelId: { type: String },
+    hotelName: { type: String },
+    roomId: { type: String },
+    roomName: { type: String },
+    roomBeds: { type: Number },
+    roomPrice: { type: Number },
     status: { type: String, enum: ["pending", "confirmed", "cancelled"], default: "confirmed" },
   },
   { timestamps: true }

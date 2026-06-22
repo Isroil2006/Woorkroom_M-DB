@@ -9,6 +9,46 @@ const langSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const roomPriceSchema = new mongoose.Schema(
+  {
+    beds: { type: Number, required: true },
+    price: { type: Number, required: true },
+  },
+  { _id: false }
+);
+
+const roomSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    name: { type: langSchema },
+    prices: [roomPriceSchema],
+    images: [{ type: String }],
+  },
+  { _id: false }
+);
+
+const hotelSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    name: { type: langSchema, required: true },
+    country: { type: langSchema },
+    city: { type: langSchema },
+    rating: { type: Number, default: 5 },
+    description: { type: langSchema },
+    included: {
+      uz: [{ type: String }],
+      ru: [{ type: String }],
+      en: [{ type: String }],
+    },
+    coverImage: { type: String },
+    images: [{ type: String }],
+    lat: { type: Number },
+    lng: { type: Number },
+    rooms: [roomSchema],
+  },
+  { _id: false }
+);
+
 const vacationSchema = new mongoose.Schema(
   {
     name: { type: langSchema, required: true },
@@ -16,7 +56,7 @@ const vacationSchema = new mongoose.Schema(
     city: { type: langSchema },
     category: {
       type: String,
-      enum: ["beach", "mountain", "city", "nature", "all"], // although "all" is a filter, keep standard ones
+      enum: ["beach", "mountain", "city", "nature", "all", "hotel"],
       default: "beach",
     },
     price: { type: Number, required: true, default: 0 },
@@ -37,6 +77,8 @@ const vacationSchema = new mongoose.Schema(
       start: { type: Date, required: true },
       end: { type: Date, required: true }
     }],
+    rooms: [roomSchema],
+    hotels: [hotelSchema],
   },
   { timestamps: true }
 );

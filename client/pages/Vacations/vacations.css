@@ -739,8 +739,6 @@
 }
 .vac-detail-side {
     flex: 0 0 300px;
-    position: sticky;
-    top: 40px;
 }
 
 .vac-detail-top-row {
@@ -949,6 +947,7 @@
     background: #fff;
     border-radius: 20px;
     width: 90%;
+    height: 820px;
     max-height: 94vh;
     display: flex;
     flex-direction: column;
@@ -975,6 +974,7 @@
 .vac-add-modal-body {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     display: grid;
     grid-template-columns: 1fr 1fr;
     min-height: 0;
@@ -1011,12 +1011,12 @@
 .vac-form-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
 }
 .vac-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: #8892a4;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -1806,4 +1806,1114 @@
 .vac-hotel-remove-btn:hover, .vac-room-remove-btn:hover {
     background: rgba(239, 68, 68, 0.1);
     border-radius: 6px;
+}
+
+/* Modal Header Tabs */
+.vac-add-modal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.vac-modal-header-tabs {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+.vac-modal-header-tab {
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    font-size: 20px;
+    font-weight: 700;
+    color: #8892a4;
+    cursor: pointer;
+    padding-bottom: 6px;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+.vac-modal-header-tab.active {
+    color: #1a1d2e;
+    border-bottom-color: #5b6ef5;
+}
+.vac-modal-header-tab:hover {
+    color: #1a1d2e;
+}
+
+/* Amenities Checkboxes */
+.vac-amenities-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 6px;
+}
+.vac-amenity-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+.vac-amenity-card:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+.vac-amenity-card.active {
+    background: #f0f4ff;
+    border-color: #5b6ef5;
+    box-shadow: 0 2px 8px rgba(91, 110, 245, 0.15);
+}
+.vac-amenity-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #5b6ef5;
+}
+.vac-amenity-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+    line-height: 1;
+}
+.vac-amenity-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+}
+.vac-amenity-card.active .vac-amenity-label {
+    color: #1e293b;
+}
+
+
+/* ==================================
+   HOTEL EDITOR (MULTI-HOTEL SIDEBAR)
+   ================================== */
+.vac-hotel-layout {
+    display: flex;
+    gap: 0;
+    height: 100%;
+    min-height: 500px;
+    background: #f8fafc;
+    border-radius: 12px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.vac-hotel-sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: #ffffff;
+    border-right: 1px solid #e2e8f0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+    box-sizing: border-box;
+}
+
+.qe-sidebar-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 15px;
+}
+
+.qe-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 5px;
+}
+
+.q-list-item {
+    padding: 12px 15px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.q-list-item:hover {
+    border-color: #cbd5e1;
+}
+.q-list-item.active {
+    border-color: #3b82f6;
+    border-left: 4px solid #3b82f6;
+    box-shadow: 0 4px 10px rgba(59, 130, 246, 0.08);
+}
+
+.q-list-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+.q-list-item-header strong {
+    font-size: 14px;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.q-dots-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+}
+.q-dots-btn:hover {
+    color: #ef4444;
+    background: #fef2f2;
+}
+
+.q-list-item p {
+    margin: 0;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.add-new-q-btn {
+    margin-top: 15px;
+    padding: 12px;
+    background: #ffffff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    color: #3b82f6;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.add-new-q-btn:hover {
+    border-color: #3b82f6;
+    background: #f0f9ff;
+}
+
+.vac-hotel-main {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 30px;
+    background: #f8fafc;
+    box-sizing: border-box;
+}
+
+.vac-hotel-main::-webkit-scrollbar,
+.qe-list::-webkit-scrollbar {
+    width: 5px;
+}
+.vac-hotel-main::-webkit-scrollbar-thumb,
+.qe-list::-webkit-scrollbar-thumb {
+    background: #dde1f3;
+    border-radius: 4px;
+}
+
+.settings-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.s-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.s-card h3 {
+    margin: 0;
+    color: #1e293b;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #64748b;
+}
+
+.vac-amenities-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 15px;
+}
+
+/* Hotel Image Custom Layout */
+.hf-image-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    display: flex;
+    background: #ffffff; /* Oq fon */
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+.hf-image-col {
+    padding: 20px 24px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.hf-image-col--left {
+    flex: 0 0 max-content;
+}
+.hf-image-col--right {
+    flex: 1.5; 
+}
+.hf-image-divider {
+    width: 1px;
+    background: #e2e8f0;
+}
+.hf-image-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+}
+.hf-image-card .vac-cover-upload {
+    border: 2px dashed #cbd5e1; /* Chiziq-chiziq border */
+    background: #f8fafc;
+    border-radius: 16px;
+    aspect-ratio: 1; 
+    height: auto;
+    width: 160px; /* Aniq o'lcham */
+    max-width: 100%;
+}
+.hf-image-card .vac-cover-img {
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+    border-radius: 14px;
+}
+.hf-image-card .vac-gallery-add-btn {
+    border: 2px dashed #cbd5e1; /* Chiziq-chiziq border */
+    background: #f8fafc;
+    border-radius: 16px;
+    aspect-ratio: 1;
+    width: 160px; /* Aniq o'lcham */
+    max-width: 100%;
+}
+.hf-image-card .vac-gallery-item {
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    width: 160px; /* Aniq o'lcham */
+    aspect-ratio: 1;
+}
+.hf-image-card .vac-gallery-thumb {
+    border-radius: 16px;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.hf-gallery-grid-custom {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.hf-image-card .vac-upload-placeholder svg stroke,
+.hf-image-card .vac-gallery-add-btn svg path {
+    stroke: #94a3b8;
+}
+
+/* Hotel Rooms */
+.hf-room-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+}
+.hf-room-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+.hf-room-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f1f5f9;
+}
+.hf-room-num {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1e293b;
+}
+.hf-room-remove {
+    background: #fee2e2;
+    color: #ef4444;
+    border: none;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.hf-room-remove:hover {
+    background: #fecaca;
+    color: #dc2626;
+}
+.hf-room-img-add {
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.hf-room-img-add:hover {
+    border-color: #94a3b8 !important;
+    background: #f1f5f9 !important;
+}
+
+/* ─── PREMIUM HOTEL CARDS (DETAIL VIEW) ─── */
+.vac-detail-hotels-section {
+    margin-top: 40px;
+    padding-top: 32px;
+    border-top: 1px solid #e2e8f0;
+}
+.vac-hotel-count-badge {
+    background: #eef2ff;
+    color: #5b6ef5;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+}
+.vac-detail-hotels-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+.vac-premium-hotel-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+}
+.vac-premium-hotel-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px -8px rgba(0,0,0,0.1);
+    border-color: #cbd5e1;
+}
+.vac-premium-hotel-left {
+    display: flex;
+    flex-direction: row;
+    flex: 1.4;
+    min-width: 0;
+    border-right: 1px solid #f1f5f9;
+}
+.vac-premium-hotel-img-wrap {
+    position: relative;
+    width: 240px;
+    height: 100%;
+    min-height: 250px;
+    flex-shrink: 0;
+}
+.vac-premium-hotel-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.vac-premium-hotel-img-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%);
+}
+.vac-premium-hotel-rating-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: #fbbf24;
+    font-size: 12px;
+    letter-spacing: 2px;
+}
+.vac-premium-hotel-price-badge {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    color: #fff;
+    font-size: 12px;
+    text-align: right;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+.vac-premium-hotel-price-badge strong {
+    font-size: 18px;
+    display: block;
+}
+.vac-premium-hotel-gallery-strip {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    display: flex;
+    gap: 4px;
+}
+.vac-premium-hotel-gallery-thumb {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.5);
+}
+.vac-premium-hotel-gallery-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.vac-premium-hotel-gallery-more {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+}
+.vac-premium-hotel-left-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+.vac-premium-hotel-header {
+    margin-bottom: 12px;
+}
+.vac-premium-hotel-name {
+    margin: 0 0 4px 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+}
+.vac-premium-hotel-location {
+    font-size: 13px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.vac-premium-hotel-desc {
+    font-size: 14px;
+    color: #475569;
+    line-height: 1.5;
+    margin: 0 0 16px 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.vac-premium-hotel-amenities {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 0px;
+}
+.vac-premium-amenity-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #475569;
+    font-weight: 500;
+}
+.vac-premium-hotel-right {
+    flex: 1;
+    padding: 20px;
+    background: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.vac-premium-rooms-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.vac-premium-rooms-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    max-height: 280px;
+    padding-right: 4px;
+}
+.vac-premium-room-card {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.vac-premium-room-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+.vac-premium-room-img-wrap {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.vac-premium-room-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.vac-premium-room-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-width: 0;
+}
+.vac-premium-room-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.vac-premium-room-prices {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.vac-premium-room-price-tag {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #64748b;
+}
+.vac-premium-room-price-tag .vac-beds {
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+.vac-premium-room-price-tag .vac-price {
+    font-weight: 700;
+    color: #10b981;
+    font-size: 13px;
+}
+
+/* ─── PREMIUM BOOKING MODAL ─── */
+.vac-book-modal-large {
+    max-width: 1100px !important;
+    width: 95% !important;
+    height: 90vh !important;
+    max-height: 900px !important;
+}
+.vac-book-step-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 32px;
+    padding: 0 20px;
+}
+.vac-book-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    z-index: 2;
+}
+.vac-book-step-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    border: 2px solid #e2e8f0;
+    transition: all 0.3s;
+}
+.vac-book-step-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+    position: absolute;
+    top: 40px;
+    white-space: nowrap;
+    transition: all 0.3s;
+}
+.vac-book-step.active .vac-book-step-circle {
+    background: #5b6ef5;
+    color: #fff;
+    border-color: #5b6ef5;
+    box-shadow: 0 0 0 4px rgba(91,110,245,0.2);
+}
+.vac-book-step.active .vac-book-step-label {
+    color: #5b6ef5;
+}
+.vac-book-step.done .vac-book-step-circle {
+    background: #10b981;
+    color: #fff;
+    border-color: #10b981;
+}
+.vac-book-step.done .vac-book-step-label {
+    color: #10b981;
+}
+.vac-book-step-line {
+    flex: 1;
+    height: 2px;
+    background: #e2e8f0;
+    margin: 0 16px;
+    transform: translateY(-12px);
+    transition: all 0.3s;
+}
+.vac-book-step-line.done {
+    background: #10b981;
+}
+
+/* Booking Step 2: Hotel Selection */
+.vac-book-hotels-premium {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.vac-book-hotel-premium {
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+.vac-book-hotel-premium:hover {
+    border-color: #cbd5e1;
+}
+.vac-book-hotel-premium.vac-selected {
+    border-color: #5b6ef5;
+    background: #f8faff;
+    box-shadow: 0 4px 12px rgba(91,110,245,0.1);
+}
+.vac-book-hotel-premium-top {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+}
+.vac-book-hotel-premium-img-wrap {
+    width: 120px;
+    height: 120px;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+}
+.vac-book-hotel-premium-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.vac-book-hotel-premium-stars {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0,0,0,0.6);
+    color: #fbbf24;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    letter-spacing: 1px;
+}
+.vac-book-hotel-premium-info {
+    flex: 1;
+    min-width: 0;
+}
+.vac-book-hotel-premium-radio-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+.vac-book-hotel-premium-radio-row input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #5b6ef5;
+    margin: 0;
+    cursor: pointer;
+}
+.vac-book-hotel-premium-name {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e293b;
+}
+.vac-book-hotel-premium-loc {
+    font-size: 13px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+.vac-book-hotel-premium-desc {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.4;
+    margin: 0 0 12px 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.vac-book-hotel-premium-amenities {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.vac-book-amenity-tag {
+    font-size: 11px;
+    font-weight: 500;
+    color: #5a6279;
+    background: #e2e8f0;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+.vac-book-hotel-premium.vac-selected .vac-book-amenity-tag {
+    background: #e0e7ff;
+    color: #4338ca;
+}
+
+.vac-book-hotel-rooms-expanded {
+    padding: 0 16px 16px 16px;
+    background: #f8faff;
+    border-top: 1px dashed #cbd5e1;
+}
+.vac-book-rooms-divider {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+    padding: 16px 0 12px 0;
+}
+.vac-book-rooms-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+.vac-book-room-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.vac-book-room-card-img {
+    height: 180px;
+    width: 100%;
+}
+.vac-book-room-card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.vac-book-room-card-body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+.vac-book-room-card-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 12px;
+}
+.vac-book-room-card-prices {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: auto;
+}
+.vac-book-room-price-option {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    background: #f8fafc;
+}
+.vac-book-room-price-option:hover {
+    border-color: #cbd5e1;
+}
+.vac-book-room-price-option.vac-selected {
+    border-color: #5b6ef5;
+    background: #edf2ff;
+}
+.vac-book-room-radio {
+    margin: 0 10px 0 0 !important;
+    accent-color: #5b6ef5;
+    width: 16px;
+    height: 16px;
+}
+.vac-book-room-price-content {
+    display: flex;
+    flex-direction: column;
+}
+.vac-book-room-beds-label {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 500;
+}
+.vac-book-room-price-amount {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+}
+.vac-book-room-price-option.vac-selected .vac-book-room-price-amount {
+    color: #5b6ef5;
+}
+.vac-book-room-selected-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #5b6ef5;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(91,110,245,0.2);
+}
+
+/* Booking Step 3: Summary */
+.vac-book-summary-section {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 24px;
+}
+.vac-book-summary-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #cbd5e1;
+}
+.vac-book-summary-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.vac-book-summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+}
+.vac-book-summary-item-label {
+    color: #64748b;
+}
+.vac-book-summary-item-val {
+    font-weight: 600;
+    color: #334155;
+    text-align: right;
+}
+
+/* Success Screen */
+.vac-book-success-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #d1fae5;
+    color: #10b981;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+}
+.vac-book-success-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 12px 0;
+    text-align: center;
+}
+.vac-book-success-desc {
+    font-size: 15px;
+    color: #64748b;
+    text-align: center;
+    margin: 0 0 24px 0;
+}
+.vac-book-summary-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.vac-book-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
+.vac-book-summary-row:last-child {
+    margin-top: 8px;
+    padding-top: 16px;
+    border-top: 1px dashed #cbd5e1;
+}
+.vac-book-summary-label {
+    color: #64748b;
+}
+.vac-book-summary-val {
+    font-weight: 600;
+    color: #1e293b;
+}
+.vac-book-summary-val-total {
+    font-size: 20px;
+    font-weight: 700;
+    color: #5b6ef5;
+}
+
+/* ─── NEW STEP 1 DESIGN ─── */
+.vac-book-step-grid {
+    animation: vacFadeIn 0.3s ease;
+}
+.vac-book-date-card {
+    display: block;
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+.vac-book-date-card:hover:not(.disabled) {
+    border-color: #cbd5e1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+.vac-book-date-card.vac-selected {
+    border: 2px solid #5b6ef5 !important;
+    padding: 16px !important;
+    border-radius: 12px !important;
+    background: #f8faff;
+    box-shadow: 0 4px 16px rgba(91,110,245,0.15);
+}
+.vac-book-hidden-radio {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.vac-book-date-card-top {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.vac-book-date-range {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+}
+.vac-book-date-card.vac-selected .vac-book-date-range {
+    color: #4338ca;
+}
+.vac-book-date-ended {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #ef4444;
+    background: #fef2f2;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+.vac-book-date-card.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #f8fafc;
+}
+
+@media (max-width: 768px) {
+    .vac-premium-hotel-card {
+        flex-direction: column;
+        min-height: auto;
+    }
+    .vac-premium-hotel-left {
+        flex-direction: column;
+        border-right: none;
+        border-bottom: 1px solid #f1f5f9;
+        flex: none;
+    }
+    .vac-premium-hotel-img-wrap {
+        width: 100%;
+        height: 200px;
+        min-height: 200px;
+    }
+    .vac-premium-hotel-right {
+        flex: none;
+        background: #f8fafc;
+    }
 }

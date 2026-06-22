@@ -10,7 +10,7 @@ export const SAMPLE_TOURS = [
         nights: 6,
         rating: 4,
         description: {
-            uz: "Tinch okeaning musaffo suvlari, oq qumli plyajlar va suv osti dunyosining go'zalligini his eting.",
+            uz: "Tinch okeanning musaffo suvlari, oq qumli plyajlar va suv osti dunyosining go'zalligini his eting.",
             ru: "Кристально чистые воды Тихого океана, белоснежные пляжи и красота подводного мира.",
             en: "Crystal clear Pacific waters, white sandy beaches and stunning underwater world.",
         },
@@ -24,6 +24,85 @@ export const SAMPLE_TOURS = [
         lat: 4.1755,
         lng: 73.5093,
         createdAt: new Date().toISOString(),
+        hotels: [
+            {
+                id: "h_maldiv_1",
+                name: { uz: "Soneva Fushi Resort", ru: "Soneva Fushi Resort", en: "Soneva Fushi Resort" },
+                country: { uz: "Maldiv", ru: "Мальдивы", en: "Maldives" },
+                city: { uz: "Baa Atoll", ru: "Атолл Баа", en: "Baa Atoll" },
+                rating: 5,
+                description: {
+                    uz: "Tropik o'rmon ichida joylashgan hashamatli resort. Shaxsiy plyaj, suv usti villalar va dunyoga mashhur SPA markazi.",
+                    ru: "Роскошный курорт в тропическом лесу. Частный пляж, виллы на воде и всемирно известный SPA-центр.",
+                    en: "Luxury resort nestled in tropical forest. Private beach, overwater villas and world-renowned SPA center.",
+                },
+                included: {
+                    uz: ["WiFi", "Baseyn", "Restoran", "Spa", "Parking"],
+                    ru: ["WiFi", "Бассейн", "Ресторан", "Spa", "Парковка"],
+                    en: ["WiFi", "Pool", "Restaurant", "Spa", "Parking"],
+                },
+                coverImage: "https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=800&q=80",
+                images: [
+                    "https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=800&q=80",
+                    "https://images.unsplash.com/photo-1540541338287-41700207dee6?w=800&q=80",
+                    "https://images.unsplash.com/photo-1602002418816-5c0aeef426aa?w=800&q=80",
+                ],
+                lat: 5.1068,
+                lng: 72.9635,
+                rooms: [
+                    {
+                        id: "r_sf_1",
+                        name: { uz: "Beach Villa", ru: "Пляжная вилла", en: "Beach Villa" },
+                        prices: [{ beds: 1, price: 450 }, { beds: 2, price: 680 }],
+                        images: ["https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&q=80"],
+                    },
+                    {
+                        id: "r_sf_2",
+                        name: { uz: "Suv usti Villa", ru: "Вилла на воде", en: "Overwater Villa" },
+                        prices: [{ beds: 1, price: 750 }, { beds: 2, price: 1100 }],
+                        images: ["https://images.unsplash.com/photo-1540541338287-41700207dee6?w=600&q=80"],
+                    },
+                ],
+            },
+            {
+                id: "h_maldiv_2",
+                name: { uz: "Baros Maldives", ru: "Baros Maldives", en: "Baros Maldives" },
+                country: { uz: "Maldiv", ru: "Мальдивы", en: "Maldives" },
+                city: { uz: "Shimoliy Malé", ru: "Северный Мале", en: "North Malé" },
+                rating: 5,
+                description: {
+                    uz: "Romantik juftliklar uchun ideal joy. Kristall tiniq suv, oq qum va shaxsiy villa.",
+                    ru: "Идеальное место для романтических пар. Кристально чистая вода, белый песок и частная вилла.",
+                    en: "Perfect for romantic couples. Crystal clear water, white sand and private villa.",
+                },
+                included: {
+                    uz: ["WiFi", "Baseyn", "Restoran", "Spa"],
+                    ru: ["WiFi", "Бассейн", "Ресторан", "Spa"],
+                    en: ["WiFi", "Pool", "Restaurant", "Spa"],
+                },
+                coverImage: "https://images.unsplash.com/photo-1573843981267-be1ceee2e0e3?w=800&q=80",
+                images: [
+                    "https://images.unsplash.com/photo-1573843981267-be1ceee2e0e3?w=800&q=80",
+                    "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800&q=80",
+                ],
+                lat: 4.2944,
+                lng: 73.4353,
+                rooms: [
+                    {
+                        id: "r_bm_1",
+                        name: { uz: "Deluxe Villa", ru: "Делюкс Вилла", en: "Deluxe Villa" },
+                        prices: [{ beds: 1, price: 380 }, { beds: 2, price: 550 }],
+                        images: ["https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80"],
+                    },
+                    {
+                        id: "r_bm_2",
+                        name: { uz: "Premium Suite", ru: "Премиум Сюит", en: "Premium Suite" },
+                        prices: [{ beds: 2, price: 900 }, { beds: 3, price: 1200 }],
+                        images: ["https://images.unsplash.com/photo-1590490360182-c33d57733427?w=600&q=80"],
+                    },
+                ],
+            },
+        ],
     },
     {
         id: "t_sample_2",
@@ -50,6 +129,84 @@ export const SAMPLE_TOURS = [
         lat: 46.6863,
         lng: 7.8632,
         createdAt: new Date().toISOString(),
+        hotels: [
+            {
+                id: "h_swiss_1",
+                name: { uz: "Victoria Jungfrau Grand Hotel", ru: "Victoria Jungfrau Grand Hotel", en: "Victoria Jungfrau Grand Hotel" },
+                country: { uz: "Shveytsariya", ru: "Швейцария", en: "Switzerland" },
+                city: { uz: "Interlaken", ru: "Интерлакен", en: "Interlaken" },
+                rating: 5,
+                description: {
+                    uz: "1865 yildan beri mehmonlarni qabul qilayotgan afsonaviy mehmonxona. Alp tog'larining ajoyib manzarasi.",
+                    ru: "Легендарный отель, принимающий гостей с 1865 года. Потрясающий вид на Альпы.",
+                    en: "Legendary hotel welcoming guests since 1865. Stunning views of the Alps.",
+                },
+                included: {
+                    uz: ["WiFi", "Baseyn", "Restoran", "Spa", "Sport zal", "Parking"],
+                    ru: ["WiFi", "Бассейн", "Ресторан", "Spa", "Спортзал", "Парковка"],
+                    en: ["WiFi", "Pool", "Restaurant", "Spa", "Gym", "Parking"],
+                },
+                coverImage: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800&q=80",
+                images: [
+                    "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800&q=80",
+                    "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80",
+                ],
+                lat: 46.6863,
+                lng: 7.8632,
+                rooms: [
+                    {
+                        id: "r_vj_1",
+                        name: { uz: "Classic Room", ru: "Классический номер", en: "Classic Room" },
+                        prices: [{ beds: 1, price: 320 }, { beds: 2, price: 480 }],
+                        images: ["https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=600&q=80"],
+                    },
+                    {
+                        id: "r_vj_2",
+                        name: { uz: "Alpine Suite", ru: "Альпийский Сюит", en: "Alpine Suite" },
+                        prices: [{ beds: 2, price: 850 }, { beds: 3, price: 1050 }],
+                        images: ["https://images.unsplash.com/photo-1590490360182-c33d57733427?w=600&q=80"],
+                    },
+                ],
+            },
+            {
+                id: "h_swiss_2",
+                name: { uz: "Hotel Bellevue", ru: "Hotel Bellevue", en: "Hotel Bellevue" },
+                country: { uz: "Shveytsariya", ru: "Швейцария", en: "Switzerland" },
+                city: { uz: "Interlaken", ru: "Интерлакен", en: "Interlaken" },
+                rating: 4,
+                description: {
+                    uz: "Shaharda qulay joylashgan, zamonaviy dizayn va tog' manzarali mehmonxona.",
+                    ru: "Удобно расположенный в городе, современный дизайн и виды на горы.",
+                    en: "Conveniently located in town, modern design with mountain views.",
+                },
+                included: {
+                    uz: ["WiFi", "Restoran", "Parking"],
+                    ru: ["WiFi", "Ресторан", "Парковка"],
+                    en: ["WiFi", "Restaurant", "Parking"],
+                },
+                coverImage: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80",
+                images: [
+                    "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80",
+                    "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80",
+                ],
+                lat: 46.6860,
+                lng: 7.8610,
+                rooms: [
+                    {
+                        id: "r_bv_1",
+                        name: { uz: "Standard Room", ru: "Стандартный номер", en: "Standard Room" },
+                        prices: [{ beds: 1, price: 180 }, { beds: 2, price: 260 }],
+                        images: ["https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=600&q=80"],
+                    },
+                    {
+                        id: "r_bv_2",
+                        name: { uz: "Mountain View Room", ru: "Номер с видом на горы", en: "Mountain View Room" },
+                        prices: [{ beds: 1, price: 280 }, { beds: 2, price: 420 }],
+                        images: ["https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&q=80"],
+                    },
+                ],
+            },
+        ],
     },
     {
         id: "t_sample_3",
@@ -76,6 +233,85 @@ export const SAMPLE_TOURS = [
         lat: 25.2048,
         lng: 55.2708,
         createdAt: new Date().toISOString(),
+        hotels: [
+            {
+                id: "h_dubai_1",
+                name: { uz: "Burj Al Arab Jumeirah", ru: "Бурдж Аль Араб", en: "Burj Al Arab Jumeirah" },
+                country: { uz: "BAA", ru: "ОАЭ", en: "UAE" },
+                city: { uz: "Dubay", ru: "Дубай", en: "Dubai" },
+                rating: 5,
+                description: {
+                    uz: "Dunyodagi eng hashamatli mehmonxona. Yelkan shaklidagi ikonik bino, shaxsiy butler xizmati.",
+                    ru: "Самый роскошный отель в мире. Культовое здание в форме паруса, персональный дворецкий.",
+                    en: "The world's most luxurious hotel. Iconic sail-shaped building with personal butler service.",
+                },
+                included: {
+                    uz: ["WiFi", "Baseyn", "Restoran", "Spa", "Sport zal", "Parking"],
+                    ru: ["WiFi", "Бассейн", "Ресторан", "Spa", "Спортзал", "Парковка"],
+                    en: ["WiFi", "Pool", "Restaurant", "Spa", "Gym", "Parking"],
+                },
+                coverImage: "https://images.unsplash.com/photo-1455587734955-081b22074882?w=800&q=80",
+                images: [
+                    "https://images.unsplash.com/photo-1455587734955-081b22074882?w=800&q=80",
+                    "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800&q=80",
+                    "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80",
+                ],
+                lat: 25.1412,
+                lng: 55.1852,
+                rooms: [
+                    {
+                        id: "r_ba_1",
+                        name: { uz: "Deluxe Suite", ru: "Делюкс Сюит", en: "Deluxe Suite" },
+                        prices: [{ beds: 1, price: 950 }, { beds: 2, price: 1400 }],
+                        images: ["https://images.unsplash.com/photo-1590490360182-c33d57733427?w=600&q=80"],
+                    },
+                    {
+                        id: "r_ba_2",
+                        name: { uz: "Royal Suite", ru: "Королевский Сюит", en: "Royal Suite" },
+                        prices: [{ beds: 2, price: 2500 }, { beds: 3, price: 3200 }],
+                        images: ["https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=600&q=80"],
+                    },
+                ],
+            },
+            {
+                id: "h_dubai_2",
+                name: { uz: "Atlantis The Palm", ru: "Atlantis The Palm", en: "Atlantis The Palm" },
+                country: { uz: "BAA", ru: "ОАЭ", en: "UAE" },
+                city: { uz: "Dubay", ru: "Дубай", en: "Dubai" },
+                rating: 5,
+                description: {
+                    uz: "Palm Jumeirah orolida joylashgan, Aquaventure suv parki va Lost Chambers akvarium bilan.",
+                    ru: "Расположен на острове Пальма Джумейра, аквапарк Aquaventure и аквариум Lost Chambers.",
+                    en: "Located on Palm Jumeirah island, with Aquaventure waterpark and Lost Chambers aquarium.",
+                },
+                included: {
+                    uz: ["WiFi", "Baseyn", "Restoran", "Spa", "Sport zal"],
+                    ru: ["WiFi", "Бассейн", "Ресторан", "Spa", "Спортзал"],
+                    en: ["WiFi", "Pool", "Restaurant", "Spa", "Gym"],
+                },
+                coverImage: "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800&q=80",
+                images: [
+                    "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800&q=80",
+                    "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80",
+                ],
+                lat: 25.1304,
+                lng: 55.1174,
+                rooms: [
+                    {
+                        id: "r_at_1",
+                        name: { uz: "Ocean King Room", ru: "Океан Кинг", en: "Ocean King Room" },
+                        prices: [{ beds: 1, price: 420 }, { beds: 2, price: 600 }],
+                        images: ["https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&q=80"],
+                    },
+                    {
+                        id: "r_at_2",
+                        name: { uz: "Underwater Suite", ru: "Подводный Сюит", en: "Underwater Suite" },
+                        prices: [{ beds: 2, price: 1800 }, { beds: 3, price: 2400 }],
+                        images: ["https://images.unsplash.com/photo-1590490360182-c33d57733427?w=600&q=80"],
+                    },
+                ],
+            },
+        ],
     },
     {
         id: "t_sample_4",
@@ -102,5 +338,83 @@ export const SAMPLE_TOURS = [
         lat: -8.5069,
         lng: 115.2625,
         createdAt: new Date().toISOString(),
+        hotels: [
+            {
+                id: "h_bali_1",
+                name: { uz: "Four Seasons Resort Bali", ru: "Four Seasons Resort Bali", en: "Four Seasons Resort Bali" },
+                country: { uz: "Indoneziya", ru: "Индонезия", en: "Indonesia" },
+                city: { uz: "Ubud, Bali", ru: "Убуд, Бали", en: "Ubud, Bali" },
+                rating: 5,
+                description: {
+                    uz: "Guruch terrasalari orasida joylashgan hashamatli resort. Infinity baseyn va ayurvedik SPA.",
+                    ru: "Роскошный курорт среди рисовых террас. Инфинити-бассейн и аюрведический SPA.",
+                    en: "Luxury resort amid rice terraces. Infinity pool and Ayurvedic SPA.",
+                },
+                included: {
+                    uz: ["WiFi", "Baseyn", "Restoran", "Spa", "Parking"],
+                    ru: ["WiFi", "Бассейн", "Ресторан", "Spa", "Парковка"],
+                    en: ["WiFi", "Pool", "Restaurant", "Spa", "Parking"],
+                },
+                coverImage: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&q=80",
+                images: [
+                    "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&q=80",
+                    "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80",
+                ],
+                lat: -8.4069,
+                lng: 115.3125,
+                rooms: [
+                    {
+                        id: "r_fs_1",
+                        name: { uz: "Garden Villa", ru: "Садовая Вилла", en: "Garden Villa" },
+                        prices: [{ beds: 1, price: 350 }, { beds: 2, price: 520 }],
+                        images: ["https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&q=80"],
+                    },
+                    {
+                        id: "r_fs_2",
+                        name: { uz: "Pool Villa", ru: "Вилла с бассейном", en: "Pool Villa" },
+                        prices: [{ beds: 2, price: 780 }, { beds: 3, price: 950 }],
+                        images: ["https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=600&q=80"],
+                    },
+                ],
+            },
+            {
+                id: "h_bali_2",
+                name: { uz: "Hanging Gardens of Bali", ru: "Hanging Gardens of Bali", en: "Hanging Gardens of Bali" },
+                country: { uz: "Indoneziya", ru: "Индонезия", en: "Indonesia" },
+                city: { uz: "Ubud, Bali", ru: "Убуд, Бали", en: "Ubud, Bali" },
+                rating: 5,
+                description: {
+                    uz: "Dunyodagi eng chiroyli infinity basseynlardan biri. Tropik o'rmon ichidagi noyob joylashuv.",
+                    ru: "Один из самых красивых инфинити-бассейнов в мире. Уникальное расположение в тропическом лесу.",
+                    en: "One of the world's most beautiful infinity pools. Unique location in tropical forest.",
+                },
+                included: {
+                    uz: ["WiFi", "Baseyn", "Restoran", "Spa"],
+                    ru: ["WiFi", "Бассейн", "Ресторан", "Spa"],
+                    en: ["WiFi", "Pool", "Restaurant", "Spa"],
+                },
+                coverImage: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80",
+                images: [
+                    "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80",
+                    "https://images.unsplash.com/photo-1552733407-5d5c46c3bb3b?w=800&q=80",
+                ],
+                lat: -8.4169,
+                lng: 115.2925,
+                rooms: [
+                    {
+                        id: "r_hg_1",
+                        name: { uz: "Jungle Villa", ru: "Вилла в Джунглях", en: "Jungle Villa" },
+                        prices: [{ beds: 1, price: 290 }, { beds: 2, price: 430 }],
+                        images: ["https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=600&q=80"],
+                    },
+                    {
+                        id: "r_hg_2",
+                        name: { uz: "Panoramic Villa", ru: "Панорамная Вилла", en: "Panoramic Villa" },
+                        prices: [{ beds: 2, price: 620 }, { beds: 3, price: 800 }],
+                        images: ["https://images.unsplash.com/photo-1590490360182-c33d57733427?w=600&q=80"],
+                    },
+                ],
+            },
+        ],
     },
 ];

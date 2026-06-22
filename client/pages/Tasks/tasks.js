@@ -31,6 +31,9 @@ let editingTaskId = null;
 let activeDetailTaskId = null;
 let selectedAssignees = [];
 let deleteCallback = null;
+let memberModalPage = 1;
+let memberModalLimit = 5;
+let memberModalQuery = "";
 
 const $ = (id) => document.getElementById(id);
 
@@ -802,78 +805,141 @@ const renderProjectOverviewView = async () => {
     renderProjectMembersList("settings-project-members-list");
 };
 
+const fetchAndRenderMemberModalUsers = async () => {
+  const resultsEl = $("add-member-results");
+  if (!resultsEl) return;
+
+  resultsEl.innerHTML = `<div style="padding: 20px; text-align: center; color: #64748b;">${t("loading") || "Yuklanmoqda..."}</div>`;
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/users/assign-list?query=${encodeURIComponent(memberModalQuery)}&page=${memberModalPage}&limit=${memberModalLimit}`, {
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
+    
+    if (!res.ok) {
+      throw new Error("Failed to fetch users");
+    }
+
+    const { users, total, page, totalPages } = await res.json();
+
+    // Update page info and buttons
+    const pageInfo = $("add-member-page-info");
+    if (pageInfo) {
+      pageInfo.textContent = `${page} / ${totalPages || 1}`;
+    }
+
+    const prevBtn = $("add-member-prev-page");
+    if (prevBtn) {
+      prevBtn.disabled = page <= 1;
+    }
+
+    const nextBtn = $("add-member-next-page");
+    if (nextBtn) {
+      nextBtn.disabled = page >= totalPages;
+    }
+
+    if (!users || users.length === 0) {
+      resultsEl.innerHTML = `<div class="search-no-results" style="padding: 16px; font-size: 13px; text-align: center; color: #64748b;">${t("no_users_yet") || "Foydalanuvchilar topilmadi"}</div>`;
+      return;
+    }
+
+    resultsEl.innerHTML = users
+      .map((u) => {
+        const uid = u.userId || u._id;
+        const alreadyAdded = selectedProjectMembers.some((m) => (typeof m === "string" ? m : m.user?._id || m.user) === uid);
+        return `
+        <div class="search-result-item-large animated-item ${alreadyAdded ? "added" : ""}" data-uid="${uid}" style="padding: 10px 16px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; cursor: ${alreadyAdded ? "default" : "pointer"};">
+           <div class="search-result-info" style="display: flex; align-items: center; gap: 10px;">
+              ${userAvatarHtml(u, 32)}
+              <div class="search-result-text" style="display: flex; flex-direction: column;">
+                <span class="res-name" style="font-size: 13px; font-weight: 600; color: #1e293b;">${u.username || u.email}</span>
+                <span class="res-email" style="font-size: 11px; color: #64748b;">${u.email || ""}</span>
+              </div>
+           </div>
+           ${
+             alreadyAdded
+               ? `<span class="added-label-large" style="font-size: 11px; color: #10b981; font-weight: 500;">${t("added_label") || "Qo'shilgan"}</span>`
+               : `<button class="add-member-action-btn-large todo-btn-primary" style="background: #5b6ef5; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 500; cursor: pointer;">${t("add") || "Qo'shish"}</button>`
+           }
+        </div>
+      `;
+      })
+      .join("");
+
+    resultsEl.querySelectorAll(".search-result-item-large:not(.added)").forEach((item) => {
+      const addBtn = item.querySelector(".add-member-action-btn-large");
+      const handleClick = async (e) => {
+        e.stopPropagation();
+        const uid = String(item.dataset.uid);
+        selectedProjectMembers.push({ user: uid, role: "viewer" });
+        $("add-member-modal").style.display = "none";
+        await renderProjectMembersList("settings-project-members-list");
+      };
+      if (addBtn) addBtn.onclick = handleClick;
+      item.onclick = handleClick;
+    });
+  } catch (err) {
+    console.error("Fetch/Render members error:", err);
+    resultsEl.innerHTML = `<div style="padding: 16px; color: #ef4444; text-align: center;">${t("error_occurred") || "Xatolik yuz berdi"}</div>`;
+  }
+};
+
 const openAddMemberModal = () => {
   const modal = $("add-member-modal");
   const input = $("add-member-search-input");
-  const results = $("add-member-results");
-  if (input) input.value = "";
-  if (results) {
-    results.style.display = "none";
-    results.innerHTML = "";
+  
+  memberModalPage = 1;
+  memberModalQuery = "";
+  
+  const limitSelect = $("add-member-limit-select");
+  if (limitSelect) {
+    memberModalLimit = parseInt(limitSelect.value) || 5;
   }
+  
+  if (input) input.value = "";
   if (modal) modal.style.display = "flex";
+  
+  fetchAndRenderMemberModalUsers();
+
   if (input) {
     input.focus();
     let timeout;
     input.oninput = (e) => {
       clearTimeout(timeout);
-      timeout = setTimeout(() => searchUsersForAddMember(e.target.value), 300);
+      timeout = setTimeout(() => {
+        memberModalQuery = e.target.value.trim();
+        memberModalPage = 1;
+        fetchAndRenderMemberModalUsers();
+      }, 300);
     };
   }
-};
 
-const searchUsersForAddMember = async (query) => {
-  const resultsEl = $("add-member-results");
-  if (!query || query.length < 2) {
-    resultsEl.style.display = "none";
-    return;
+  const prevBtn = $("add-member-prev-page");
+  if (prevBtn) {
+    prevBtn.onclick = () => {
+      if (memberModalPage > 1) {
+        memberModalPage--;
+        fetchAndRenderMemberModalUsers();
+      }
+    };
   }
 
-  try {
-    const res = await fetch(`${BASE_URL}/api/users/search?query=${encodeURIComponent(query)}`, {
-      headers: getAuthHeaders(),
-      credentials: "include",
-    });
-    const users = await res.json();
+  const nextBtn = $("add-member-next-page");
+  if (nextBtn) {
+    nextBtn.onclick = () => {
+      memberModalPage++;
+      fetchAndRenderMemberModalUsers();
+    };
+  }
 
-    if (users.length === 0) {
-      resultsEl.innerHTML = `<div class="search-no-results" style="padding: 12px; font-size: 13px;">${t("no_users_yet")}</div>`;
-    } else {
-      resultsEl.innerHTML = users
-        .map((u) => {
-          const uid = u.userId || u._id;
-          const alreadyAdded = selectedProjectMembers.some((m) => (typeof m === "string" ? m : m.user?._id || m.user) === uid);
-          return `
-          <div class="search-result-item-large animated-item ${alreadyAdded ? "added" : ""}" data-uid="${uid}" style="padding: 10px 16px; border-bottom: 1px solid #f1f5f9; cursor: ${alreadyAdded ? "default" : "pointer"};">
-             <div class="search-result-info" style="display: flex; align-items: center; gap: 10px;">
-                ${userAvatarHtml(u, 32)}
-                <div class="search-result-text" style="display: flex; flex-direction: column;">
-                  <span class="res-name" style="font-size: 13px; font-weight: 600;">${u.username || u.email}</span>
-                  <span class="res-email" style="font-size: 11px; color: #64748b;">${u.email || ""}</span>
-                </div>
-             </div>
-             ${
-               alreadyAdded
-                 ? `<span class="added-label-large" style="font-size: 11px; color: #10b981;">${t("added_label") || "Qo'shilgan"}</span>`
-                 : `<button class="add-member-action-btn-large" style="margin-left: auto; background: #5b6ef5; color: #fff; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px;">${t("add") || "Qo'shish"}</button>`
-             }
-          </div>
-        `;
-        })
-        .join("");
-
-      resultsEl.querySelectorAll(".search-result-item-large:not(.added)").forEach((item) => {
-        item.onclick = async () => {
-          const uid = String(item.dataset.uid);
-          selectedProjectMembers.push({ user: uid, role: "viewer" });
-          $("add-member-modal").style.display = "none";
-          await renderProjectMembersList("settings-project-members-list");
-        };
-      });
-    }
-    resultsEl.style.display = "block";
-  } catch (err) {
-    console.error("Search error:", err);
+  const limitSelectEl = $("add-member-limit-select");
+  if (limitSelectEl) {
+    limitSelectEl.onchange = (e) => {
+      memberModalLimit = parseInt(e.target.value) || 5;
+      memberModalPage = 1;
+      fetchAndRenderMemberModalUsers();
+    };
   }
 };
 
@@ -1322,7 +1388,7 @@ export const TodoPage = () => `
 </div>
 <!-- ══ ADD MEMBER MODAL ══ -->
 <div id="add-member-modal" class="todo-modal-overlay" style="display:none">
-  <div class="todo-modal" style="max-width:500px;">
+  <div class="todo-modal" style="max-width:650px;">
     <div class="todo-modal-header">
       <h3>${t("add_member") || "Add Member"}</h3>
       <button class="todo-modal-close" id="add-member-modal-close">✕</button>
@@ -1332,7 +1398,25 @@ export const TodoPage = () => `
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#8892a4" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#8892a4" stroke-width="2" stroke-linecap="round"/></svg>
         <input type="text" id="add-member-search-input" placeholder="${t("search_users_placeholder")}" />
       </div>
-      <div id="add-member-results" class="member-results-dropdown-inline" style="display:none; max-height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;"></div>
+      <div id="add-member-results" class="member-results-dropdown-inline" style="max-height: 350px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 16px;"></div>
+      
+      <!-- Pagination Controls -->
+      <div class="modal-pagination-controls" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; border-top: 1px solid #f1f5f9; padding-top: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b;">
+          <span>${t("show") || "Ko'rsatish"}:</span>
+          <select id="add-member-limit-select" style="padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer; outline: none; font-size: 13px;">
+            <option value="5" selected>5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="add-member-prev-page" class="todo-btn-secondary" style="padding: 6px 12px; font-size: 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px;">&larr; ${t("prev") || "Oldingi"}</button>
+          <span id="add-member-page-info" style="font-size: 13px; font-weight: 500; color: #334155; min-width: 60px; text-align: center;">1 / 1</span>
+          <button id="add-member-next-page" class="todo-btn-secondary" style="padding: 6px 12px; font-size: 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px;">${t("next") || "Keyingi"} &rarr;</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
