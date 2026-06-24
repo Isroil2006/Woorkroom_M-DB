@@ -9,6 +9,10 @@
       "destination": "/login.html"
     },
     {
+      "source": "/receipt.html",
+      "destination": "/receipt.html"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
