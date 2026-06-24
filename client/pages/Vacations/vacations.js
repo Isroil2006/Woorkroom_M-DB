@@ -11,6 +11,21 @@ const t = createTranslationHelper(vacTranslations);
 let toursData = [];
 const getTours = () => toursData;
 
+let vacExchangeRates = { UZS: 1, USD: 12800, RUB: 130 };
+const vacFetchRates = async () => {
+    try {
+        const res = await fetch("https://cbu.uz/uz/arkhiv-kursov-valyut/json/");
+        const data = await res.json();
+        const usd = data.find(d => d.Ccy === "USD");
+        const rub = data.find(d => d.Ccy === "RUB");
+        if (usd) vacExchangeRates.USD = parseFloat(usd.Rate);
+        if (rub) vacExchangeRates.RUB = parseFloat(rub.Rate);
+    } catch (e) {
+        console.warn("Failed to fetch vac rates", e);
+    }
+};
+vacFetchRates();
+
 const fetchToursAPI = async () => {
     try {
         const res = await fetch(`${API_URL}/api/vacations`, { headers: getAuthHeaders(), credentials: "include" });
@@ -374,7 +389,7 @@ const renderDetailInline = () => {
                             return `
                             <div class="vac-premium-hotel-card">
                                 <div class="vac-premium-hotel-left">
-                                    <div class="vac-premium-hotel-img-wrap">
+                                    <div class="vac-premium-hotel-img-wrap" style="cursor:pointer;" onclick="openGalleryModal(${esc(JSON.stringify(hImages && hImages.length ? hImages : [hCover]).replace(/"/g, `'`))}, 0)">
                                         <img src="${esc(hCover)}" class="vac-premium-hotel-img" alt="${esc(hName)}" onerror="this.src='https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80'"/>
                                         <div class="vac-premium-hotel-img-overlay"></div>
                                         <div class="vac-premium-hotel-rating-badge">
@@ -382,22 +397,26 @@ const renderDetailInline = () => {
                                         </div>
                                         ${minPrice ? `<div class="vac-premium-hotel-price-badge">${tr.from || 'dan'} <strong>$${minPrice}</strong> ${tr.per_night || '/ kecha'}</div>` : ''}
                                         ${hImages.length > 1 ? `
-                                        <div class="vac-premium-hotel-gallery-strip">
+                                        <div class="vac-premium-hotel-gallery-strip" style="margin-top:8px;">
                                             ${hImages.slice(0, 4).map((img, i) => `
-                                                <div class="vac-premium-hotel-gallery-thumb"><img src="${esc(img)}" alt="photo ${i+1}" onerror="this.style.display='none'"/></div>
+                                                <div class="vac-premium-hotel-gallery-thumb" style="cursor:pointer;" onclick="event.stopPropagation(); openGalleryModal(${esc(JSON.stringify(hImages).replace(/"/g, `'`))}, ${i})"><img src="${esc(img)}" alt="photo ${i+1}" onerror="this.style.display='none'"/></div>
                                             `).join('')}
-                                            ${hImages.length > 4 ? `<div class="vac-premium-hotel-gallery-more">+${hImages.length - 4}</div>` : ''}
+                                            ${hImages.length > 4 ? `<div class="vac-premium-hotel-gallery-more" style="cursor:pointer;" onclick="event.stopPropagation(); openGalleryModal(${esc(JSON.stringify(hImages).replace(/"/g, `'`))}, 4)">+${hImages.length - 4}</div>` : ''}
                                         </div>` : ''}
                                     </div>
                                     <div class="vac-premium-hotel-left-body">
                                         <div class="vac-premium-hotel-header">
                                             <h3 class="vac-premium-hotel-name">${esc(hName)}</h3>
-                                            <div class="vac-premium-hotel-location">
-                                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/></svg>
-                                                ${hCity ? esc(hCity) + ', ' : ''}${esc(hCountry)}
-                                            </div>
+                                        </div>
+                                        <div class="vac-premium-hotel-location-text" style="display:flex; align-items:center; gap:6px; color:#64748b; font-size:14px; margin-bottom:12px;">
+                                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2.5"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2.5"/></svg>
+                                            ${hCity ? esc(hCity) + ', ' : ''}${esc(hCountry)}
                                         </div>
                                         <p class="vac-premium-hotel-desc">${esc(hDesc)}</p>
+                                        <button class="vac-premium-hotel-map-btn" style="background:#f0f9ff; color:#0284c7; border:1px solid #bae6fd; border-radius:8px; padding:8px 16px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px; width:fit-content; margin-top:12px; margin-bottom:12px; transition:0.2s;" onmouseover="this.style.background='#e0f2fe'" onmouseout="this.style.background='#f0f9ff'" onclick="openLocationModal('${esc(hCity).replace(/'/g, "\\'")}', '${esc(hCountry).replace(/'/g, "\\'")}')">
+                                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/></svg>
+                                            Xaritada ko'rish
+                                        </button>
                                         ${hIncluded.length ? `
                                         <div class="vac-premium-hotel-amenities">
                                             ${hIncluded.map(item => `
@@ -421,7 +440,7 @@ const renderDetailInline = () => {
                                             const rCover = r.images && r.images.length ? r.images[0] : 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=600&q=80';
                                             return `
                                             <div class="vac-premium-room-card">
-                                                <div class="vac-premium-room-img-wrap">
+                                                <div class="vac-premium-room-img-wrap" style="cursor:pointer;" onclick="openGalleryModal(${esc(JSON.stringify(r.images && r.images.length ? r.images : [rCover]).replace(/"/g, `'`))}, 0)">
                                                     <img src="${esc(rCover)}" class="vac-premium-room-img" alt="${rName}" onerror="this.src='https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=600&q=80'"/>
                                                 </div>
                                                 <div class="vac-premium-room-info">
@@ -509,9 +528,10 @@ const getBookModalHTML = () => {
     if (bookSelectedRoomPrice) {
         totalCost += Number(bookSelectedRoomPrice);
     }
+    const totalCostUzs = totalCost * vacExchangeRates.USD;
 
     const methods = myCards || [];
-    const fmt = n => Number(n||0).toLocaleString("en-US", {minimumFractionDigits:2}) + " UZS";
+    const fmtUzs = n => Number(n||0).toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2}) + " UZS";
 
     // Find selected hotel/room names for display
     let selectedHotelName = '';
@@ -554,9 +574,12 @@ const getBookModalHTML = () => {
                         <span class="vac-book-summary-label">${tr.book_success_room || 'Xona:'}</span>
                         <span class="vac-book-summary-val">${esc(selectedRoomName)} (${bookSelectedRoomBeds} ${tr.room_beds || 'yotoqli'})</span>
                     </div>` : ''}
-                    <div class="vac-book-summary-row">
+                    <div class="vac-book-summary-row" style="align-items: flex-end;">
                         <span class="vac-book-summary-label">${tr.book_total}</span>
-                        <span class="vac-book-summary-val-total">$${totalCost.toLocaleString()}</span>
+                        <div style="text-align: right;">
+                            <span class="vac-book-summary-val-total">$${totalCost.toLocaleString()}</span>
+                            <div style="font-size:13px; color:#94a3b8; font-weight:600; margin-top:2px;">≈ ${totalCostUzs.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} UZS</div>
+                        </div>
                     </div>
                 </div>
                 <button class="vac-btn-primary vac-book-confirm-btn" id="vac-book-close">${tr.book_continue}</button>
@@ -754,9 +777,9 @@ const getBookModalHTML = () => {
                 </div>
             </div>
 
-            <div class="vac-book-actions" style="margin-top:32px; display:flex; justify-content:space-between;">
-                <button class="vac-btn-secondary" id="vac-book-prev-2">${tr.prev_step || 'Orqaga'}</button>
-                <button class="vac-btn-primary" id="vac-book-next-2" ${!bookSelectedRoomId ? 'disabled' : ''}>${tr.next_step || 'Keyingi qadam'}</button>
+            <div class="vac-book-actions" style="margin-top:32px; display:flex; justify-content:flex-end; gap: 16px;">
+                <button class="vac-btn-secondary" id="vac-book-prev-2" style="padding: 12px 24px;">${tr.prev_step || 'Orqaga'}</button>
+                <button class="vac-btn-primary" id="vac-book-next-2" ${!bookSelectedRoomId ? 'disabled' : ''} style="padding: 12px 24px;">${tr.next_step || 'Keyingi qadam'}</button>
             </div>
         `;
     }
@@ -779,43 +802,74 @@ const getBookModalHTML = () => {
                     </div>
                 </div>` : ''}
 
+                <div class="vac-book-rate-info" style="margin-top: 24px; margin-bottom: 24px; padding: 14px 18px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #bbf7d0; border-radius: 14px; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.08);">
+                    <div style="width: 42px; height: 42px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.05); flex-shrink: 0;">
+                        <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm0-2a8 8 0 100-16 8 8 0 000 16zm-1-5h2v2h-2v-2zm0-8h2v6h-2V7z" fill="#16a34a"/></svg>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-size: 15px; font-weight: 700; color: #166534; margin-bottom: 2px;">Joriy valyuta kursi</div>
+                        <div style="font-size: 14px; font-weight: 500; color: #15803d; display: flex; align-items: center; gap: 6px;">
+                            <span style="background: rgba(255,255,255,0.6); padding: 2px 8px; border-radius: 6px;">1 USD</span> 
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m4 6H4m0 0l4 4m-4-4l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span style="background: rgba(255,255,255,0.6); padding: 2px 8px; border-radius: 6px; font-weight: 700;">${vacExchangeRates.USD.toLocaleString()} UZS</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="vac-book-section">
-                    <label class="vac-book-label">${tr.book_select_payment}</label>
+                    <label class="vac-book-label" style="font-size: 17px;">${tr.book_select_payment}</label>
                     <div class="vac-book-methods">
-                        ${methods.length ? methods.map((m, i) => `
-                        <label class="vac-book-method-item ${bookSelectedMethodIdx === i ? 'active' : ''}">
-                            <input type="radio" name="b-method" value="${i}" ${bookSelectedMethodIdx === i ? 'checked' : ''} class="vac-book-method-radio"/>
-                            <div class="vac-book-method-info">
-                                <div class="vac-book-method-top">
-                                    <span class="vac-book-method-name">${m.cardName || m.type} ${m.displayNumber || m.number}</span>
-                                    <span class="vac-book-method-bal ${Number(m.balance)<totalCost ? 'error' : ''}">${fmt(m.balance)}</span>
+                        ${methods.length ? methods.map((m, i) => {
+                            const isEnough = Number(m.balance) >= totalCostUzs;
+                            return `
+                            <label class="vac-book-method-item ${bookSelectedMethodIdx === i ? 'active' : ''} ${!isEnough ? 'disabled' : ''}" style="transition: all 0.3s ease;">
+                                <input type="radio" name="b-method" value="${i}" ${bookSelectedMethodIdx === i ? 'checked' : ''} ${!isEnough ? 'disabled' : ''} class="vac-book-method-radio"/>
+                                <div class="vac-book-method-info">
+                                    <div class="vac-book-method-top">
+                                        <span class="vac-book-method-name" style="font-size:16px; font-weight:600;">${m.cardName || m.type} <span style="color:#64748b; font-weight:500;">${m.displayNumber || m.number}</span></span>
+                                        <div style="text-align: right;">
+                                            <div class="vac-book-method-bal ${!isEnough ? 'error' : ''}" style="font-size: 16px; font-weight: 700;">${fmtUzs(m.balance)}</div>
+                                            ${!isEnough ? `<div style="font-size:11px; color:#ef4444; margin-top:2px; font-weight:600;">Mablag' yetarli emas</div>` : ''}
+                                        </div>
+                                    </div>
+                                    <span class="vac-book-method-sub" style="font-size:13px; color:#64748b; display:inline-block; margin-top:6px; background:#f1f5f9; padding:2px 8px; border-radius:4px;">${m.holder || ''}</span>
                                 </div>
-                                <span class="vac-book-method-sub">${m.holder || ''}</span>
-                            </div>
-                        </label>
-                        `).join("") : `<div class="vac-book-no-methods">${tr.book_no_methods}</div>`}
+                            </label>
+                            `;
+                        }).join("") : `<div class="vac-book-no-methods" style="padding:24px; text-align:center; background:#f8fafc; border-radius:12px; color:#64748b;">${tr.book_no_methods}</div>`}
                     </div>
                 </div>
 
-                <div class="vac-book-total-row" style="margin-top:24px; padding-top:16px; border-top:1px dashed #e2e8f0; border-bottom:none;">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:14px; color:#64748b; font-weight:500;">
-                        <span>${tr.tour_price_label || 'Tur narxi'} (${bookGuests} ${tr.person_count || 'kishi'}):</span>
-                        <span>$${(Number(t.price) * bookGuests).toLocaleString()}</span>
+                <div class="vac-book-total-row" style="margin-top:32px; padding:32px 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; text-align: center; box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);">
+                    
+                    <div style="display: flex; justify-content: center; gap: 48px; margin-bottom: 24px; flex-wrap: wrap;">
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: 13px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">${tr.tour_price_label || 'Tur narxi'} (${bookGuests} ${tr.person_count || 'kishi'})</span>
+                            <span style="font-size: 22px; font-weight: 800; color: #1e293b;">$${(Number(t.price) * bookGuests).toLocaleString()}</span>
+                        </div>
+                        ${bookSelectedRoomPrice ? `
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: 13px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">${tr.room_price_label || "Xona to'lovi"}</span>
+                            <span style="font-size: 22px; font-weight: 800; color: #1e293b;">$${Number(bookSelectedRoomPrice).toLocaleString()}</span>
+                        </div>
+                        ` : ''}
                     </div>
-                    ${bookSelectedRoomPrice ? `
-                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:14px; color:#64748b; font-weight:500;">
-                        <span>${tr.room_price_label || "Qo'shimcha xona to'lovi"}:</span>
-                        <span>$${Number(bookSelectedRoomPrice).toLocaleString()}</span>
-                    </div>` : ""}
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; padding-top:16px; border-top:1px solid #e2e8f0;">
-                        <span class="vac-book-total-label">${tr.book_total_label}</span>
-                        <span class="vac-book-total-val" style="font-size:24px; color:#5b6ef5;">$${totalCost.toLocaleString()}</span>
+
+                    <div style="width: 60px; height: 3px; background: #cbd5e1; margin: 0 auto 24px; border-radius: 2px;"></div>
+
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <span class="vac-book-total-label" style="font-size: 15px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">${tr.book_total_label}</span>
+                        <div class="vac-book-total-val" style="font-size: 40px; font-weight: 900; color: #5b6ef5; line-height: 1; margin-bottom: 16px; text-shadow: 0 2px 10px rgba(91,110,245,0.2);">$${totalCost.toLocaleString()}</div>
+                        <div style="display: inline-flex; align-items: center; gap: 8px; background: #fff; padding: 8px 16px; border-radius: 24px; border: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #475569; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                            <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="#94a3b8"/></svg>
+                            ≈ ${totalCostUzs.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} UZS
+                        </div>
                     </div>
                 </div>
 
-                <div class="vac-book-actions" style="margin-top:32px; display:flex; justify-content:space-between;">
-                    <button class="vac-btn-secondary" id="vac-book-prev-3">${tr.prev_step || 'Orqaga'}</button>
-                    <button class="vac-btn-primary vac-book-confirm-btn" id="vac-book-confirm" ${!methods.length ? 'disabled' : ''}>
+                <div class="vac-book-actions" style="margin-top:32px; display:flex; justify-content:flex-end; gap: 16px;">
+                    <button class="vac-btn-secondary" id="vac-book-prev-3" style="padding: 14px 24px; font-size: 16px;">${tr.prev_step || 'Orqaga'}</button>
+                    <button class="vac-btn-primary vac-book-confirm-btn" id="vac-book-confirm" ${!methods.length ? 'disabled' : ''} style="padding: 14px 32px; font-size: 16px; box-shadow: 0 8px 20px rgba(91,110,245,0.3);">
                         ${tr.book_pay}
                     </button>
                 </div>
@@ -952,14 +1006,14 @@ const renderHotelRooms = (h) => {
                     <div class="vac-form-group">
                         <label class="vac-label" style="display:flex; align-items:center; gap:6px;">
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            Xona turi (masalan: Lux)
+                            Xona turi
                         </label>
                         <input type="text" class="vac-input hf-room-type" data-idx="${i}" value="${esc(r.name?.[cl] || '')}" placeholder="Lux xona" style="font-size:14px; font-weight:500;" />
                     </div>
                     <div class="vac-form-group">
                         <label class="vac-label" style="display:flex; align-items:center; gap:6px;">
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            Yotoqlar va Narxlar ($ yoki so'mda, faqat raqam)
+                            Yotoqlar va Narxlar
                         </label>
                         <div class="hf-room-prices-container" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                             ${[1, 2, 3, 4].map(beds => {
@@ -3046,4 +3100,115 @@ const openDeleteModal = (tourId, onConfirm) => {
             document.removeEventListener("keydown", esc);
         }
     });
+};
+
+window.openGalleryModal = (images, startIndex) => {
+    if (!images || !images.length) return;
+    let currentIndex = startIndex || 0;
+
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(4px);";
+
+    const closeBtn = document.createElement("button");
+    closeBtn.innerHTML = '<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>';
+    closeBtn.style.cssText = "position:absolute; top:20px; right:20px; background:rgba(255,255,255,0.1); border:none; color:white; border-radius:50%; cursor:pointer; width:44px; height:44px; display:flex; align-items:center; justify-content:center; transition:0.2s;";
+    closeBtn.onmouseover = () => closeBtn.style.background = "rgba(255,255,255,0.2)";
+    closeBtn.onmouseout = () => closeBtn.style.background = "rgba(255,255,255,0.1)";
+    
+    const imgWrapper = document.createElement("div");
+    imgWrapper.style.cssText = "position:relative; width:90%; max-width:1000px; height:75vh; display:flex; align-items:center; justify-content:center;";
+    
+    const img = document.createElement("img");
+    img.style.cssText = "max-width:100%; max-height:100%; object-fit:contain; border-radius:12px; box-shadow:0 25px 50px rgba(0,0,0,0.5); animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);";
+    img.src = images[currentIndex];
+    imgWrapper.appendChild(img);
+
+    const prevBtn = document.createElement("button");
+    prevBtn.innerHTML = '<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>';
+    prevBtn.style.cssText = "position:absolute; left:-60px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.1); border:none; color:white; border-radius:50%; width:48px; height:48px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:0.2s;";
+    prevBtn.onmouseover = () => prevBtn.style.background = "rgba(255,255,255,0.2)";
+    prevBtn.onmouseout = () => prevBtn.style.background = "rgba(255,255,255,0.1)";
+    
+    const nextBtn = document.createElement("button");
+    nextBtn.innerHTML = '<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>';
+    nextBtn.style.cssText = "position:absolute; right:-60px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.1); border:none; color:white; border-radius:50%; width:48px; height:48px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:0.2s;";
+    nextBtn.onmouseover = () => nextBtn.style.background = "rgba(255,255,255,0.2)";
+    nextBtn.onmouseout = () => nextBtn.style.background = "rgba(255,255,255,0.1)";
+
+    const counter = document.createElement("div");
+    counter.style.cssText = "color:white; margin-top:20px; font-size:15px; font-weight:600; letter-spacing:2px; background:rgba(0,0,0,0.5); padding:6px 16px; border-radius:20px;";
+    
+    const updateUI = () => {
+        img.src = images[currentIndex];
+        counter.textContent = `${currentIndex + 1} / ${images.length}`;
+        prevBtn.style.display = images.length > 1 ? "flex" : "none";
+        nextBtn.style.display = images.length > 1 ? "flex" : "none";
+        prevBtn.style.opacity = currentIndex === 0 ? "0.3" : "1";
+        nextBtn.style.opacity = currentIndex === images.length - 1 ? "0.3" : "1";
+        prevBtn.style.pointerEvents = currentIndex === 0 ? "none" : "auto";
+        nextBtn.style.pointerEvents = currentIndex === images.length - 1 ? "none" : "auto";
+    };
+
+    prevBtn.onclick = (e) => { e.stopPropagation(); if(currentIndex > 0) { currentIndex--; updateUI(); } };
+    nextBtn.onclick = (e) => { e.stopPropagation(); if(currentIndex < images.length - 1) { currentIndex++; updateUI(); } };
+    
+    imgWrapper.appendChild(prevBtn);
+    imgWrapper.appendChild(nextBtn);
+    
+    overlay.appendChild(closeBtn);
+    overlay.appendChild(imgWrapper);
+    overlay.appendChild(counter);
+
+    document.body.appendChild(overlay);
+    updateUI();
+
+    const close = () => overlay.remove();
+    closeBtn.onclick = close;
+    overlay.onclick = (e) => { if(e.target === overlay) close(); };
+    
+    const escListener = (e) => {
+        if(e.key === "Escape") close();
+        if(e.key === "ArrowLeft" && currentIndex > 0) prevBtn.click();
+        if(e.key === "ArrowRight" && currentIndex < images.length - 1) nextBtn.click();
+    };
+    document.addEventListener("keydown", escListener);
+    
+    const originalClose = close;
+    overlay.onclick = (e) => { if(e.target === overlay) { originalClose(); document.removeEventListener("keydown", escListener); } };
+    closeBtn.onclick = () => { originalClose(); document.removeEventListener("keydown", escListener); };
+};
+
+window.openLocationModal = (city, country) => {
+    const query = encodeURIComponent((city ? city + " " : "") + country);
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.6); backdrop-filter:blur(6px); z-index:99999; display:flex; align-items:center; justify-content:center;";
+    
+    const box = document.createElement("div");
+    box.style.cssText = "background:white; border-radius:24px; width:90%; max-width:700px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.3); animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); display:flex; flex-direction:column;";
+    
+    const header = document.createElement("div");
+    header.style.cssText = "padding:20px 24px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; background:#f8fafc;";
+    header.innerHTML = `
+        <h3 style="margin:0; font-size:18px; color:#0f172a; display:flex; align-items:center; gap:8px;">
+            <div style="background:#e0f2fe; color:#0284c7; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            </div>
+            Joylashuv: ${city ? city + ', ' : ''}${country}
+        </h3>
+        <button style="background:#f1f5f9; border:none; cursor:pointer; color:#64748b; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'" onclick="this.closest('.vac-loc-overlay').remove()">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    `;
+    
+    const body = document.createElement("div");
+    body.style.cssText = "height:450px; width:100%; position:relative; background:#f1f5f9;";
+    body.innerHTML = `<iframe width="100%" height="100%" frameborder="0" style="border:0" src="https://maps.google.com/maps?q=${query}&t=&z=13&ie=UTF8&iwloc=&output=embed" allowfullscreen></iframe>`;
+    
+    box.appendChild(header);
+    box.appendChild(body);
+    overlay.appendChild(box);
+    overlay.className = "vac-loc-overlay";
+    document.body.appendChild(overlay);
+    
+    overlay.onclick = (e) => { if(e.target === overlay) overlay.remove(); };
 };

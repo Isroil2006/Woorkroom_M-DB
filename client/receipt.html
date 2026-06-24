@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Woorkroom - Elektron Chek</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        body {
+            background-color: #f1f5f9;
+            color: #1e293b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .receipt-container {
+            background: #ffffff;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            position: relative;
+        }
+        .receipt-header {
+            background: #0f122e;
+            padding: 30px 20px 40px;
+            text-align: center;
+            color: white;
+            position: relative;
+        }
+        .receipt-header h1 {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+        .receipt-header p {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+        .receipt-body {
+            padding: 30px 24px;
+            background: white;
+            border-radius: 24px 24px 0 0;
+            margin-top: -20px;
+            position: relative;
+            z-index: 2;
+        }
+        .success-icon {
+            width: 60px;
+            height: 60px;
+            background: #10b981;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 4px solid white;
+            box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3);
+        }
+        .success-icon svg {
+            color: white;
+            width: 32px;
+            height: 32px;
+        }
+        .amount-display {
+            text-align: center;
+            margin: 40px 0 20px;
+        }
+        .amount-display h2 {
+            font-size: 32px;
+            font-weight: 800;
+            color: #1e293b;
+        }
+        .amount-display span {
+            font-size: 16px;
+            color: #64748b;
+            font-weight: 500;
+        }
+        .divider {
+            height: 1px;
+            background: #e2e8f0;
+            border-style: dashed;
+            margin: 20px 0;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .info-label {
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .info-value {
+            color: #1e293b;
+            font-size: 15px;
+            font-weight: 700;
+            text-align: right;
+            max-width: 60%;
+            word-break: break-all;
+        }
+        .footer {
+            background: #f8fafc;
+            padding: 20px;
+            text-align: center;
+            font-size: 13px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+        
+        /* Zigzag edge at the bottom */
+        .receipt-container::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 10px;
+            background-size: 20px 20px;
+            background-image: radial-gradient(circle at 10px 0, transparent 10px, #ffffff 11px);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="receipt-container">
+        <div class="receipt-header">
+            <h1>Woorkroom</h1>
+            <p>Elektron To'lov Cheki</p>
+        </div>
+        
+        <div class="receipt-body">
+            <div class="success-icon">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            
+            <div class="amount-display">
+                <h2 id="r-amount">...</h2>
+                <span>To'lov muvaffaqiyatli</span>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="info-row">
+                <span class="info-label">Sana va vaqt</span>
+                <span class="info-value" id="r-date">...</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">Kimdan</span>
+                <span class="info-value" id="r-sender">...</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">Kimga</span>
+                <span class="info-value" id="r-receiver">...</span>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="info-row">
+                <span class="info-label">Tranzaksiya ID</span>
+                <span class="info-value" id="r-txid" style="font-family: monospace; font-size: 14px;">...</span>
+            </div>
+        </div>
+        
+        <div class="footer">
+            Ushbu chek elektron ko'rinishda yaratildi va tasdiqlandi.
+        </div>
+    </div>
+
+    <script>
+        // Parse URL params
+        const params = new URLSearchParams(window.location.search);
+        
+        document.getElementById('r-txid').textContent = params.get('txId') || 'Nomalum';
+        document.getElementById('r-date').textContent = params.get('date') || 'Nomalum';
+        document.getElementById('r-amount').textContent = params.get('amount') || '0.00';
+        document.getElementById('r-sender').textContent = params.get('sender') || '-';
+        document.getElementById('r-receiver').textContent = params.get('receiver') || '-';
+    </script>
+</body>
+</html>

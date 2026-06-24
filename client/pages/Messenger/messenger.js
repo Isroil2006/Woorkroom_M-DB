@@ -242,7 +242,12 @@ export const MassangerPage = `<div class="messenger-wrap" id="messenger-root">
 let currentLang = "uz";
 let currentUser = null;
 let activeContact = null;
+let msgSearchModalOpen = false;
+let msgSearchModalQuery = "";
 let searchQuery = "";
+let msgSearchModalPage = 1;
+let msgSearchModalLimit = 10;
+let msgSearchModalLimitOpen = false;
 let pendingImages = [];
 let emojiPickerOpen = false;
 let sidebarCollapsed = false;
@@ -270,6 +275,7 @@ const renderRoot = () => {
                 ${renderChatArea()}
             </div>
             ${activeContact ? `<div class="msg-info-panel" id="msg-info-panel">${renderInfoPanel()}</div>` : ""}
+            ${msgSearchModalOpen ? renderSearchModal() : ""}
         </div>`;
   attachRootEvents();
 };
@@ -279,10 +285,6 @@ const renderSidebar = () => {
   const tr = translations[currentLang];
   const users = getUsers().filter((u) => u.username !== currentUser?.username);
   const activeChats = users.filter((u) => getMessages(currentUser?.username, u.username).length > 0);
-  let searchResults = [];
-  if (searchQuery) {
-      searchResults = users.filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
-  }
 
   if (sidebarCollapsed) {
     return `
@@ -314,22 +316,11 @@ const renderSidebar = () => {
             </div>
             ${userCardOpen ? renderUserCard() : ""}
         </div>
-        <div class="msg-search-wrap" style="position:relative">
-            <div class="msg-search-inner">
+        <div class="msg-search-wrap" style="position:relative; cursor:pointer;" id="msg-search-trigger">
+            <div class="msg-search-inner" style="pointer-events:none;">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#aaa" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#aaa" stroke-width="2" stroke-linecap="round"/></svg>
-                <input type="text" id="msg-search-input" placeholder="${tr.search_placeholder}" value="${escHtml(searchQuery)}" autocomplete="off" />
+                <div style="color: #64748b; font-size: 13px; font-weight: 500;">${tr.search_placeholder}</div>
             </div>
-            ${searchQuery ? `
-            <div class="msg-search-dropdown">
-                ${searchResults.length === 0 ? `<div class="msg-search-empty">${tr.no_users}</div>` : 
-                  searchResults.map(u => `
-                    <div class="msg-search-item" data-username="${u.username}">
-                        ${avatarHtml(u, 32)}
-                        <span class="msg-search-item-name">${escHtml(u.username)}</span>
-                    </div>
-                  `).join("")}
-            </div>
-            ` : ""}
         </div>
         <div class="msg-contacts-label">${tr.contacts_label}</div>
         <div class="msg-contacts-list" id="msg-contacts-list">
@@ -484,6 +475,79 @@ const renderInfoPanel = () => {
 };
 
 // ═══════════════════════════════════════════════
+//  SEARCH MODAL
+const renderSearchModal = () => {
+    const tr = translations[currentLang];
+    const allUsers = getUsers().filter((u) => u.username !== currentUser?.username);
+    
+    // Filter
+    let filtered = allUsers;
+    if (msgSearchModalQuery) {
+        filtered = allUsers.filter(u => u.username.toLowerCase().includes(msgSearchModalQuery.toLowerCase()));
+    }
+    
+    // Pagination
+    const totalItems = filtered.length;
+    const totalPages = Math.ceil(totalItems / msgSearchModalLimit) || 1;
+    if (msgSearchModalPage > totalPages) msgSearchModalPage = totalPages;
+    const startIndex = (msgSearchModalPage - 1) * msgSearchModalLimit;
+    const paginatedUsers = filtered.slice(startIndex, startIndex + msgSearchModalLimit);
+
+    return `
+    <div class="msg-search-modal-overlay" id="msg-search-modal-overlay">
+        <div class="msg-search-modal">
+            <div class="msg-search-modal-header">
+                <h2>${tr.search_placeholder}</h2>
+                <button class="msg-search-modal-close" id="msg-search-modal-close">
+                    <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="msg-search-modal-input-wrap">
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#94a3b8" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/></svg>
+                <input type="text" id="msg-search-modal-input" placeholder="${tr.search_placeholder}..." value="${escHtml(msgSearchModalQuery)}" autocomplete="off" />
+            </div>
+            
+            <div class="msg-search-modal-list">
+                ${paginatedUsers.length === 0 ? `<div class="msg-search-empty">${tr.no_users}</div>` : 
+                  paginatedUsers.map(u => `
+                    <div class="msg-search-modal-item" data-username="${u.username}">
+                        ${avatarHtml(u, 40)}
+                        <div class="msg-search-modal-item-info">
+                            <span class="msg-search-modal-item-name">${escHtml(u.username)}</span>
+                            <span class="msg-search-modal-item-email" style="font-size: 13px; color: #64748b; margin-top: 2px;">${escHtml(u.email || "")}</span>
+                        </div>
+                    </div>
+                  `).join("")}
+            </div>
+
+            <div class="msg-search-modal-footer">
+                <div style="position:relative">
+                    <button class="rows-selector-btn" id="msg-rows-selector-btn">
+                        <span>${msgSearchModalLimit}</span>
+                        <svg class="chevron ${msgSearchModalLimitOpen ? "open" : ""}" width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="rows-dropdown ${msgSearchModalLimitOpen ? "show" : ""}" id="msg-rows-dropdown" style="bottom: 100%; top: auto; margin-bottom: 4px;">
+                        <div class="rows-option ${msgSearchModalLimit === 5 ? "active" : ""}" data-val="5">5</div>
+                        <div class="rows-option ${msgSearchModalLimit === 10 ? "active" : ""}" data-val="10">10</div>
+                        <div class="rows-option ${msgSearchModalLimit === 20 ? "active" : ""}" data-val="20">20</div>
+                    </div>
+                </div>
+
+                <div class="msg-pagination">
+                    <button class="msg-page-btn" id="msg-page-prev" ${msgSearchModalPage === 1 ? "disabled" : ""}>
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <span class="msg-page-info">${msgSearchModalPage} / ${totalPages}</span>
+                    <button class="msg-page-btn" id="msg-page-next" ${msgSearchModalPage === totalPages ? "disabled" : ""}>
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+};
+
 //  CHAT AREA
 // ═══════════════════════════════════════════════
 const renderChatArea = () => {
@@ -907,17 +971,9 @@ const refreshFeed = (forceScroll = false) => {
 const refreshContacts = () => {
   const sb = $("msg-sidebar");
   if (!sb) return;
-  const isInputFocused = document.activeElement && document.activeElement.id === "msg-search-input";
   sb.innerHTML = renderSidebar();
   attachSidebarEvents();
-  if (isInputFocused) {
-    const si = $("msg-search-input");
-    if (si) {
-      si.focus();
-      const val = si.value;
-      si.setSelectionRange(val.length, val.length);
-    }
-  }
+  attachContactEvents();
 };
 const refreshInfoPanel = () => {
   const p = $("msg-info-panel");
@@ -1045,13 +1101,15 @@ const attachContactEvents = () => {
     item.addEventListener("click", () => {
       activeContact =
         getUsers().find((u) => u.username === item.dataset.username) || null;
-      if (activeContact)
+      if (activeContact && currentUser)
         markAsRead(currentUser.username, activeContact.username);
       emojiPickerOpen = false;
       pendingImages = [];
       infoExpanded = false;
       attachExpanded = false;
-      searchQuery = "";
+      msgSearchModalOpen = false;
+      msgSearchModalQuery = "";
+      msgSearchModalPage = 1;
       renderRoot();
       scrollFeed();
     });
@@ -1079,12 +1137,134 @@ const attachInfoEvents = () => {
 };
 
 const attachSidebarEvents = () => {
-  const si = $("msg-search-input");
-  if (si)
-    si.addEventListener("input", (e) => {
-      searchQuery = e.target.value;
-      refreshContacts();
-    });
+  const searchTrigger = $("msg-search-trigger");
+  if (searchTrigger) {
+      searchTrigger.addEventListener("click", () => {
+          msgSearchModalOpen = true;
+          renderRoot();
+          setTimeout(() => {
+              const inp = $("msg-search-modal-input");
+              if(inp) inp.focus();
+          }, 0);
+      });
+  }
+
+  const refreshSearchModal = () => {
+      const overlay = $("msg-search-modal-overlay");
+      if (overlay) {
+          const temp = document.createElement("div");
+          temp.innerHTML = renderSearchModal();
+          
+          const oldList = overlay.querySelector(".msg-search-modal-list");
+          const oldFooter = overlay.querySelector(".msg-search-modal-footer");
+          const newList = temp.querySelector(".msg-search-modal-list");
+          const newFooter = temp.querySelector(".msg-search-modal-footer");
+
+          if (oldList && newList) oldList.replaceWith(newList);
+          if (oldFooter && newFooter) oldFooter.replaceWith(newFooter);
+
+          attachSearchModalDynamicEvents();
+      }
+  };
+
+  const attachSearchModalStaticEvents = () => {
+      const modalClose = $("msg-search-modal-close");
+      if (modalClose) {
+          modalClose.addEventListener("click", () => {
+              msgSearchModalOpen = false;
+              msgSearchModalQuery = "";
+              renderRoot();
+          });
+      }
+      
+      const modalOverlay = $("msg-search-modal-overlay");
+      if (modalOverlay) {
+          modalOverlay.addEventListener("mousedown", (e) => {
+              if (e.target === modalOverlay) {
+                  msgSearchModalOpen = false;
+                  msgSearchModalQuery = "";
+                  renderRoot();
+              }
+          });
+      }
+
+      const modalInput = $("msg-search-modal-input");
+      if (modalInput) {
+          modalInput.addEventListener("input", (e) => {
+              msgSearchModalQuery = e.target.value;
+              msgSearchModalPage = 1;
+              refreshSearchModal();
+          });
+      }
+  };
+
+  const attachSearchModalDynamicEvents = () => {
+      const pagePrev = $("msg-page-prev");
+      if (pagePrev) {
+          pagePrev.addEventListener("click", () => {
+              msgSearchModalPage--;
+              refreshSearchModal();
+          });
+      }
+
+      const pageNext = $("msg-page-next");
+      if (pageNext) {
+          pageNext.addEventListener("click", () => {
+              msgSearchModalPage++;
+              refreshSearchModal();
+          });
+      }
+
+      const rowsBtn = $("msg-rows-selector-btn");
+      if (rowsBtn) {
+          rowsBtn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              msgSearchModalLimitOpen = !msgSearchModalLimitOpen;
+              refreshSearchModal();
+          });
+      }
+
+      document.querySelectorAll(".rows-option").forEach(opt => {
+          opt.addEventListener("click", (e) => {
+              e.stopPropagation();
+              msgSearchModalLimit = parseInt(opt.dataset.val, 10);
+              msgSearchModalPage = 1;
+              msgSearchModalLimitOpen = false;
+              refreshSearchModal();
+          });
+      });
+
+      document.querySelectorAll(".msg-search-modal-item").forEach((item) => {
+          item.addEventListener("click", () => {
+              const u = item.dataset.username;
+              if (u) {
+                  activeContact = getUsers().find(us => us.username === u) || null;
+                  msgSearchModalOpen = false;
+                  msgSearchModalQuery = "";
+                  renderRoot();
+              }
+          });
+      });
+  };
+
+  const attachSearchModalEvents = () => {
+      attachSearchModalStaticEvents();
+      attachSearchModalDynamicEvents();
+  };
+
+  attachSearchModalEvents();
+
+  // Close dropdown on outside click
+  document.addEventListener("click", (e) => {
+      const rowsBtnEl = $("msg-rows-selector-btn");
+      const rowsDropdownEl = $("msg-rows-dropdown");
+      if (msgSearchModalLimitOpen && rowsBtnEl && rowsDropdownEl) {
+          if (!rowsBtnEl.contains(e.target) && !rowsDropdownEl.contains(e.target)) {
+              msgSearchModalLimitOpen = false;
+              refreshSearchModal();
+          }
+      }
+  });
   const cb = $("msg-collapse-btn");
   if (cb)
     cb.addEventListener("click", () => {

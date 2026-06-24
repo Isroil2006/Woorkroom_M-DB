@@ -34,6 +34,18 @@ let deleteCallback = null;
 let memberModalPage = 1;
 let memberModalLimit = 5;
 let memberModalQuery = "";
+let taskListPage = 1;
+let taskListLimit = 10;
+
+let taskFilters = {
+  status: [],
+  myTasksOnly: false,
+  priority: [],
+  deadline: "all",
+  dateStart: "",
+  dateEnd: "",
+  sortByDeadline: false
+};
 
 const $ = (id) => document.getElementById(id);
 
@@ -1153,12 +1165,114 @@ export const TodoPage = () => `
       <div class="header-project-info">
         <h1 id="todo-project-title">Select a Project</h1>
         <button id="project-overview-btn" class="project-settings-btn" style="width: max-content; padding: 0 12px; gap: 6px; display: none;" title="${t('project_overview')}">
-          <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="10 9 9 9 8 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings-icon lucide-settings"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>
           <span style="font-size: 14px; font-weight: 600;">${t("project_overview")}</span>
         </button>
       </div>
 
       <div class="header-actions">
+        <div class="task-filter-dropdown-container">
+          <div class="task-search-wrap">
+            <input type="text" id="task-search-input" class="task-search-input" placeholder="${t("search_tasks") || "Filter tasks..."}" />
+            <div class="task-search-icon-btn">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </div>
+          </div>
+
+          <div style="position: relative;">
+            <button class="task-filter-dropdown-btn" id="task-filter-dropdown-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sliders-horizontal"><path d="M21 4H14"/><path d="M10 4H3"/><path d="M14 2v4"/><path d="M17 10h4"/><path d="M13 10H3"/><path d="M13 8v4"/><path d="M21 16H10"/><path d="M6 16H3"/><path d="M10 14v4"/></svg>
+              <span>${t("filter_btn")}</span>
+              <span class="active-filter-badge" id="active-filter-badge" style="display: none;">0</span>
+            </button>
+          
+          <div class="task-filter-large-menu" id="task-filter-large-menu">
+            <div class="filter-menu-header">
+              <h3>${t("filter_title")}</h3>
+              <button class="filter-reset-btn" id="filter-reset-btn">${t("filter_reset")}</button>
+            </div>
+            
+            <div class="filter-menu-body">
+              <div class="filter-section">
+                <h4>${t("filter_status")}</h4>
+                <div class="filter-options-grid">
+                  <label class="filter-checkbox-label">
+                    <input type="checkbox" name="filter-status" value="todo" ${taskFilters.status.includes('todo') ? 'checked' : ''}>
+                    <span>${t("status_todo")}</span>
+                  </label>
+                  <label class="filter-checkbox-label">
+                    <input type="checkbox" name="filter-status" value="progress" ${taskFilters.status.includes('progress') ? 'checked' : ''}>
+                    <span>${t("status_progress")}</span>
+                  </label>
+                  <label class="filter-checkbox-label">
+                    <input type="checkbox" name="filter-status" value="done" ${taskFilters.status.includes('done') ? 'checked' : ''}>
+                    <span>${t("status_done")}</span>
+                  </label>
+                </div>
+              </div>
+              
+              <div class="filter-section">
+                <h4>${t("filter_assignee")}</h4>
+                <label class="filter-checkbox-label">
+                  <input type="checkbox" id="filter-my-tasks" name="filter-my-tasks" ${taskFilters.myTasksOnly ? 'checked' : ''}>
+                  <span>${t("filter_my_tasks")}</span>
+                </label>
+              </div>
+
+              <div class="filter-section">
+                <h4>${t("filter_priority")}</h4>
+                <div class="filter-options-grid">
+                  <label class="filter-checkbox-label">
+                    <input type="checkbox" name="filter-priority" value="urgent" ${taskFilters.priority.includes('urgent') ? 'checked' : ''}>
+                    <span>${t("priority_urgent")} 🔥</span>
+                  </label>
+                  <label class="filter-checkbox-label">
+                    <input type="checkbox" name="filter-priority" value="high" ${taskFilters.priority.includes('high') ? 'checked' : ''}>
+                    <span>${t("priority_high")} 🔴</span>
+                  </label>
+                  <label class="filter-checkbox-label">
+                    <input type="checkbox" name="filter-priority" value="medium" ${taskFilters.priority.includes('medium') ? 'checked' : ''}>
+                    <span>${t("priority_medium")} 🟡</span>
+                  </label>
+                  <label class="filter-checkbox-label">
+                    <input type="checkbox" name="filter-priority" value="low" ${taskFilters.priority.includes('low') ? 'checked' : ''}>
+                    <span>${t("priority_low")} 🟢</span>
+                  </label>
+                </div>
+              </div>
+              
+              <div class="filter-section">
+                <h4>${t("filter_deadline")}</h4>
+                <div class="filter-options-grid flex-col">
+                  <label class="filter-radio-label">
+                    <input type="radio" name="filter-deadline" value="all" ${taskFilters.deadline === 'all' ? 'checked' : ''}>
+                    <span>${t("filter_all")}</span>
+                  </label>
+                  <label class="filter-radio-label">
+                    <input type="radio" name="filter-deadline" value="overdue" ${taskFilters.deadline === 'overdue' ? 'checked' : ''}>
+                    <span>${t("overdue")}</span>
+                  </label>
+                </div>
+                <label class="filter-checkbox-label" style="margin-top: 6px; border-top: 1px solid #f1f5f9; padding-top: 8px;">
+                  <input type="checkbox" id="filter-sort-deadline" ${taskFilters.sortByDeadline ? 'checked' : ''}>
+                  <span>${t("filter_sort_deadline")}</span>
+                </label>
+              </div>
+              
+              <div class="filter-section">
+                <h4>${t("filter_date_range")}</h4>
+                <div class="filter-date-inputs">
+                  <input type="date" id="filter-date-start" class="filter-date-input" value="${taskFilters.dateStart || ''}">
+                  <span>${t("filter_date_from")}</span>
+                  <input type="date" id="filter-date-end" class="filter-date-input" value="${taskFilters.dateEnd || ''}">
+                  <span>${t("filter_date_to")}</span>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+
         <div class="view-switch">
           <button class="view-tab active" id="tab-list">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -1169,25 +1283,13 @@ export const TodoPage = () => `
             <span>${t("board_view")}</span>
           </button>
         </div>
+
         <button class="create-task-btn" id="todo-create-task-btn" data-perm="task_add_task">
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
           <span>${t("add_task")}</span>
         </button>
       </div>
     </header>
-
-    <div class="tasks-toolbar">
-      <div class="tasks-search-wrap">
-        <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#8892a4" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#8892a4" stroke-width="2" stroke-linecap="round"/></svg>
-        <input type="text" id="todo-search" placeholder="${t("search_tasks") || "Filter tasks..."}" />
-      </div>
-      <div class="tasks-filters">
-        <button class="filter-btn active" data-filter="all" id="filter-all">${t("filter_all") || "All"}</button>
-        <button class="filter-btn" data-filter="todo" id="filter-todo">${t("filter_todo") || "Todo"}</button>
-        <button class="filter-btn" data-filter="progress" id="filter-progress">${t("filter_progress") || "In Progress"}</button>
-        <button class="filter-btn" data-filter="done" id="filter-done">${t("filter_done") || "Done"}</button>
-      </div>
-    </div>
 
     <div class="tasks-content">
       <div id="todo-no-projects" class="empty-state" style="display:none">
@@ -1508,6 +1610,7 @@ const renderProjectSidebar = async () => {
     item.addEventListener("click", () => {
       currentProjectId = item.dataset.pid;
       viewMode = "tasks";
+      taskListPage = 1;
       renderProjectSidebar();
       renderView();
     });
@@ -1587,7 +1690,6 @@ const renderView = async (forceRefresh = false) => {
 
   const noProj = $("todo-no-projects");
   const settingsBtn = $("project-settings-btn");
-  const tasksToolbar = document.querySelector(".tasks-toolbar");
   const tasksContent = document.querySelector(".tasks-content");
 
   if (projects.length === 0) {
@@ -1595,10 +1697,8 @@ const renderView = async (forceRefresh = false) => {
       noProj.style.display = "flex";
       $("no-projects-msg").textContent = t("no_projects");
     }
-    const viewContainer = $("todo-view-container");
     if (viewContainer) viewContainer.style.display = "none";
     if (settingsBtn) settingsBtn.style.display = "none";
-    if (tasksToolbar) tasksToolbar.style.display = "none";
     container.innerHTML = "";
     if ($("todo-project-title")) $("todo-project-title").textContent = t("todo_title");
     return;
@@ -1618,7 +1718,6 @@ const renderView = async (forceRefresh = false) => {
   const allTasks = await fetchTasks(currentProjectId, forceRefresh);
 
   if (viewMode === "overview" || viewMode === "task-detail" || viewMode === "task-history") {
-    if (tasksToolbar) tasksToolbar.style.display = "none";
     if (tasksContent) tasksContent.classList.add("settings-mode");
 
     // Disable header buttons in settings/history/task-detail
@@ -1638,7 +1737,6 @@ const renderView = async (forceRefresh = false) => {
       await renderTaskHistoryView();
     }
   } else {
-    if (tasksToolbar) tasksToolbar.style.display = "flex";
     if (tasksContent) tasksContent.classList.remove("settings-mode");
 
     // Re-enable header buttons
@@ -1652,6 +1750,91 @@ const renderView = async (forceRefresh = false) => {
 
     let tasks = allTasks;
     if (currentFilter !== "all") tasks = tasks.filter((t) => getVisibleStatus(t) === currentFilter);
+    
+    // Status Filter
+    if (taskFilters.status.length > 0) {
+      tasks = tasks.filter((t) => taskFilters.status.includes(getVisibleStatus(t)));
+    }
+    
+    // Assigned to me Filter
+    if (taskFilters.myTasksOnly) {
+      const cu = getCurrent();
+      const cuId = cu?.userId || cu?._id;
+      if (cuId) {
+        tasks = tasks.filter((t) => t.assignees && t.assignees.some((a) => String(a._id || a) === String(cuId)));
+      }
+    }
+    
+    // Priority Filter
+    if (taskFilters.priority.length > 0) {
+      tasks = tasks.filter((t) => taskFilters.priority.includes((t.priority || "none").toLowerCase()));
+    }
+    
+    // Deadline Filter
+    if (taskFilters.deadline !== "all") {
+      const now = new Date();
+      now.setHours(0,0,0,0);
+      
+      tasks = tasks.filter((t) => {
+        if (!t.dueDate) return false;
+        const due = new Date(t.dueDate);
+        due.setHours(0,0,0,0);
+        
+        if (taskFilters.deadline === "overdue") {
+          return due < now && getVisibleStatus(t) !== "done";
+        }
+        return true;
+      });
+    }
+    
+    // Date Start Filter
+    if (taskFilters.dateStart) {
+      const start = new Date(taskFilters.dateStart);
+      start.setHours(0,0,0,0);
+      tasks = tasks.filter((t) => t.dueDate && new Date(t.dueDate).setHours(0,0,0,0) >= start.getTime());
+    }
+    
+    // Date End Filter
+    if (taskFilters.dateEnd) {
+      const end = new Date(taskFilters.dateEnd);
+      end.setHours(0,0,0,0);
+      tasks = tasks.filter((t) => t.dueDate && new Date(t.dueDate).setHours(0,0,0,0) <= end.getTime());
+    }
+
+    // Sort by closest deadline if checked
+    if (taskFilters.sortByDeadline) {
+      tasks = [...tasks].sort((a, b) => {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate) - new Date(b.dueDate);
+      });
+    } else {
+      // Default sorting: in-progress first, then others, then done last
+      tasks = [...tasks].sort((a, b) => {
+        const statusA = getVisibleStatus(a);
+        const statusB = getVisibleStatus(b);
+        
+        const getPriority = (status) => {
+          if (status === "progress") return 1;
+          if (status === "done") return 3;
+          return 2;
+        };
+
+        const prioA = getPriority(statusA);
+        const prioB = getPriority(statusB);
+
+        if (prioA !== prioB) {
+          return prioA - prioB;
+        }
+
+        // Within the same status, sort by latest update
+        const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
+    }
+
     if (searchQuery) tasks = tasks.filter((t) => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.description || "").toLowerCase().includes(searchQuery.toLowerCase()));
 
     if (currentView === "list") renderListView(tasks);
@@ -1664,47 +1847,88 @@ const renderView = async (forceRefresh = false) => {
   }
 };
 
+const renderPageButtons = (total, limit, current) => {
+  const maxPage = Math.ceil(total / limit);
+  if (maxPage <= 1) return "";
+  let html = "";
+  for (let i = 1; i <= maxPage; i++) {
+    if (i === 1 || i === maxPage || (i >= current - 1 && i <= current + 1)) {
+      html += `<button class="pagination-page-btn ${i === current ? "active" : ""}" data-page="${i}">${i}</button>`;
+    } else if (i === 2 && current > 3) {
+      html += `<span class="pagination-ellipsis">...</span>`;
+      i = current - 2;
+    } else if (i === current + 2 && current < maxPage - 2) {
+      html += `<span class="pagination-ellipsis">...</span>`;
+      i = maxPage - 1;
+    }
+  }
+  return html;
+};
+
 const renderListView = (tasks) => {
   const container = $("todo-view-container");
   if (!container) return;
-  const statuses = ["todo", "progress", "done"];
-  let html = `<div class="todo-list-view">`;
+  
+  const totalTasks = tasks.length;
+  const maxPage = Math.ceil(totalTasks / taskListLimit);
+  if (taskListPage > maxPage && maxPage > 0) {
+    taskListPage = maxPage;
+  }
+  const start = (taskListPage - 1) * taskListLimit;
+  const paginatedTasks = tasks.slice(start, start + taskListLimit);
+  
+  let html = `
+    <div class="todo-list-view">
+      <div class="todo-list-table-header">
+        <span class="todo-col-name">${t("task_name_col")}</span>
+        <span class="todo-col-center">${t("status_label")}</span>
+        <span class="todo-col-center">${t("assignee")}</span>
+        <span class="todo-col-center">${t("due_date")}</span>
+        <span class="todo-col-center">${t("priority")}</span>
+        <span class="todo-col-center">${t("actions")}</span>
+      </div>
+      <div class="todo-list-body">
+        ${paginatedTasks.length ? paginatedTasks.map((task) => renderListRow(task)).join("") : `<div class="todo-list-empty">${t("no_tasks")}</div>`}
+      </div>`;
 
-  statuses.forEach((status) => {
-    const statusTasks = tasks.filter((t) => getVisibleStatus(t) === status);
-    if (currentFilter !== "all" && currentFilter !== status) return;
-    const cfg = statusConfig[status];
+  if (totalTasks > 0) {
     html += `
-        <div class="todo-list-section">
-          <div class="todo-list-section-header" data-collapse="${status}">
-            <div class="todo-section-header-left">
-              <svg class="todo-collapse-icon" data-status="${status}" width="12" height="12" fill="none" viewBox="0 0 24 24">
-                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+      <div class="todo-list-pagination">
+        <div class="pagination-right-wrap">
+          <div class="task-rows-per-page-container" id="task-rows-per-page-container">
+            <button class="task-rows-selector-btn" id="task-rows-selector-btn">
+              <span>${t("show")}: <span id="current-task-rows-val">${taskListLimit}</span></span>
+              <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
-              <span class="todo-section-label ${cfg.cls}">
-                <span class="todo-section-dot ${cfg.cls}"></span>
-                ${cfg.label()}
-              </span>
-              <span class="todo-section-count ${cfg.cls}">${tasks.filter((t) => getVisibleStatus(t) === status).length}</span>
+            </button>
+            <div class="task-rows-dropdown" id="task-rows-dropdown">
+              <div class="task-rows-option ${taskListLimit === 10 ? "active" : ""}" data-val="10">10</div>
+              <div class="task-rows-option ${taskListLimit === 20 ? "active" : ""}" data-val="20">20</div>
+              <div class="task-rows-option ${taskListLimit === 30 ? "active" : ""}" data-val="30">30</div>
+              <div class="task-rows-option ${taskListLimit === 40 ? "active" : ""}" data-val="40">40</div>
+              <div class="task-rows-option ${taskListLimit === 50 ? "active" : ""}" data-val="50">50</div>
             </div>
-            <button class="todo-add-in-section" data-status="${status}" data-perm="task_add_task">+ ${t("add_task")}</button>
           </div>
-           <div class="todo-list-section-body" id="list-section-${status}">
-            <div class="todo-list-table-header">
-              <span class="todo-col-name">${t("task_name_col")}</span>
-              <span class="todo-col-center">${t("status_label")}</span>
-              <span class="todo-col-center">${t("assignee")}</span>
-              <span class="todo-col-center">${t("due_date")}</span>
-              <span class="todo-col-center">${t("priority")}</span>
-              <span class="todo-col-center">${t("actions")}</span>
+          <div class="pagination-controls">
+            <button class="pagination-btn prev-btn" ${taskListPage === 1 ? "disabled" : ""}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <div class="pagination-pages">
+              <span class="pagination-current-page">${taskListPage}</span>
             </div>
-            ${statusTasks.length ? statusTasks.map((task) => renderListRow(task)).join("") : `<div class="todo-list-empty">${t("no_tasks")}</div>`}
+            <button class="pagination-btn next-btn" ${taskListPage === maxPage || maxPage === 0 ? "disabled" : ""}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
           </div>
-        </div>`;
-  });
+        </div>
+      </div>`;
+  }
+
   html += `</div>`;
+  
   container.innerHTML = html;
-  attachListEvents(container);
+  attachListEvents(container, tasks);
 };
 
 const renderListRow = (task) => {
@@ -1730,7 +1954,7 @@ const renderListRow = (task) => {
       </div>
       <div class="todo-row-center-cell">
         <div class="todo-list-status-custom-select s-${myStatus} ${canChangeStatus ? "" : "disabled"}" data-tid="${task._id}" data-action="change-status-custom" style="${canChangeStatus ? "" : "pointer-events:none;"}">
-          <div style="width:max-content;" class="status-selected">
+          <div class="status-selected">
             <span>${myStatus === "todo" ? t("status_todo") : myStatus === "progress" ? t("status_progress") : t("status_done")}</span>
             <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="6 9 12 15 18 9"></polyline>
@@ -1773,23 +1997,65 @@ const renderListRow = (task) => {
     </div>`;
 };
 
-const attachListEvents = (container) => {
-  container.querySelectorAll(".todo-list-section-header").forEach((header) => {
-    header.addEventListener("click", (e) => {
-      if (e.target.closest(".todo-add-in-section")) return;
-      const status = header.dataset.collapse;
-      const body = $(`list-section-${status}`);
-      const icon = container.querySelector(`.todo-collapse-icon[data-status="${status}"]`);
-      const hidden = body.style.display === "none";
-      body.style.display = hidden ? "block" : "none";
-      if (icon) icon.style.transform = hidden ? "rotate(0deg)" : "rotate(-90deg)";
-    });
-  });
-
-  container.querySelectorAll(".todo-add-in-section").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+const attachListEvents = (container, tasks) => {
+  // Custom rows dropdown toggle
+  const rowsBtn = container.querySelector("#task-rows-selector-btn");
+  const rowsDropdown = container.querySelector("#task-rows-dropdown");
+  if (rowsBtn && rowsDropdown) {
+    rowsBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      openTaskModal(null, btn.dataset.status);
+      const isOpen = rowsDropdown.style.display === "flex";
+      rowsDropdown.style.display = isOpen ? "none" : "flex";
+      const chevron = rowsBtn.querySelector(".chevron");
+      if (chevron) chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
+    });
+
+    // Close dropdown on click outside
+    document.addEventListener("click", (e) => {
+      if (!rowsBtn.contains(e.target) && !rowsDropdown.contains(e.target)) {
+        rowsDropdown.style.display = "none";
+        const chevron = rowsBtn.querySelector(".chevron");
+        if (chevron) chevron.style.transform = "rotate(0deg)";
+      }
+    });
+
+    // Handle options click
+    rowsDropdown.querySelectorAll(".task-rows-option").forEach((opt) => {
+      opt.addEventListener("click", () => {
+        const val = parseInt(opt.dataset.val, 10);
+        taskListLimit = val;
+        taskListPage = 1;
+        renderView();
+      });
+    });
+  }
+
+  // Pagination controls
+  const prevBtn = container.querySelector(".pagination-btn.prev-btn");
+  if (prevBtn) {
+    prevBtn.addEventListener("click", () => {
+      if (taskListPage > 1) {
+        taskListPage--;
+        renderView();
+      }
+    });
+  }
+
+  const nextBtn = container.querySelector(".pagination-btn.next-btn");
+  if (nextBtn) {
+    nextBtn.addEventListener("click", () => {
+      const maxPage = Math.ceil((tasks || []).length / taskListLimit);
+      if (taskListPage < maxPage) {
+        taskListPage++;
+        renderView();
+      }
+    });
+  }
+
+  container.querySelectorAll(".pagination-page-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      taskListPage = parseInt(btn.dataset.page, 10);
+      renderView();
     });
   });
 
@@ -1913,7 +2179,7 @@ const renderBoardView = (tasks) => {
     { key: "progress", label: t("status_progress") },
     { key: "done", label: t("status_done") },
   ];
-  let html = `<div style="display: flex; gap: 20px;" class="todo-board-view">`;
+  let html = `<div class="todo-board-wrap">`;
   columns.forEach((col) => {
     const colTasks = tasks.filter((t) => getVisibleStatus(t) === col.key);
     const cfg = statusConfig[col.key];
@@ -3201,14 +3467,9 @@ const translateUI = () => {
   el("tab-board-label", t("board_view"));
   el("todo-add-project-label", t("add_project"));
   el("todo-add-task-label", t("add_task"));
-  ph("todo-search", t("search_tasks"));
   ph("tm-title", t("task_title_placeholder"));
   ph("tm-desc", t("task_desc_placeholder"));
   ph("pm-name", t("project_name_placeholder"));
-  el("filter-all", t("filter_all"));
-  el("filter-todo", t("filter_todo"));
-  el("filter-progress", t("filter_progress"));
-  el("filter-done", t("filter_done"));
   if ($("lbl-project-name")) $("lbl-project-name").textContent = t("project_label");
   if ($("project-modal-cancel")) $("project-modal-cancel").textContent = t("cancel");
   if ($("project-modal-save")) $("project-modal-save").textContent = t("create");
@@ -3218,6 +3479,157 @@ const translateUI = () => {
   if ($("noproj-desc")) $("noproj-desc").textContent = t("no_projects_desc");
   if ($("noproj-create-btn")) $("noproj-create-btn").textContent = t("add_project");
   if ($("noproj-cancel-btn")) $("noproj-cancel-btn").textContent = t("cancel");
+};
+
+const updateActiveFilterBadge = () => {
+  let count = 0;
+  if (taskFilters.status.length > 0) count++;
+  if (taskFilters.myTasksOnly) count++;
+  if (taskFilters.priority.length > 0) count++;
+  if (taskFilters.deadline !== "all") count++;
+  if (taskFilters.dateStart) count++;
+  if (taskFilters.dateEnd) count++;
+  if (taskFilters.sortByDeadline) count++;
+  
+  const badge = $("active-filter-badge");
+  if (badge) {
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = "inline-flex";
+    } else {
+      badge.style.display = "none";
+    }
+  }
+};
+
+const initTaskFilterEvents = () => {
+  const taskSearchInput = $("task-search-input");
+  if (taskSearchInput) {
+    taskSearchInput.value = searchQuery;
+    taskSearchInput.addEventListener("input", (e) => {
+      searchQuery = e.target.value;
+      renderView();
+    });
+  }
+
+  const filterBtn = $("task-filter-dropdown-btn");
+  const filterMenu = $("task-filter-large-menu");
+  
+  if (!filterBtn || !filterMenu) return;
+  
+  filterBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    filterMenu.classList.toggle("active");
+  });
+  
+  filterMenu.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+  
+  document.addEventListener("click", () => {
+    filterMenu.classList.remove("active");
+  });
+  
+  const resetBtn = $("filter-reset-btn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      taskFilters = {
+        status: [],
+        myTasksOnly: false,
+        priority: [],
+        deadline: "all",
+        dateStart: "",
+        dateEnd: "",
+        sortByDeadline: false
+      };
+      
+      searchQuery = "";
+      if (taskSearchInput) taskSearchInput.value = "";
+      
+      document.querySelectorAll('input[name="filter-status"]').forEach(cb => cb.checked = false);
+      const myTasksCb = $("filter-my-tasks");
+      if (myTasksCb) myTasksCb.checked = false;
+      document.querySelectorAll('input[name="filter-priority"]').forEach(cb => cb.checked = false);
+      const allRadio = document.querySelector('input[name="filter-deadline"][value="all"]');
+      if (allRadio) allRadio.checked = true;
+      const sortDeadlineCb = $("filter-sort-deadline");
+      if (sortDeadlineCb) sortDeadlineCb.checked = false;
+      const startInput = $("filter-date-start");
+      const endInput = $("filter-date-end");
+      if (startInput) startInput.value = "";
+      if (endInput) endInput.value = "";
+      
+      updateActiveFilterBadge();
+      renderView();
+    });
+  }
+  
+  document.querySelectorAll('input[name="filter-status"]').forEach(cb => {
+    cb.addEventListener("change", () => {
+      if (cb.checked) {
+        if (!taskFilters.status.includes(cb.value)) taskFilters.status.push(cb.value);
+      } else {
+        taskFilters.status = taskFilters.status.filter(s => s !== cb.value);
+      }
+      updateActiveFilterBadge();
+      renderView();
+    });
+  });
+  
+  const myTasksCb = $("filter-my-tasks");
+  if (myTasksCb) {
+    myTasksCb.addEventListener("change", () => {
+      taskFilters.myTasksOnly = myTasksCb.checked;
+      updateActiveFilterBadge();
+      renderView();
+    });
+  }
+  
+  document.querySelectorAll('input[name="filter-priority"]').forEach(cb => {
+    cb.addEventListener("change", () => {
+      if (cb.checked) {
+        if (!taskFilters.priority.includes(cb.value)) taskFilters.priority.push(cb.value);
+      } else {
+        taskFilters.priority = taskFilters.priority.filter(p => p !== cb.value);
+      }
+      updateActiveFilterBadge();
+      renderView();
+    });
+  });
+  
+  document.querySelectorAll('input[name="filter-deadline"]').forEach(radio => {
+    radio.addEventListener("change", () => {
+      if (radio.checked) {
+        taskFilters.deadline = radio.value;
+        updateActiveFilterBadge();
+        renderView();
+      }
+    });
+  });
+  
+  const startInput = $("filter-date-start");
+  const endInput = $("filter-date-end");
+  
+  const handleDateChange = () => {
+    taskFilters.dateStart = startInput ? startInput.value : "";
+    taskFilters.dateEnd = endInput ? endInput.value : "";
+    updateActiveFilterBadge();
+    renderView();
+  };
+  
+  startInput?.addEventListener("change", handleDateChange);
+  endInput?.addEventListener("change", handleDateChange);
+
+  const sortDeadlineCb = $("filter-sort-deadline");
+  if (sortDeadlineCb) {
+    sortDeadlineCb.addEventListener("change", () => {
+      taskFilters.sortByDeadline = sortDeadlineCb.checked;
+      updateActiveFilterBadge();
+      renderView();
+    });
+  }
+
+  updateActiveFilterBadge();
 };
 
 // ─── INIT ─────────────────────────────────────────────────────
@@ -3239,6 +3651,7 @@ export const initTodoLogic = async () => {
   }
 
   initProjectSidebarEvents();
+  initTaskFilterEvents();
 
   const cu = getCurrent();
   if (cu) applyPermissions(cu.userId || cu._id);
@@ -3256,26 +3669,13 @@ export const initTodoLogic = async () => {
   document.querySelectorAll(".view-tab").forEach((btn) => {
     btn.addEventListener("click", () => {
       currentView = btn.id === "tab-list" ? "list" : "board";
+      if (currentView === "list") {
+        taskListPage = 1;
+      }
       document.querySelectorAll(".view-tab").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       renderView();
     });
-  });
-
-  // Filters (Todo/Progress/Done)
-  document.querySelectorAll(".filter-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      currentFilter = btn.dataset.filter;
-      document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      renderView();
-    });
-  });
-
-  // Search tasks
-  $("todo-search")?.addEventListener("input", (e) => {
-    searchQuery = e.target.value;
-    renderView();
   });
 
   // Clear errors on input
@@ -3402,7 +3802,7 @@ export const initTodoLogic = async () => {
       const searchInput = document.getElementById("project-search-input");
       if (searchInput) searchInput.placeholder = t("search_projects") || "Search projects...";
 
-      const todoSearch = document.getElementById("todo-search");
+      const todoSearch = document.getElementById("task-search-input");
       if (todoSearch) todoSearch.placeholder = t("search_tasks") || "Filter tasks...";
 
       const overviewBtn = document.getElementById("project-overview-btn");
@@ -3412,17 +3812,53 @@ export const initTodoLogic = async () => {
         if (span) span.textContent = t("project_overview");
       }
 
-      const filterAll = document.getElementById("filter-all");
-      if (filterAll) filterAll.textContent = t("filter_all") || "All";
+      // Update Filter Dropdown Translates
+      const filterBtnSpan = document.querySelector("#task-filter-dropdown-btn span");
+      if (filterBtnSpan) filterBtnSpan.textContent = t("filter_btn");
 
-      const filterTodo = document.getElementById("filter-todo");
-      if (filterTodo) filterTodo.textContent = t("filter_todo") || "Todo";
+      const filterMenuHeader = document.querySelector(".filter-menu-header h3");
+      if (filterMenuHeader) filterMenuHeader.textContent = t("filter_title");
 
-      const filterProgress = document.getElementById("filter-progress");
-      if (filterProgress) filterProgress.textContent = t("filter_progress") || "In Progress";
+      const filterResetBtn = document.getElementById("filter-reset-btn");
+      if (filterResetBtn) filterResetBtn.textContent = t("filter_reset");
 
-      const filterDone = document.getElementById("filter-done");
-      if (filterDone) filterDone.textContent = t("filter_done") || "Done";
+      const filterSections = document.querySelectorAll(".filter-section h4");
+      if (filterSections.length >= 5) {
+        filterSections[0].textContent = t("filter_status");
+        filterSections[1].textContent = t("filter_assignee");
+        filterSections[2].textContent = t("filter_priority");
+        filterSections[3].textContent = t("filter_deadline");
+        filterSections[4].textContent = t("filter_date_range");
+      }
+
+      const valText = (name, val, key, extra = "") => {
+        const el = document.querySelector(`input[name="${name}"][value="${val}"]`);
+        if (el && el.nextElementSibling) el.nextElementSibling.textContent = t(key) + extra;
+      };
+
+      valText("filter-status", "todo", "status_todo");
+      valText("filter-status", "progress", "status_progress");
+      valText("filter-status", "done", "status_done");
+
+      const myTasksCb = document.getElementById("filter-my-tasks");
+      if (myTasksCb && myTasksCb.nextElementSibling) myTasksCb.nextElementSibling.textContent = t("filter_my_tasks");
+
+      valText("filter-priority", "urgent", "priority_urgent", " 🔥");
+      valText("filter-priority", "high", "priority_high", " 🔴");
+      valText("filter-priority", "medium", "priority_medium", " 🟡");
+      valText("filter-priority", "low", "priority_low", " 🟢");
+
+      valText("filter-deadline", "all", "filter_all");
+      valText("filter-deadline", "overdue", "overdue");
+
+      const sortDeadlineCb = document.getElementById("filter-sort-deadline");
+      if (sortDeadlineCb && sortDeadlineCb.nextElementSibling) sortDeadlineCb.nextElementSibling.textContent = t("filter_sort_deadline");
+
+      const dateStartEl = document.getElementById("filter-date-start");
+      if (dateStartEl && dateStartEl.nextElementSibling) dateStartEl.nextElementSibling.textContent = t("filter_date_from");
+      
+      const dateEndEl = document.getElementById("filter-date-end");
+      if (dateEndEl && dateEndEl.nextElementSibling) dateEndEl.nextElementSibling.textContent = t("filter_date_to");
 
       renderView();
     });

@@ -7,7 +7,7 @@ export const translations = {
         monthly_expense: "Oylik chiqim",
         monthly_income: "Oylik tushim",
         transfer_to_self: "O'z hisobiga o'tkazish",
-        internal_transfer: "O'z hisobiga o'tkazma",
+        internal_transfer: "O'z hisobiga",
         from_card: "Qayerdan",
         to_card: "Qayerga",
         not_enough_cards: "Sizda ikkinchi hisob mavjud emas",

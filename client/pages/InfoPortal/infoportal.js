@@ -441,16 +441,30 @@ export const InfoPortalPage = () => `
                 </div>
             </div>
             <div class="cal-view-dropdown" id="cal-filter-dropdown" style="margin-left: 10px;">
-                <button class="cal-view-btn" id="cal-filter-btn">
-                    <span id="cal-filter-label">${t(currentFilter === 'all' ? 'all_events' : currentFilter)}</span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                <button class="cal-view-btn" id="cal-filter-btn" title="${currentFilter.includes('all') ? t('all_events') : currentFilter.map(f => t(f)).join(', ')}">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sliders-horizontal-icon lucide-sliders-horizontal"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg>
                 </button>
                 <div class="cal-view-menu" id="cal-filter-menu">
-                    <button class="cal-filter-option ${currentFilter === 'all' ? 'active' : ''}" data-filter="all">${t("all_events")}</button>
-                    <button class="cal-filter-option ${currentFilter === 'tasks' ? 'active' : ''}" data-filter="tasks">${t("tasks")}</button>
-                    <button class="cal-filter-option ${currentFilter === 'tests' ? 'active' : ''}" data-filter="tests">${t("tests")}</button>
-                    <button class="cal-filter-option ${currentFilter === 'vacations' ? 'active' : ''}" data-filter="vacations">${t("vacations")}</button>
-                    <button class="cal-filter-option ${currentFilter === 'payments' ? 'active' : ''}" data-filter="payments">${t("payments")}</button>
+                    <div class="cal-filter-option ${currentFilter.includes('all') ? 'active' : ''}" data-filter="all">
+                        <input type="checkbox" class="cal-filter-checkbox" data-filter="all" ${currentFilter.includes('all') ? 'checked' : ''}>
+                        <span>${t("all_events")}</span>
+                    </div>
+                    <div class="cal-filter-option ${currentFilter.includes('tasks') ? 'active' : ''}" data-filter="tasks">
+                        <input type="checkbox" class="cal-filter-checkbox" data-filter="tasks" ${currentFilter.includes('tasks') ? 'checked' : ''}>
+                        <span>${t("tasks")}</span>
+                    </div>
+                    <div class="cal-filter-option ${currentFilter.includes('tests') ? 'active' : ''}" data-filter="tests">
+                        <input type="checkbox" class="cal-filter-checkbox" data-filter="tests" ${currentFilter.includes('tests') ? 'checked' : ''}>
+                        <span>${t("tests")}</span>
+                    </div>
+                    <div class="cal-filter-option ${currentFilter.includes('vacations') ? 'active' : ''}" data-filter="vacations">
+                        <input type="checkbox" class="cal-filter-checkbox" data-filter="vacations" ${currentFilter.includes('vacations') ? 'checked' : ''}>
+                        <span>${t("vacations")}</span>
+                    </div>
+                    <div class="cal-filter-option ${currentFilter.includes('payments') ? 'active' : ''}" data-filter="payments">
+                        <input type="checkbox" class="cal-filter-checkbox" data-filter="payments" ${currentFilter.includes('payments') ? 'checked' : ''}>
+                        <span>${t("payments")}</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -492,7 +506,7 @@ export const InfoPortalPage = () => `
 
 let viewDate = new Date();
 let currentView = "month";
-let currentFilter = "all";
+let currentFilter = ["all"];
 let selectedDate = null;
 let cachedEvents = null;
 let expandedDate = null; // Google style popover date
@@ -510,13 +524,13 @@ const invalidateCache = () => {
 
 const getFilteredEvents = async () => {
   const allEvents = await getCachedEvents();
-  if (currentFilter === "all") return allEvents;
+  if (currentFilter.includes("all") || currentFilter.length === 0) return allEvents;
   return allEvents.filter(e => {
-    if (currentFilter === 'tasks') return e.type === EVENT_TYPES.TASK_DUE || e.type === EVENT_TYPES.TASK_ASSIGNED;
-    if (currentFilter === 'tests') return e.type === EVENT_TYPES.TEST_COMPLETED;
-    if (currentFilter === 'vacations') return e.type === EVENT_TYPES.VACATION_BOOKED;
-    if (currentFilter === 'payments') return e.type === EVENT_TYPES.PAYMENT_RECEIVED || e.type === EVENT_TYPES.PAYMENT_SENT;
-    return true;
+    if (currentFilter.includes('tasks') && (e.type === EVENT_TYPES.TASK_DUE || e.type === EVENT_TYPES.TASK_ASSIGNED)) return true;
+    if (currentFilter.includes('tests') && e.type === EVENT_TYPES.TEST_COMPLETED) return true;
+    if (currentFilter.includes('vacations') && e.type === EVENT_TYPES.VACATION_BOOKED) return true;
+    if (currentFilter.includes('payments') && (e.type === EVENT_TYPES.PAYMENT_RECEIVED || e.type === EVENT_TYPES.PAYMENT_SENT)) return true;
+    return false;
   });
 };
 
@@ -1193,12 +1207,21 @@ export const initInfoPortalLogic = async () => {
       }
     });
 
-    const filterLabel = document.getElementById("cal-filter-label");
-    if (filterLabel) filterLabel.textContent = t(currentFilter === 'all' ? 'all_events' : currentFilter);
+    const filterBtn = document.getElementById("cal-filter-btn");
+    if (filterBtn) {
+      if (currentFilter.includes("all") || currentFilter.length === 0 || currentFilter.length === 4) {
+        filterBtn.setAttribute("title", t("all_events"));
+      } else {
+        filterBtn.setAttribute("title", currentFilter.map(f => t(f)).join(", "));
+      }
+    }
 
     document.querySelectorAll(".cal-filter-option").forEach((opt) => {
       if (opt.dataset.filter) {
-        opt.textContent = t(opt.dataset.filter === 'all' ? 'all_events' : opt.dataset.filter);
+        const span = opt.querySelector("span");
+        if (span) {
+          span.textContent = t(opt.dataset.filter === 'all' ? 'all_events' : opt.dataset.filter);
+        }
       }
     });
 
@@ -1239,15 +1262,79 @@ export const initInfoPortalLogic = async () => {
     filterMenu?.classList.toggle("active");
   });
 
+  filterMenu?.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+
   document.addEventListener("click", () => filterMenu?.classList.remove("active"));
 
-  document.querySelectorAll(".cal-filter-option").forEach((opt) => {
-    opt.addEventListener("click", () => {
-      document.querySelectorAll(".cal-filter-option").forEach((o) => o.classList.remove("active"));
-      opt.classList.add("active");
-      currentFilter = opt.dataset.filter;
-      document.getElementById("cal-filter-label").textContent = t(currentFilter === 'all' ? 'all_events' : currentFilter);
-      filterMenu?.classList.remove("active");
+  const filterOptions = document.querySelectorAll(".cal-filter-option");
+  filterOptions.forEach((opt) => {
+    opt.addEventListener("click", (e) => {
+      e.stopPropagation();
+      
+      const cb = opt.querySelector(".cal-filter-checkbox");
+      if (!cb) return;
+      
+      if (e.target !== cb) {
+        cb.checked = !cb.checked;
+      }
+      
+      const filterVal = cb.dataset.filter;
+      
+      if (filterVal === "all") {
+        if (cb.checked) {
+          currentFilter = ["all"];
+          filterOptions.forEach((otherOpt) => {
+            const otherCb = otherOpt.querySelector(".cal-filter-checkbox");
+            if (otherCb && otherCb.dataset.filter !== "all") {
+              otherCb.checked = false;
+              otherOpt.classList.remove("active");
+            }
+          });
+          opt.classList.add("active");
+        } else {
+          cb.checked = true;
+        }
+      } else {
+        if (cb.checked) {
+          currentFilter = currentFilter.filter(f => f !== "all");
+          const allOpt = document.querySelector('.cal-filter-option[data-filter="all"]');
+          const allCb = allOpt?.querySelector(".cal-filter-checkbox");
+          if (allCb) {
+            allCb.checked = false;
+            allOpt.classList.remove("active");
+          }
+          
+          if (!currentFilter.includes(filterVal)) {
+            currentFilter.push(filterVal);
+          }
+          opt.classList.add("active");
+        } else {
+          currentFilter = currentFilter.filter(f => f !== filterVal);
+          opt.classList.remove("active");
+          
+          if (currentFilter.length === 0) {
+            currentFilter = ["all"];
+            const allOpt = document.querySelector('.cal-filter-option[data-filter="all"]');
+            const allCb = allOpt?.querySelector(".cal-filter-checkbox");
+            if (allCb) {
+              allCb.checked = true;
+              allOpt.classList.add("active");
+            }
+          }
+        }
+      }
+      
+      const filterBtn = document.getElementById("cal-filter-btn");
+      if (filterBtn) {
+        if (currentFilter.includes("all") || currentFilter.length === 4) {
+          filterBtn.setAttribute("title", t("all_events"));
+        } else {
+          filterBtn.setAttribute("title", currentFilter.map(f => t(f)).join(", "));
+        }
+      }
+      
       animateAndRenderCalendar();
     });
   });

@@ -166,8 +166,8 @@
 }
 
 .biz-dash-right {
-    width: 330px;
-    flex: 0 0 330px;
+    width: 340px;
+    flex: 0 0 340px;
     display: flex;
     flex-direction: column;
     gap: 20px;

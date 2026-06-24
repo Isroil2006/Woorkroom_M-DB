@@ -13,6 +13,23 @@ let myTransactions = [];
 let paymentUsers = [];
 let myStats = {};
 let pusherChannel = null;
+let exchangeRates = { UZS: 1, USD: 12800, RUB: 130 };
+let cardCurrency = "UZS";
+
+const fetchRates = async () => {
+  try {
+    const res = await fetch("https://cbu.uz/uz/arkhiv-kursov-valyut/json/");
+    const data = await res.json();
+    const usd = data.find(d => d.Ccy === "USD");
+    const rub = data.find(d => d.Ccy === "RUB");
+    if (usd) exchangeRates.USD = parseFloat(usd.Rate);
+    if (rub) exchangeRates.RUB = parseFloat(rub.Rate);
+  } catch (e) {
+    console.warn("Failed to fetch rates", e);
+  }
+};
+
+
 
 // ─── API HELPERS ─────────────────────────────────────────────────
 const apiFetch = async (url, options = {}) => {
@@ -35,6 +52,7 @@ const loadPaymentData = async () => {
       apiFetch("/api/payments/transactions"),
       apiFetch("/api/payments/stats"),
       apiFetch("/api/payments/users"),
+      fetchRates(),
     ]);
     myMethods = methods;
     myTransactions = transactions;
@@ -46,7 +64,13 @@ const loadPaymentData = async () => {
 };
 
 // ─── FORMAT HELPERS ─────────────────────────────────────────────
-const fmt = (n) => "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n) => Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " UZS";
+const fmtCardBalance = (n) => {
+   const converted = (n || 0) / exchangeRates[cardCurrency];
+   const symbol = cardCurrency === "USD" ? "$" : (cardCurrency === "RUB" ? "₽" : "UZS");
+   const formatted = Number(converted).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+   return symbol === "UZS" ? formatted + " UZS" : symbol + formatted;
+};
 const initials = (name = "") => name.split(" ").slice(0, 2).map((w) => w[0] || "").join("").toUpperCase();
 const avatarColor = (name = "") => {
   const colors = ["#5b6ef5", "#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#ec4899"];
@@ -314,8 +338,8 @@ export const BusinessPage = () => `
         <div class="pmt-split-col">
           <p class="pmt-step-desc" style="margin-bottom:8px;">${t("transfer_details")}</p>
           <div class="pmt-amount-box" style="margin-bottom: 16px;">
-            <span class="pmt-currency">$</span>
-            <input type="number" id="pmt-amount" placeholder="0.00" class="pmt-amount-input" />
+            <input type="text" id="pmt-amount" placeholder="0" class="pmt-amount-input" />
+            <span class="pmt-currency" style="margin-left: 8px; margin-right: 0;">UZS</span>
           </div>
           
           <p class="pmt-step-desc" style="margin-bottom:8px;">${t("choose_sender_card")}</p>
@@ -390,7 +414,13 @@ export const BusinessPage = () => `
     <input class="biz-input" id="cm-holder" placeholder="${t("full_name")}" />
     <div style="display:flex;gap:12px">
       <div style="flex:1"><label class="biz-label">${t("expiry")}</label><input class="biz-input" id="cm-expiry" placeholder="05/27" maxlength="5" inputmode="numeric"/></div>
-      <div style="flex:1"><label class="biz-label">${t("balance_dollar")}</label><input class="biz-input" type="number" id="cm-balance" placeholder="0"/></div>
+      <div style="flex:1">
+        <label class="biz-label">${t("balance")}</label>
+        <div style="position:relative; display:flex; align-items:center;">
+          <input class="biz-input" type="text" id="cm-balance" placeholder="0" oninput="this.value = this.value.replace(/[^\\d]/g, '').replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',')" style="padding-right: 45px; width: 100%; box-sizing: border-box;"/>
+          <span style="position:absolute; right:12px; font-size:14px; color:#64748b; font-weight:600; pointer-events:none;">UZS</span>
+        </div>
+      </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:4px">
       <button class="biz-btn-secondary" id="cm-cancel" style="flex:1">${t("cancel")}</button>
@@ -411,6 +441,60 @@ export const BusinessPage = () => `
       <button class="biz-btn-secondary" id="del-card-cancel" style="flex:1"></button>
       <button id="del-card-confirm" style="flex:1;padding:10px;border:none;border-radius:8px;background:#ef4444;color:#fff;font-weight:700;font-size:13px;cursor:pointer"></button>
     </div>
+  </div>
+</div>
+
+<!-- ══ CARD SETTINGS MODAL ══ -->
+<div id="card-settings-modal" class="biz-overlay" style="display:none; align-items:center; justify-content:center; backdrop-filter:blur(8px); z-index:9999;">
+  <div class="biz-modal" style="width:100%; max-width:360px; border-radius: 24px; padding:24px; background:#fff; position:relative; box-shadow:0 20px 40px rgba(0,0,0,0.1); animation: popIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;">
+    <button id="cs-close" style="position:absolute; top:16px; right:16px; background:#f1f5f9; border:none; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#64748b; transition:all 0.2s;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <h3 style="margin:0 0 20px; font-size:18px; font-weight:800; color:#1e293b;">Karta ma'lumotlari</h3>
+    
+    <div id="cs-card-preview" style="margin-bottom:20px;"></div>
+
+    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden;">
+      <div id="cs-toggle-details" style="padding:16px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; background:#f1f5f9; transition:background 0.2s;">
+        <span style="font-size:14px; font-weight:600; color:#334155;">To'liq ma'lumotlar</span>
+        <button style="background:transparent; border:none; color:#64748b; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+          <svg id="cs-eye-icon" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <div id="cs-details-content" style="padding:0 16px; max-height:0; overflow:hidden; transition:max-height 0.3s ease, padding 0.3s ease;">
+        <div style="padding:16px 0; display:flex; flex-direction:column; gap:12px;">
+          <div>
+            <p style="font-size:12px; color:#64748b; margin:0 0 4px; font-weight:500;">Karta raqami</p>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+              <span id="cs-full-number" style="font-size:14px; font-weight:700; color:#1e293b; font-family:monospace; letter-spacing:1px;"></span>
+              <button class="cs-copy-btn" data-target="cs-full-number" style="background:transparent; border:none; color:#3b82f6; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;" title="Nusxa olish">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+          </div>
+          <div id="cs-expiry-container">
+            <p style="font-size:12px; color:#64748b; margin:0 0 4px; font-weight:500;">Amal qilish muddati</p>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+              <span id="cs-expiry" style="font-size:14px; font-weight:700; color:#1e293b;"></span>
+              <button class="cs-copy-btn" data-target="cs-expiry" style="background:transparent; border:none; color:#3b82f6; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;" title="Nusxa olish">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+          </div>
+          <div>
+            <p style="font-size:12px; color:#64748b; margin:0 0 4px; font-weight:500;">Karta egasi</p>
+            <div style="background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+              <span id="cs-holder" style="font-size:14px; font-weight:700; color:#1e293b;"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <button id="cs-delete-card-btn" class="biz-btn-primary" style="width:100%; margin-top:20px; background:#fee2e2; color:#ef4444; border:none; display:flex; align-items:center; justify-content:center; gap:8px;">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      Kartani o'chirish
+    </button>
   </div>
 </div>
 
@@ -540,8 +624,8 @@ export const BusinessPage = () => `
      <div style="background:#f1f5f9; border-radius:16px; padding:16px; margin-bottom:24px;">
        <label style="color:#64748b; font-size:12px; margin-bottom:6px; display:block; font-weight:600;">${t("amount_dollar")}</label>
        <div style="display:flex; align-items:center;">
-           <span style="font-size:24px; font-weight:700; color:#1e293b; margin-right:8px;">$</span>
-           <input type="number" id="ts-amount" placeholder="0.00" style="background:transparent; border:none; font-size:28px; font-weight:700; color:#1e293b; width:100%; outline:none;" />
+           <input type="text" id="ts-amount" placeholder="0" style="background:transparent; border:none; font-size:28px; font-weight:700; color:#1e293b; width:100%; outline:none;" oninput="this.value = this.value.replace(/[^\\d]/g, '').replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',')" />
+           <span style="font-size:24px; font-weight:700; color:#1e293b; margin-left:8px;">UZS</span>
        </div>
        <p id="ts-error" style="color:#ef4444; font-size:12px; margin:8px 0 0; display:none; font-weight:500;"></p>
      </div>
@@ -633,7 +717,16 @@ const renderAccounts = () => {
         ${myMethods.map((m) => {
           const label = m.cardName || (m.type === "card" ? "VISA" : "BANK");
           const fullNum = (m.number || m.displayNumber || "0000 0000 0000 0000").replace(/\s/g, "");
-          const formatted = fullNum.match(/.{1,4}/g)?.join("  ") || fullNum;
+          let formatted = fullNum;
+          if (fullNum.length > 8) {
+            const start = fullNum.substring(0, 4);
+            const end = fullNum.substring(fullNum.length - 4);
+            const midLen = fullNum.length - 8;
+            const mask = "*".repeat(midLen).match(/.{1,4}/g)?.join("  ") || "****";
+            formatted = `${start}  ${mask}  ${end}`;
+          } else {
+            formatted = fullNum.match(/.{1,4}/g)?.join("  ") || fullNum;
+          }
           return `
         <div class="biz-carousel-slide">
           <div class="biz-acc-card ${m.type === "card" ? "card-grad" : "bank-grad"}" style="min-height:170px">
@@ -645,37 +738,55 @@ const renderAccounts = () => {
               <span style="font-size:13px;font-weight:700;letter-spacing:2px">${formatted}</span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div>
-                <p style="font-size:7px;opacity:.55;margin:0;text-transform:uppercase;letter-spacing:.5px">CARD HOLDER</p>
-                <p style="font-size:11px;font-weight:600;margin:2px 0 0">${m.holder || "—"}</p>
+              <div style="text-align:left">
+                <p style="font-size:9px;opacity:.55;margin:0;text-transform:uppercase;letter-spacing:.5px">BALANCE</p>
+                <p style="font-size:18px;font-weight:700;margin:4px 0 0">${fmtCardBalance(m.balance)}</p>
               </div>
-              <div style="text-align:center">
-                <p style="font-size:7px;opacity:.55;margin:0;text-transform:uppercase;letter-spacing:.5px">BALANCE</p>
-                <p style="font-size:11px;font-weight:700;margin:2px 0 0">${fmt(m.balance)}</p>
-              </div>
-              <div style="text-align:right">
-                <p style="font-size:7px;opacity:.55;margin:0;text-transform:uppercase;letter-spacing:.5px">EXPIRES</p>
-                <p style="font-size:11px;font-weight:600;margin:2px 0 0">${m.expiry || m.bank || "—"}</p>
-              </div>
+              <button class="biz-card-settings-btn" data-id="${m._id}" style="background:transparent;border:none;color:inherit;cursor:pointer;opacity:0.8;transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              </button>
             </div>
           </div>
         </div>`;
         }).join("")}
       </div>
     </div>
-    <div class="biz-carousel-controls">
-      <button class="biz-carousel-arrow" id="c-prev" ${carouselIdx === 0 ? "disabled" : ""}>
-        <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <div class="biz-carousel-dots" id="c-dots">
-        ${myMethods.map((_, i) => `<span class="biz-carousel-dot${i === carouselIdx ? " active" : ""}"></span>`).join("")}
+    <div style="display:flex; justify-content:flex-start; align-items:center; margin-top:16px; gap:12px;">
+      <!-- Carousel controls -->
+      <div style="display:flex; align-items:center; gap:12px;">
+        <button class="biz-carousel-arrow" id="c-prev" style="background:#f8fafc; border:1px solid #f1f5f9; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink: 0;" ${carouselIdx === 0 ? "disabled" : ""}>
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="biz-carousel-dots" id="c-dots" style="display:flex; gap:8px; overflow:hidden; max-width:40px; justify-content:flex-start; scroll-behavior: smooth;">
+          ${myMethods.map((_, i) => `<span class="biz-carousel-dot${i === carouselIdx ? " active" : ""}" style="flex-shrink:0;"></span>`).join("")}
+        </div>
+        <button class="biz-carousel-arrow" id="c-next" style="background:#f8fafc; border:1px solid #f1f5f9; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink: 0;" ${carouselIdx === myMethods.length - 1 ? "disabled" : ""}>
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="#475569" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
       </div>
-      <button class="biz-carousel-arrow" id="c-next" ${carouselIdx === myMethods.length - 1 ? "disabled" : ""}>
-        <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <button class="biz-carousel-del" id="c-del" style="${canDel ? "" : "display:none"}" title="${t("delete_card_title") || "O'chirish"}">
-        <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
+
+      <!-- Divider -->
+      <div style="width:1px; height:24px; background:#e2e8f0; border-radius:1px; margin:0 4px; flex-shrink: 0;"></div>
+
+      <!-- Currency Select and actions -->
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div class="biz-custom-select" id="card-currency-select" style="min-width: 85px;">
+           <div class="biz-select-trigger" style="height:36px; padding:0 12px; border-radius:12px; font-weight:700; background:#f8fafc; border:1px solid #f1f5f9; display:flex; align-items:center; justify-content:space-between; font-size:14px; color:#0f172a; cursor:pointer;">
+              <span class="biz-select-val">${cardCurrency}</span>
+              <svg style="margin-left:8px;" width="16" height="16" fill="none" stroke="#64748b" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+           </div>
+           <div class="biz-select-options" style="min-width: 85px;">
+              <div class="biz-option ${cardCurrency === 'UZS' ? 'biz-selected' : ''}" data-value="UZS">UZS</div>
+              <div class="biz-option ${cardCurrency === 'USD' ? 'biz-selected' : ''}" data-value="USD">USD</div>
+              <div class="biz-option ${cardCurrency === 'RUB' ? 'biz-selected' : ''}" data-value="RUB">RUB</div>
+           </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <button id="inline-refresh-btn" style="background:#f8fafc; border:1px solid #f1f5f9; border-radius:12px; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; color:#475569;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+        </button>
+      </div>
     </div>
     <button class="biz-btn-secondary" id="transfer-to-self-btn" style="width:100%; margin-top:16px; display:flex; justify-content:center; align-items:center; gap:8px;">
       <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>
@@ -687,13 +798,13 @@ const renderAccounts = () => {
         <div class="biz-stat-icon waiting-icon" style="background:#fee2e2;color:#ef4444;">
           <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 20V4M5 11l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
-        <div><p class="biz-stat-label">${t("monthly_expense")}</p><p class="biz-stat-value" id="stat-waiting">$0</p></div>
+        <div><p class="biz-stat-label">${t("monthly_expense")}</p><p class="biz-stat-value" id="stat-waiting">0 UZS</p></div>
       </div>
       <div class="biz-stat-card">
         <div class="biz-stat-icon paid-icon" style="background:#dcfce7;color:#16a34a;">
           <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 4v16m7-7l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
-        <div><p class="biz-stat-label">${t("monthly_income")}</p><p class="biz-stat-value" id="stat-paid">$0</p></div>
+        <div><p class="biz-stat-label">${t("monthly_income")}</p><p class="biz-stat-value" id="stat-paid">0 UZS</p></div>
       </div>
       <div class="biz-stat-card biz-stat-accent">
         <div class="biz-stat-icon account-icon">
@@ -701,7 +812,7 @@ const renderAccounts = () => {
         </div>
         <div>
           <p class="biz-stat-label" style="color:rgba(255,255,255,.7)">${t("account_balance")}</p>
-          <p class="biz-stat-value" id="stat-balance" style="color:#fff">$0</p>
+          <p class="biz-stat-value" id="stat-balance" style="color:#fff">0 UZS</p>
         </div>
       </div>
     </div>
@@ -715,17 +826,18 @@ const renderAccounts = () => {
     if ($("c-prev")) $("c-prev").disabled = carouselIdx === 0;
     if ($("c-next")) $("c-next").disabled = carouselIdx === myMethods.length - 1;
 
-    const dots = $("c-dots")?.children;
-    if (dots) for (let i = 0; i < dots.length; i++) {
-      dots[i].className = `biz-carousel-dot${i === carouselIdx ? " active" : ""}`;
+    const dotsContainer = $("c-dots");
+    if (dotsContainer) {
+      const dots = dotsContainer.children;
+      for (let i = 0; i < dots.length; i++) {
+        const isActive = i === carouselIdx;
+        dots[i].className = `biz-carousel-dot${isActive ? " active" : ""}`;
+        if (isActive) {
+           dots[i].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+      }
     }
 
-    // Show/hide delete button based on current card
-    const delBtn = $("c-del");
-    if (delBtn) {
-      delBtn.style.display = myMethods[carouselIdx]?.isDefault ? "none" : "";
-    }
-    
     // Refresh stats for the selected card
     refreshStats();
   };
@@ -737,35 +849,41 @@ const renderAccounts = () => {
     if (carouselIdx < myMethods.length - 1) { carouselIdx++; updateUI(); }
   };
 
-  // ── Delete button (next to arrows) ──
-  if ($("c-del")) {
-    $("c-del").onclick = () => {
-      const mid = myMethods[carouselIdx]?._id;
-      if (!mid) return;
-      $("del-card-title").textContent = t("delete_card_title");
-      $("del-card-desc").textContent = t("delete_card_desc");
-      $("del-card-cancel").textContent = t("cancel");
-      $("del-card-confirm").textContent = t("delete_confirm_btn");
-      $("del-card-modal").style.display = "flex";
-      const confirmBtn = $("del-card-confirm");
-      const newConfirm = confirmBtn.cloneNode(true);
-      confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
-      newConfirm.onclick = async () => {
-        $("del-card-modal").style.display = "none";
-        try {
-          await apiFetch(`/api/payments/methods/${mid}`, { method: "DELETE" });
-          myMethods = myMethods.filter((m) => m._id !== mid);
-          renderAccounts();
-          refreshStats();
-        } catch (e) {
-          showToast(e.message, "error");
-        }
-      };
-    };
-  }
-
   // Restore the stats values into the freshly rendered stat blocks
   refreshStats();
+
+  const currSelect = $("card-currency-select");
+  if (currSelect) {
+    const trigger = currSelect.querySelector(".biz-select-trigger");
+    trigger.onclick = (e) => {
+       e.stopPropagation();
+       document.querySelectorAll(".biz-custom-select.open").forEach(el => {
+          if (el !== currSelect) el.classList.remove("open");
+       });
+       currSelect.classList.toggle("open");
+    };
+    currSelect.querySelectorAll(".biz-option").forEach(opt => {
+       opt.onclick = (e) => {
+          e.stopPropagation();
+          cardCurrency = opt.getAttribute("data-value");
+          currSelect.classList.remove("open");
+          renderAccounts();
+       };
+    });
+  }
+
+
+  if ($("inline-refresh-btn")) {
+    $("inline-refresh-btn").onclick = async (e) => {
+      const btn = e.currentTarget;
+      const svg = btn.querySelector("svg");
+      svg.style.transition = "transform 0.5s ease";
+      svg.style.transform = "rotate(360deg)";
+      await fetchRates();
+      renderAccounts();
+      setTimeout(() => { svg.style.transition = "none"; svg.style.transform = "rotate(0deg)"; }, 500);
+    };
+  }
 
   // Self Transfer btn logic
   if ($("transfer-to-self-btn")) {
@@ -777,6 +895,18 @@ const renderAccounts = () => {
          openSelfTransferModal();
      };
   }
+
+  // Settings buttons
+  const settingsBtns = document.querySelectorAll(".biz-card-settings-btn");
+  settingsBtns.forEach(btn => {
+    btn.onclick = (e) => {
+      const mid = e.currentTarget.getAttribute("data-id");
+      const card = myMethods.find(m => m._id === mid);
+      if(card) {
+        openCardSettingsModal(card);
+      }
+    };
+  });
 };
 
 
@@ -1490,7 +1620,8 @@ const openQRModal = (txId) => {
 
   if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
 
-  const qrUrl = `${baseUrl}/?receiptData=${encodeURIComponent(receiptText)}`;
+  const txShortId = tx._id.slice(-10).toUpperCase();
+  const qrUrl = `${baseUrl}/receipt.html?txId=${encodeURIComponent(txShortId)}&date=${encodeURIComponent(dateStr)}&amount=${encodeURIComponent(amtStr)}&sender=${encodeURIComponent(tx.senderName || "—")}&receiver=${encodeURIComponent(tx.receiverName || "—")}`;
   $("qr-code-img").style.display = "none";
   $("qr-code-img").src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrUrl)}`;
   qrModal.style.display = "flex";
@@ -1598,7 +1729,7 @@ const showReceiverStep = (user, specificMethodId = null) => {
   }
 
   const checkNextStepReady = () => {
-     const amount = parseFloat($("pmt-amount").value);
+     const amount = parseFloat($("pmt-amount").value.replace(/[\s,]/g, ""));
      const senderSelected = window.currentSenderMethodSelection ? window.currentSenderMethodSelection() : null;
      if (selRecipMethodId && senderSelected && !isNaN(amount) && amount > 0) {
         $("pmt-next-3").disabled = false;
@@ -1617,8 +1748,16 @@ const showReceiverStep = (user, specificMethodId = null) => {
   });
 
   const tx = activeTransactionId && activeTransactionId !== "new" ? myTransactions.find((t) => t._id === activeTransactionId) : null;
-  $("pmt-amount").value = tx?.amount || "";
-  $("pmt-amount").oninput = checkNextStepReady;
+  if (tx?.amount) {
+    $("pmt-amount").value = Number(tx.amount).toLocaleString("en-US").replace(/\..*/, "");
+  } else {
+    $("pmt-amount").value = "";
+  }
+  $("pmt-amount").oninput = (e) => {
+    let val = e.target.value.replace(/[^\d]/g, "");
+    e.target.value = val.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    checkNextStepReady();
+  };
   
   renderSenderMethods(checkNextStepReady);
 };
@@ -1980,7 +2119,7 @@ export const initBusinessLogic = async () => {
   if ($("pmt-next-3")) {
     $("pmt-next-3").addEventListener("click", () => {
       $("pmt-step3-error").textContent = "";
-      const amount = parseFloat($("pmt-amount").value);
+      const amount = parseFloat($("pmt-amount").value.replace(/[\s,]/g, ""));
       if (isNaN(amount) || amount <= 0) {
          $("pmt-step3-error").textContent = t("err_valid_amount"); return;
       }
@@ -2158,7 +2297,7 @@ export const initBusinessLogic = async () => {
           displayNumber: raw.slice(0, 4) + " **** **** " + raw.slice(-4),
           holder,
           expiry,
-          balance: parseFloat($("cm-balance").value) || 0,
+          balance: parseFloat($("cm-balance").value.replace(/[\s,]/g, "")) || 0,
         }),
       });
       myMethods.push(newMethod);
@@ -2171,6 +2310,119 @@ export const initBusinessLogic = async () => {
     }
   });
 
+  initCardSettingsModal();
+};
+
+// ── Card Settings Modal Logic ──
+const openCardSettingsModal = (card) => {
+  const modal = $("card-settings-modal");
+  if(!modal) return;
+  
+  const label = card.cardName || (card.type === "card" ? "VISA" : "BANK");
+  const fullNum = (card.number || card.displayNumber || "0000 0000 0000 0000").replace(/\s/g, "");
+  let formatted = fullNum;
+  if (fullNum.length > 8) {
+    const start = fullNum.substring(0, 4);
+    const end = fullNum.substring(fullNum.length - 4);
+    const midLen = fullNum.length - 8;
+    const mask = "*".repeat(midLen).match(/.{1,4}/g)?.join("  ") || "****";
+    formatted = `${start}  ${mask}  ${end}`;
+  } else {
+    formatted = fullNum.match(/.{1,4}/g)?.join("  ") || fullNum;
+  }
+  const fullNumSpaced = fullNum.match(/.{1,4}/g)?.join(" ") || fullNum;
+
+  $("cs-card-preview").innerHTML = `
+    <div class="biz-acc-card ${card.type === "card" ? "card-grad" : "bank-grad"}" style="min-height:170px; margin:0; padding:20px; color:#fff; border-radius:20px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 10px 20px rgba(0,0,0,0.15);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-nfc-icon lucide-nfc"><path d="M6 8.32a7.43 7.43 0 0 1 0 7.36"/><path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58"/><path d="M12.91 4.1a15.91 15.91 0 0 1 .01 15.8"/><path d="M16.37 2a20.16 20.16 0 0 1 0 20"/></svg>
+        <span style="font-size:14px;font-weight:700;letter-spacing:1.5px;opacity:.9">${label}</span>
+      </div>
+      <div style="margin:20px 0;">
+        <span style="font-size:16px;font-weight:700;letter-spacing:2px">${formatted}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div style="text-align:left">
+          <p style="font-size:9px;opacity:.55;margin:0;text-transform:uppercase;letter-spacing:.5px">BALANCE</p>
+          <p style="font-size:18px;font-weight:700;margin:4px 0 0">${fmt(card.balance)}</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  $("cs-full-number").textContent = fullNumSpaced;
+  $("cs-expiry").textContent = card.expiry || card.bank || "—";
+  $("cs-holder").textContent = card.holder || "—";
+  
+  if ($("cs-expiry-container")) {
+    $("cs-expiry-container").style.display = card.type === "bank" ? "none" : "block";
+  }
+  
+  $("cs-details-content").style.maxHeight = "0";
+  $("cs-details-content").style.padding = "0 16px";
+  $("cs-eye-icon").innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+  
+  const delBtn = $("cs-delete-card-btn");
+  if (delBtn) {
+    delBtn.style.display = card.isDefault ? "none" : "flex";
+    delBtn.onclick = () => {
+      modal.style.display = "none";
+      $("del-card-title").textContent = t("delete_card_title") || "Kartani o'chirish";
+      $("del-card-desc").textContent = t("delete_card_desc") || "Haqiqatan ham ushbu kartani o'chirmoqchimisiz?";
+      $("del-card-cancel").textContent = t("cancel") || "Bekor qilish";
+      $("del-card-confirm").textContent = t("delete_confirm_btn") || "O'chirish";
+      $("del-card-modal").style.display = "flex";
+      const confirmBtn = $("del-card-confirm");
+      const newConfirm = confirmBtn.cloneNode(true);
+      confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
+      newConfirm.onclick = async () => {
+        $("del-card-modal").style.display = "none";
+        try {
+          await apiFetch(`/api/payments/methods/${card._id}`, { method: "DELETE" });
+          myMethods = myMethods.filter((m) => m._id !== card._id);
+          renderAccounts();
+          refreshStats();
+        } catch (e) {
+          showToast(e.message, "error");
+        }
+      };
+    };
+  }
+
+  modal.style.display = "flex";
+};
+
+const initCardSettingsModal = () => {
+  if($("cs-close")) {
+    $("cs-close").onclick = () => {
+      $("card-settings-modal").style.display = "none";
+    };
+  }
+  
+  if($("cs-toggle-details")) {
+    $("cs-toggle-details").onclick = () => {
+      const content = $("cs-details-content");
+      const eye = $("cs-eye-icon");
+      if(content.style.maxHeight === "0px" || !content.style.maxHeight) {
+        content.style.maxHeight = "300px";
+        content.style.padding = "0 16px 16px 16px";
+        eye.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
+      } else {
+        content.style.maxHeight = "0";
+        content.style.padding = "0 16px";
+        eye.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+      }
+    };
+  }
+
+  document.querySelectorAll(".cs-copy-btn").forEach(btn => {
+    btn.onclick = () => {
+      const targetId = btn.getAttribute("data-target");
+      const text = $(targetId).textContent;
+      navigator.clipboard.writeText(text.replace(/\s/g, ""));
+      showToast("Nusxa olindi!", "success");
+    };
+  });
 };
 
 // ── Self Transfer Logic ──
@@ -2191,7 +2443,7 @@ const openSelfTransferModal = () => {
                 <div class="ts-select-trigger" style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px; font-weight:700; color:#1e293b; display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
                     <div style="display:flex; flex-direction:column;">
                         <span style="font-size:14px;">${selectedMethod.type === "card" ? selectedMethod.cardName : "Hisob"} ${selectedMethod.number ? " • " + selectedMethod.number.slice(-4) : ""}</span>
-                        <span style="font-size:12px; color:#64748b; font-weight:500; margin-top:2px;">${t("account_balance")}: ${selectedMethod.balance.toLocaleString('en-US').replace(/,/g, ' ')} $</span>
+                        <span style="font-size:12px; color:#64748b; font-weight:500; margin-top:2px;">${t("account_balance")}: ${selectedMethod.balance.toLocaleString('en-US').replace(/,/g, ' ')} UZS</span>
                     </div>
                     <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#8892a4" stroke-width="2"><path d="M19 9l-7 7-7-7"/></svg>
                 </div>
@@ -2199,7 +2451,7 @@ const openSelfTransferModal = () => {
                     ${myMethods.map(m => `
                         <div class="ts-option" data-value="${m._id}" style="padding:12px; border-bottom:1px solid #f1f5f9; cursor:pointer; transition:background 0.2s;">
                             <div style="font-weight:700; font-size:14px; color:#1e293b; pointer-events:none;">${m.type === "card" ? m.cardName : "Hisob"} ${m.number ? " • " + m.number.slice(-4) : ""}</div>
-                            <div style="font-size:12px; color:#64748b; font-weight:500; margin-top:2px; pointer-events:none;">${t("account_balance")}: ${m.balance.toLocaleString('en-US').replace(/,/g, ' ')} $</div>
+                            <div style="font-size:12px; color:#64748b; font-weight:500; margin-top:2px; pointer-events:none;">${t("account_balance")}: ${m.balance.toLocaleString('en-US').replace(/,/g, ' ')} UZS</div>
                         </div>
                     `).join("")}
                 </div>
@@ -2261,7 +2513,7 @@ const openSelfTransferModal = () => {
     modal.onclick = (e) => { if(e.target === modal) modal.style.display = "none"; };
 
     $("ts-confirm").onclick = async () => {
-        const amount = parseFloat($("ts-amount").value);
+        const amount = parseFloat($("ts-amount").value.replace(/[\s,]/g, ""));
         if (!amount || amount <= 0) {
             $("ts-error").textContent = t("invalid_amount") || "Noto'g'ri summa kiritildi";
             $("ts-error").style.display = "block";

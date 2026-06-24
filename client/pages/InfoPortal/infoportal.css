@@ -92,8 +92,7 @@
     transform: translateY(0);
 }
 
-.cal-view-option,
-.cal-filter-option {
+.cal-view-option {
     display: block;
     width: 100%;
     padding: 8px 12px;
@@ -107,6 +106,36 @@
     text-align: left;
     transition: all 0.15s;
     font-family: inherit;
+}
+
+.cal-filter-option {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #5a6279;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.cal-filter-option input[type="checkbox"] {
+    margin: 0;
+    margin-right: 8px;
+    width: 15px;
+    height: 15px;
+    accent-color: #5b6ef5;
+    cursor: pointer;
+}
+
+#cal-filter-menu {
+    min-width: 160px;
 }
 
 .cal-view-option:hover,

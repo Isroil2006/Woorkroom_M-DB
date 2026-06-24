@@ -1747,6 +1747,11 @@
     border-radius: 12px;
     transition: background-color 0.2s, color 0.2s;
 }
+
+.vac-book-actions .vac-book-confirm-btn {
+    width: max-content;
+}
+
 .vac-book-confirm-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -2917,3 +2922,5 @@
         background: #f8fafc;
     }
 }
+
+.vac-book-method-item.disabled { opacity: 0.5; pointer-events: none; cursor: not-allowed; filter: grayscale(1); }
