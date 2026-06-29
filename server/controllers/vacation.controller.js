@@ -355,8 +355,9 @@ exports.bookVacation = async (req, res) => {
       guests,
       totalCost,
       paymentMethod,
+      paymentMethodId,
       selectedDate,
-      status: "confirmed"
+      status: "pending"
     });
 
     await booking.save();
@@ -375,6 +376,84 @@ exports.getMyBookings = async (req, res) => {
     res.json({ success: true, data: bookings });
   } catch (error) {
     console.error("Get my bookings error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Admin endpoints
+exports.getAllBookingsAdmin = async (req, res) => {
+  try {
+    const bookings = await VacationBooking.find()
+      .populate("vacationId")
+      .populate("userId", "username email avatar");
+    res.json({ success: true, data: bookings });
+  } catch (error) {
+    console.error("Get all bookings error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+exports.approveBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const booking = await VacationBooking.findById(id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+    if (booking.status !== "pending") {
+      return res.status(400).json({ success: false, message: "Booking is not pending" });
+    }
+    booking.status = "confirmed";
+    await booking.save();
+    res.json({ success: true, message: "Booking confirmed successfully" });
+  } catch (error) {
+    console.error("Approve booking error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+exports.rejectBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const booking = await VacationBooking.findById(id).populate("vacationId");
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+    if (booking.status !== "pending") {
+      return res.status(400).json({ success: false, message: "Booking is not pending" });
+    }
+    booking.status = "cancelled";
+    await booking.save();
+
+    // Refund logic
+    if (booking.paymentMethodId) {
+      const pm = await PaymentMethod.findById(booking.paymentMethodId);
+      if (pm) {
+        pm.balance += booking.totalCost;
+        await pm.save();
+      }
+      
+      const userId = booking.userId;
+      const user = await User.findOne({ $or: [{ userId }, { _id: userId }] });
+
+      // Create refund transaction
+      const tx = new Transaction({
+        senderId: "system_tour",
+        senderName: "Workroom Agency",
+        receiverId: user ? (user.userId || user._id) : userId,
+        receiverName: user ? user.username : "Unknown",
+        receiverMethodId: booking.paymentMethodId,
+        amount: booking.totalCost,
+        description: `Sayohat rad etildi, to'lov qaytarildi: ${booking.vacationId.name.uz || booking.vacationId.name || "Noma'lum tur"}`,
+        status: "paid",
+        paidAt: new Date()
+      });
+      await tx.save();
+    }
+
+    res.json({ success: true, message: "Booking rejected and refunded successfully" });
+  } catch (error) {
+    console.error("Reject booking error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };

@@ -54,7 +54,7 @@ const loadPaymentData = async () => {
       apiFetch("/api/payments/users"),
       fetchRates(),
     ]);
-    myMethods = methods;
+    myMethods = methods.sort((a, b) => (b.isDefault === true ? 1 : 0) - (a.isDefault === true ? 1 : 0));
     myTransactions = transactions;
     myStats = stats;
     paymentUsers = users;
@@ -64,8 +64,14 @@ const loadPaymentData = async () => {
 };
 
 // ─── FORMAT HELPERS ─────────────────────────────────────────────
-const fmt = (n) => Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " UZS";
-const fmtCardBalance = (n) => {
+const fmt = (n, isVisa = false) => {
+  const formatted = Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return isVisa ? "$" + formatted : formatted + " UZS";
+};
+const fmtCardBalance = (n, isVisa = false) => {
+   if (isVisa) {
+     return "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+   }
    const converted = (n || 0) / exchangeRates[cardCurrency];
    const symbol = cardCurrency === "USD" ? "$" : (cardCurrency === "RUB" ? "₽" : "UZS");
    const formatted = Number(converted).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -154,16 +160,19 @@ export const BusinessPage = () => `
         <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
           <h3>${t("documents")}</h3>
           <div id="mini-filters-container" style="display:flex; gap:10px; z-index:10;"></div>
+          <button class="biz-btn-secondary" id="btn-view-all-cards" style="height:32px; padding:0 12px; font-size:12px; border-radius:10px; font-weight:600; display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+            Barcha kartalarni ko'rish
+          </button>
         </div>
-        <button class="biz-btn-primary" id="mini-create-doc-btn">${t("create")}</button>
+        <button class="biz-btn-primary" id="mini-create-doc-btn" style="height:32px; padding:0 14px; font-size:12px;">${t("create")}</button>
       </div>
       <div class="biz-full-table-header docs-cols mini-table-header">
         <span>${t("col_type")}</span>
         <span>${t("col_amount")}</span>
-        <span>${t("col_payment_method")}</span>
         <span>${t("col_date")}</span>
-        <span>${t("col_activity")}</span>
-        <span>${t("col_status")}</span>
+        <span>${t("col_sender")}</span>
+        <span>${t("col_receiver")}</span>
         <span>${t("col_action")}</span>
       </div>
       <div id="docs-mini"></div>
@@ -229,10 +238,9 @@ export const BusinessPage = () => `
       <div class="biz-full-table-header docs-cols">
         <span>${t("col_type")}</span>
         <span>${t("col_amount")}</span>
-        <span>${t("col_payment_method")}</span>
         <span>${t("col_date")}</span>
-        <span>${t("col_activity")}</span>
-        <span>${t("col_status")}</span>
+        <span>${t("col_sender")}</span>
+        <span>${t("col_receiver")}</span>
         <span>${t("col_action")}</span>
       </div>
       <div id="docs-full-list" style="flex:1;overflow-y:auto;"></div>
@@ -244,6 +252,70 @@ export const BusinessPage = () => `
           <button id="dp-next">&#8250;</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div id="view-all-cards" style="display:none; flex:1; flex-direction:column; overflow:hidden;">
+    <div class="biz-card" style="height:100%; display:flex; flex-direction:column;">
+      
+      <!-- Card Head -->
+      <div class="biz-card-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; border-bottom: 1px solid #f0f2fa; padding: 16px 20px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button class="biz-back-btn" id="back-all-cards">${t("back")}</button>
+          <h3 style="font-size:18px; font-weight:700; color:#1a1d2e;">Barcha hisob va kartalar</h3>
+        </div>
+      </div>
+
+      <!-- Filters & Analytics Banner -->
+      <div class="biz-doc-filters" style="display:flex; justify-content:space-between; align-items:center; padding: 14px 20px; border-bottom: 1px solid #f8fafc; flex-wrap:wrap; gap:12px; background:#fafbff;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <!-- Filter Select Type -->
+          <div class="custom-select" id="all-cards-type-filter-custom" style="font-size: 14px;">
+            <div class="selected" style="font-size: 14px; padding: 8px 12px; border-radius: 9px; gap: 8px;">
+                <span id="all-cards-filter-text">Barchasi</span>
+                <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+            <ul class="options" style="font-size: 14px; min-width: 140px; right: auto; left: 0;">
+                <li data-value="">Barchasi</li>
+                <li data-value="Humo">Humo</li>
+                <li data-value="Uzcard">Uzcard</li>
+                <li data-value="Visa">Visa</li>
+                <li data-value="Bank">Bank hisobi</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Split Layout for Grid and Card Details -->
+      <div style="flex:1; display:flex; min-height:0; overflow:hidden; padding: 20px; border-radius: 24px; background-color: #fff;">
+        
+        <!-- Left Column: Cards List Grid -->
+        <div id="all-cards-grid-container" style="flex: 1.8; border-radius: 24px; background-color: #EEF0FD; overflow-y:auto; padding:20px; display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:20px; border-right:1px solid #f0f2fa; align-content:start;">
+          <!-- Generated Cards list -->
+        </div>
+
+        <!-- line -->
+        <div style="width: 1px; height: 100%; background-color: #e2e8f0; margin: 0 50px;"></div>
+
+        <!-- Right Column: Card Detailed Inspector -->
+        <div id="all-cards-inspector" style="flex: 1.2; overflow-y:auto; padding:20px; background-color: #EEF0FD; border-radius: 24px; display:flex; flex-direction:column; gap:20px;">
+          <!-- If no card selected -->
+          <div id="all-cards-no-selection" style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:#8892a4; padding:40px 20px; background-color:#EEF0FD;">
+            <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="margin-bottom:12px; opacity:0.6;"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+            <p style="font-weight:600; margin:0 0 4px; font-size:14px; color:#1a1d2e;">Karta tanlanmagan</p>
+            <p style="font-size:12px; margin:0;">Batafsil ma'lumot olish va sozlamalarni o'zgartirish uchun istalgan kartani tanlang.</p>
+          </div>
+          
+          <!-- Card details panel (will be generated dynamically) -->
+          <div id="all-cards-details-panel" style="display:none; flex-direction:column; gap:20px;">
+             <!-- Details content here -->
+          </div>
+        </div>
+
+      </div>
+
     </div>
   </div>
 </div>
@@ -403,13 +475,20 @@ export const BusinessPage = () => `
 <div id="card-modal" class="biz-overlay" style="display:none">
   <div class="biz-modal">
     <h3>${t("add_new_card")}</h3>
-    <label class="biz-label">${t("card_type") || "Karta turi"}</label>
-    <select class="biz-input" id="cm-card-type">
-      <option value="Humo">Humo</option>
-      <option value="Uzcard">Uzcard</option>
-    </select>
-    <label class="biz-label">${t("card_number")}</label>
-    <input class="biz-input" id="cm-number" placeholder="1234 5678 9012 3456" maxlength="19" inputmode="numeric" />
+    <div style="display:flex; gap:0;">
+      <div style="flex:1;">
+        <label class="biz-label">${t("card_number")}</label>
+        <input class="biz-input" id="cm-number" placeholder="1234 5678 9012 3456" maxlength="19" inputmode="numeric" />
+        <div id="cm-card-detector" style="margin-top:8px; display:flex; align-items:center; gap:8px; display:none;">
+          <div id="cm-detected-card" style="font-size:12px; font-weight:600; padding:4px 8px; border-radius:6px; background:#f1f5f9; color:#475569;"></div>
+          <span id="cm-number-error" class="biz-error" style="font-size:12px; display:none;">Faqat Humo, Uzcard yoki Visa kiriting</span>
+        </div>
+      </div>
+      <div id="cm-cvv-container" style="width:80px; overflow:hidden; transition:max-width 0.4s ease, opacity 0.4s ease, margin-left 0.4s ease; max-width:0; opacity:0; margin-left:0;">
+        <label class="biz-label">CVV</label>
+        <input class="biz-input" id="cm-cvv" placeholder="123" maxlength="3" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
+      </div>
+    </div>
     <label class="biz-label">${t("card_holder")}</label>
     <input class="biz-input" id="cm-holder" placeholder="${t("full_name")}" />
     <div style="display:flex;gap:12px">
@@ -418,7 +497,7 @@ export const BusinessPage = () => `
         <label class="biz-label">${t("balance")}</label>
         <div style="position:relative; display:flex; align-items:center;">
           <input class="biz-input" type="text" id="cm-balance" placeholder="0" oninput="this.value = this.value.replace(/[^\\d]/g, '').replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',')" style="padding-right: 45px; width: 100%; box-sizing: border-box;"/>
-          <span style="position:absolute; right:12px; font-size:14px; color:#64748b; font-weight:600; pointer-events:none;">UZS</span>
+          <span id="cm-currency-label" style="position:absolute; right:12px; font-size:14px; color:#64748b; font-weight:600; pointer-events:none;">UZS</span>
         </div>
       </div>
     </div>
@@ -477,6 +556,15 @@ export const BusinessPage = () => `
             <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
               <span id="cs-expiry" style="font-size:14px; font-weight:700; color:#1e293b;"></span>
               <button class="cs-copy-btn" data-target="cs-expiry" style="background:transparent; border:none; color:#3b82f6; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;" title="Nusxa olish">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+          </div>
+          <div id="cs-cvv-container" style="display:none;">
+            <p style="font-size:12px; color:#64748b; margin:0 0 4px; font-weight:500;">CVV</p>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+              <span id="cs-cvv" style="font-size:14px; font-weight:700; color:#1e293b;"></span>
+              <button class="cs-copy-btn" data-target="cs-cvv" style="background:transparent; border:none; color:#3b82f6; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;" title="Nusxa olish">
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               </button>
             </div>
@@ -634,6 +722,50 @@ export const BusinessPage = () => `
   </div>
 </div>
 
+<!-- ══ CURRENCY EXCHANGE MODAL ══ -->
+<div id="ce-modal" class="biz-overlay" style="display:none; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
+  <div class="biz-modal" style="width:100%; max-width:380px; border-radius: 24px; padding:24px; animation: popIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both; background:#fff;">
+     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+        <h3 style="margin:0; font-size:20px; font-weight:800; color:#1a1d2e;">Valyuta almashtirish</h3>
+        <button class="biz-close-btn" id="ce-close">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+     </div>
+     
+     <div style="position:relative;">
+         <div style="background:#f4f5f7; border-radius:16px; padding:16px; margin-bottom:12px;">
+           <label style="color:#64748b; font-size:12px; margin-bottom:6px; display:block; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Yuborish</label>
+           <div id="ce-sender-card-container" style="position:relative;"></div>
+           <div style="display:flex; align-items:center; margin-top:12px; border-top:1px solid #e2e8f0; padding-top:12px;">
+               <input type="text" id="ce-amount-send" placeholder="0" style="background:transparent; border:none; font-size:24px; font-weight:700; color:#1e293b; width:100%; outline:none;" />
+               <span id="ce-currency-send" style="font-size:20px; font-weight:700; color:#1e293b; margin-left:8px;">UZS</span>
+           </div>
+         </div>
+
+         <button id="ce-swap-btn" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:40px; height:40px; background:#5b6ef5; border:4px solid #fff; border-radius:50%; display:flex; justify-content:center; align-items:center; cursor:pointer; z-index:10; box-shadow:0 4px 12px rgba(91,110,245,0.2); color:#fff; transition:transform 0.2s;">
+           <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>
+         </button>
+
+         <div style="background:#f4f5f7; border-radius:16px; padding:16px; margin-bottom:24px;">
+           <label style="color:#64748b; font-size:12px; margin-bottom:6px; display:block; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Qabul qilish</label>
+           <div id="ce-receiver-card-container" style="position:relative;"></div>
+           <div style="display:flex; align-items:center; margin-top:12px; border-top:1px solid #e2e8f0; padding-top:12px;">
+               <input type="text" id="ce-amount-receive" placeholder="0" style="background:transparent; border:none; font-size:24px; font-weight:700; color:#64748b; width:100%; outline:none;" disabled />
+               <span id="ce-currency-receive" style="font-size:20px; font-weight:700; color:#64748b; margin-left:8px;">USD</span>
+           </div>
+         </div>
+     </div>
+     
+     <div style="display:flex; justify-content:space-between; margin-bottom:24px; font-size:12px; font-weight:600; color:#64748b;">
+        <span>Kurs:</span>
+        <span id="ce-rate-display">1 USD = ... UZS</span>
+     </div>
+     <p id="ce-error" style="color:#ef4444; font-size:12px; margin:0 0 16px 0; display:none; font-weight:500; text-align:center;"></p>
+
+     <button class="biz-btn-primary" id="ce-confirm" style="width:100%; padding:16px; font-size:16px; background:#5b6ef5; color:#fff; box-shadow:0 8px 20px rgba(91,110,245,0.3); transition:all 0.2s;">Almashtirish</button>
+  </div>
+</div>
+
 <!-- ══ NOTIFICATION TOAST ══ -->
 `;
 
@@ -729,7 +861,13 @@ const renderAccounts = () => {
           }
           return `
         <div class="biz-carousel-slide">
-          <div class="biz-acc-card ${m.type === "card" ? "card-grad" : "bank-grad"}" style="min-height:170px">
+          <div class="biz-acc-card ${m.type === "card" ? "card-grad" : "bank-grad"}" style="min-height:170px; position:relative;">
+            ${blockedCardIds.has(m._id) ? `
+            <div style="position:absolute; inset:0; background:rgba(15, 23, 42, 0.7); backdrop-filter:blur(3px); display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; gap:8px; z-index:2; border-radius:16px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-snowflake-icon lucide-snowflake"><path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/></svg>
+              <span style="font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Karta muzlatilgan</span>
+            </div>
+            ` : ""}
             <div style="display:flex;justify-content:space-between;align-items:flex-start">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-nfc-icon lucide-nfc"><path d="M6 8.32a7.43 7.43 0 0 1 0 7.36"/><path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58"/><path d="M12.91 4.1a15.91 15.91 0 0 1 .01 15.8"/><path d="M16.37 2a20.16 20.16 0 0 1 0 20"/></svg>
               <span style="font-size:14px;font-weight:700;letter-spacing:1.5px;opacity:.9">${label}</span>
@@ -740,7 +878,7 @@ const renderAccounts = () => {
             <div style="display:flex;justify-content:space-between;align-items:flex-end">
               <div style="text-align:left">
                 <p style="font-size:9px;opacity:.55;margin:0;text-transform:uppercase;letter-spacing:.5px">BALANCE</p>
-                <p style="font-size:18px;font-weight:700;margin:4px 0 0">${fmtCardBalance(m.balance)}</p>
+                <p style="font-size:18px;font-weight:700;margin:4px 0 0">${fmtCardBalance(m.balance, m.cardName === "Visa")}</p>
               </div>
               <button class="biz-card-settings-btn" data-id="${m._id}" style="background:transparent;border:none;color:inherit;cursor:pointer;opacity:0.8;transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -751,7 +889,7 @@ const renderAccounts = () => {
         }).join("")}
       </div>
     </div>
-    <div style="display:flex; justify-content:flex-start; align-items:center; margin-top:16px; gap:12px;">
+    <div style="display:flex; justify-content:center; align-items:center; margin-top:16px; gap:12px;">
       <!-- Carousel controls -->
       <div style="display:flex; align-items:center; gap:12px;">
         <button class="biz-carousel-arrow" id="c-prev" style="background:#f8fafc; border:1px solid #f1f5f9; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink: 0;" ${carouselIdx === 0 ? "disabled" : ""}>
@@ -764,33 +902,14 @@ const renderAccounts = () => {
           <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="#475569" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>
-
-      <!-- Divider -->
-      <div style="width:1px; height:24px; background:#e2e8f0; border-radius:1px; margin:0 4px; flex-shrink: 0;"></div>
-
-      <!-- Currency Select and actions -->
-      <div style="display:flex; align-items:center; gap:8px;">
-        <div class="biz-custom-select" id="card-currency-select" style="min-width: 85px;">
-           <div class="biz-select-trigger" style="height:36px; padding:0 12px; border-radius:12px; font-weight:700; background:#f8fafc; border:1px solid #f1f5f9; display:flex; align-items:center; justify-content:space-between; font-size:14px; color:#0f172a; cursor:pointer;">
-              <span class="biz-select-val">${cardCurrency}</span>
-              <svg style="margin-left:8px;" width="16" height="16" fill="none" stroke="#64748b" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-           </div>
-           <div class="biz-select-options" style="min-width: 85px;">
-              <div class="biz-option ${cardCurrency === 'UZS' ? 'biz-selected' : ''}" data-value="UZS">UZS</div>
-              <div class="biz-option ${cardCurrency === 'USD' ? 'biz-selected' : ''}" data-value="USD">USD</div>
-              <div class="biz-option ${cardCurrency === 'RUB' ? 'biz-selected' : ''}" data-value="RUB">RUB</div>
-           </div>
-        </div>
-        
-        <!-- Action Buttons -->
-        <button id="inline-refresh-btn" style="background:#f8fafc; border:1px solid #f1f5f9; border-radius:12px; width:36px; height:36px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; color:#475569;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
-        </button>
-      </div>
     </div>
     <button class="biz-btn-secondary" id="transfer-to-self-btn" style="width:100%; margin-top:16px; display:flex; justify-content:center; align-items:center; gap:8px;">
       <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>
       ${t("transfer_to_self")}
+    </button>
+    <button class="biz-btn-primary" id="currency-exchange-btn" style="width:100%; margin-top:10px; display:flex; justify-content:center; align-items:center; gap:8px; background:#5b6ef5; color:#fff; border:none; padding:12px; border-radius:12px; font-weight:600; cursor:pointer;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left-right-icon lucide-arrow-left-right"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
+      Valyuta almashtirish
     </button>
     
     <div class="biz-stats-col" style="margin-top:14px">
@@ -805,15 +924,6 @@ const renderAccounts = () => {
           <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 4v16m7-7l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
         <div><p class="biz-stat-label">${t("monthly_income")}</p><p class="biz-stat-value" id="stat-paid">0 UZS</p></div>
-      </div>
-      <div class="biz-stat-card biz-stat-accent">
-        <div class="biz-stat-icon account-icon">
-          <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3H8L2 7h20l-6-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-        </div>
-        <div>
-          <p class="biz-stat-label" style="color:rgba(255,255,255,.7)">${t("account_balance")}</p>
-          <p class="biz-stat-value" id="stat-balance" style="color:#fff">0 UZS</p>
-        </div>
       </div>
     </div>
   `;
@@ -852,38 +962,7 @@ const renderAccounts = () => {
   // Restore the stats values into the freshly rendered stat blocks
   refreshStats();
 
-  const currSelect = $("card-currency-select");
-  if (currSelect) {
-    const trigger = currSelect.querySelector(".biz-select-trigger");
-    trigger.onclick = (e) => {
-       e.stopPropagation();
-       document.querySelectorAll(".biz-custom-select.open").forEach(el => {
-          if (el !== currSelect) el.classList.remove("open");
-       });
-       currSelect.classList.toggle("open");
-    };
-    currSelect.querySelectorAll(".biz-option").forEach(opt => {
-       opt.onclick = (e) => {
-          e.stopPropagation();
-          cardCurrency = opt.getAttribute("data-value");
-          currSelect.classList.remove("open");
-          renderAccounts();
-       };
-    });
-  }
 
-
-  if ($("inline-refresh-btn")) {
-    $("inline-refresh-btn").onclick = async (e) => {
-      const btn = e.currentTarget;
-      const svg = btn.querySelector("svg");
-      svg.style.transition = "transform 0.5s ease";
-      svg.style.transform = "rotate(360deg)";
-      await fetchRates();
-      renderAccounts();
-      setTimeout(() => { svg.style.transition = "none"; svg.style.transform = "rotate(0deg)"; }, 500);
-    };
-  }
 
   // Self Transfer btn logic
   if ($("transfer-to-self-btn")) {
@@ -893,6 +972,12 @@ const renderAccounts = () => {
              return;
          }
          openSelfTransferModal();
+     };
+  }
+
+  if ($("currency-exchange-btn")) {
+     $("currency-exchange-btn").onclick = () => {
+         openCurrencyExchangeModal();
      };
   }
 
@@ -947,11 +1032,11 @@ const renderMiniFilters = () => {
      const svgIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
      
      selDiv.innerHTML = `
-        <div class="biz-select-trigger">
+        <div class="biz-select-trigger" style="height:32px; padding:0 12px; font-size:12px; border-radius:10px; font-weight:600; color:#1a1d2e;">
            <span class="biz-select-label">${selectedOpt.label}</span>
            ${svgIcon}
         </div>
-        <div class="biz-select-options">
+        <div class="biz-select-options" style="left:0; right:auto; min-width:140px;">
            ${options.map(o => `<div class="biz-option ${o.value === currentValue ? 'biz-selected' : ''}" data-value="${o.value}">${o.label}</div>`).join('')}
         </div>
      `;
@@ -995,6 +1080,41 @@ const renderMiniFilters = () => {
 document.addEventListener("click", () => {
    document.querySelectorAll(".biz-custom-select.open").forEach(el => el.classList.remove("open"));
 });
+const getMethodInfo = (methodObj, methodId, isMySide) => {
+    if (isMySide && typeof myMethods !== 'undefined') {
+        const found = myMethods.find(m => m._id === methodId);
+        if (found) return found;
+    }
+    if (methodObj && typeof methodObj === 'object') {
+        return methodObj;
+    }
+    return null;
+};
+
+const buildUserCell = (name, method) => {
+    const dispName = name || "User";
+    const initial = dispName.charAt(0).toUpperCase();
+    let cardStr = "****";
+    if (method) {
+        if (method.number) {
+            cardStr = "**** " + method.number.slice(-4);
+        } else if (method.cardName) {
+            cardStr = method.cardName;
+        }
+    }
+    
+    return `
+    <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;flex-shrink:0;">
+        ${initial}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1px;overflow:hidden;">
+        <span style="font-weight:600;font-size:12px;color:#1a1d2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${dispName}</span>
+        <span style="font-size:10px;color:#8892a4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${cardStr}</span>
+      </div>
+    </div>`;
+};
+
 
 const renderDocsMini = () => {
   const el = $("docs-mini");
@@ -1051,7 +1171,8 @@ const renderDocsMini = () => {
         const d = new Date(p.createdAt);
         const date = isPending ? "-" : `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
         
-        const amountColor = isPending ? "#f59e0b" : (isSent ? "#ef4444" : "#16a34a");
+        let amountColor = isPending ? "#f59e0b" : (isSent ? "#ef4444" : "#16a34a");
+        if (p.senderId === "system_tour") amountColor = "#0284c7";
         const amountSign = isSent ? "- " : "+ ";
         
         let activityText = isSent ? `${t("sending_payment_to")} ${p.receiverName || "User"}` : `${t("received_payment_from")} ${p.senderName || "User"}`;
@@ -1060,15 +1181,12 @@ const renderDocsMini = () => {
         
         const sId = typeof p.senderMethodId === 'object' && p.senderMethodId ? p.senderMethodId._id : p.senderMethodId;
         const rId = typeof p.receiverMethodId === 'object' && p.receiverMethodId ? p.receiverMethodId._id : p.receiverMethodId;
-        let myMethodUsed = isSent ? myMethods.find(m => m._id === sId) : myMethods.find(m => m._id === rId);
-        let paymentMethodText = "-";
-        let paymentMethodSub = "";
-        if (myMethodUsed) {
-           const methodType = myMethodUsed.type === "card" ? t("method_card_via") : t("method_bank_via");
-           const last4 = myMethodUsed.number ? myMethodUsed.number.slice(-4) : "****";
-           paymentMethodText = methodType;
-           paymentMethodSub = `**** ${last4}`;
-        }
+        const senderMethod = getMethodInfo(p.senderMethodId, sId, isSent);
+        const receiverMethod = getMethodInfo(p.receiverMethodId, rId, !isSent);
+        const senderName = p.senderName || (p.senderId === "system_tour" ? "Sayohat" : "User");
+        const receiverName = p.receiverName || (p.receiverId === "system_tour" ? "Sayohat" : "User");
+        const senderCell = buildUserCell(senderName, senderMethod);
+        const receiverCell = buildUserCell(receiverName, receiverMethod);
 
         let typeBg = isPending ? "#fef3c7" : (isSent ? "#fee2e2" : "#dcfce7");
         let typeColor = isPending ? "#f59e0b" : (isSent ? "#ef4444" : "#16a34a");
@@ -1093,6 +1211,13 @@ const renderDocsMini = () => {
             typeIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
         }
 
+        if (p.senderId === "system_tour") {
+            typeBg = "rgba(14, 165, 233, 0.15)";
+            typeColor = "#0284c7";
+            typeText = t("type_refunded") || "Qaytarilgan";
+            typeIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6m-6-6l6-6"/></svg>`;
+        }
+
         return `
         <div class="biz-doc-row-wrap mini-table-row${expanded ? " expanded" : ""}">
           <div class="biz-row docs-cols mini-table-grid">
@@ -1103,23 +1228,12 @@ const renderDocsMini = () => {
               <span style="font-weight:600;font-size:12px;color:#1a1d2e">${typeText}</span>
             </div>
 
-            <span class="biz-cell" style="font-weight:700;color:${amountColor};font-size:12px">${amountSign}${fmt(p.amount)}</span>
-
-            <div style="display:flex;flex-direction:column;gap:1px">
-              <span style="font-weight:600;font-size:11px;color:#1a1d2e">${paymentMethodText}</span>
-              <span style="font-size:9px;color:#8892a4">${paymentMethodSub}</span>
-            </div>
+            <span class="biz-cell" style="font-weight:700;color:${amountColor};font-size:12px">${amountSign}${fmt(p.amount, (isSent ? senderMethod : receiverMethod) ? (isSent ? senderMethod : receiverMethod).cardName === "Visa" : false)}</span>
 
             <span class="biz-cell biz-small" style="font-size:10px">${date}</span>
 
-            <span class="biz-cell" style="font-size:11px;font-weight:500;color:#1a1d2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${activityText}</span>
-
-            <div>
-              <div class="biz-status-badge ${badgeClass}" style="padding:2px 6px;font-size:9px">
-                ${badgeIcon}
-                ${badgeText}
-              </div>
-            </div>
+            ${senderCell}
+            ${receiverCell}
 
             <div style="display:flex;gap:4px;align-items:center">
               ${isWait ? `
@@ -1128,11 +1242,11 @@ const renderDocsMini = () => {
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
                 </button>
               ` : `
-                <button class="biz-icon-btn receipt-btn" data-tid="${p._id}" style="background:#e0f2fe;color:#0284c7;width:auto;padding:0 6px;" title="Chekni ko'rish">
+                <button class="biz-icon-btn receipt-btn" data-tid="${p._id}" style="background:#f1f3fa;color:#1a1d2e;width:auto;padding:0 6px;" title="Chekni ko'rish">
                   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 </button>
-                <button class="biz-icon-btn qr-btn" data-tid="${p._id}" style="background:#fef3c7;color:#d97706;width:auto;padding:0 6px;" title="QR kod orqali ko'rish">
-                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+                <button class="biz-icon-btn qr-btn" data-tid="${p._id}" style="background:#f1f3fa;color:#1a1d2e;width:auto;padding:0 6px;" title="QR kod orqali ko'rish">
+                  <svg width="12" height="12" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-qr-code-icon lucide-qr-code"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>
                 </button>
               `}
             </div>
@@ -1252,7 +1366,8 @@ const renderDocsFull = (statusF = "", numF = "") => {
         const date = isWait ? "-" : `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
         const time = isWait ? "-" : d.toLocaleTimeString();
         
-        const amountColor = isSent ? "#1a1d2e" : "#16a34a";
+        let amountColor = isSent ? "#1a1d2e" : "#16a34a";
+        if (p.senderId === "system_tour") amountColor = "#0284c7";
         const amountSign = isSent ? "- " : "+ ";
         
         let activityText = isSent ? `${t("sending_payment_to")} ${p.receiverName || "User"}` : `${t("received_payment_from")} ${p.senderName || "User"}`;
@@ -1261,15 +1376,12 @@ const renderDocsFull = (statusF = "", numF = "") => {
         
         const sId = typeof p.senderMethodId === 'object' && p.senderMethodId ? p.senderMethodId._id : p.senderMethodId;
         const rId = typeof p.receiverMethodId === 'object' && p.receiverMethodId ? p.receiverMethodId._id : p.receiverMethodId;
-        let myMethodUsed = isSent ? myMethods.find(m => m._id === sId) : myMethods.find(m => m._id === rId);
-        let paymentMethodText = "-";
-        let paymentMethodSub = "";
-        if (myMethodUsed) {
-           const methodType = myMethodUsed.type === "card" ? t("method_card_via") : t("method_bank_via");
-           const last4 = myMethodUsed.number ? myMethodUsed.number.slice(-4) : "****";
-           paymentMethodText = methodType;
-           paymentMethodSub = `**** ${last4}`;
-        }
+        const senderMethod = getMethodInfo(p.senderMethodId, sId, isSent);
+        const receiverMethod = getMethodInfo(p.receiverMethodId, rId, !isSent);
+        const senderName = p.senderName || (p.senderId === "system_tour" ? "Sayohat" : "User");
+        const receiverName = p.receiverName || (p.receiverId === "system_tour" ? "Sayohat" : "User");
+        const senderCell = buildUserCell(senderName, senderMethod);
+        const receiverCell = buildUserCell(receiverName, receiverMethod);
 
         let typeBg = isSent ? '#fee2e2' : '#dcfce7';
         let typeColor = isSent ? '#ef4444' : '#16a34a';
@@ -1292,6 +1404,13 @@ const renderDocsFull = (statusF = "", numF = "") => {
             typeIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
         }
 
+        if (p.senderId === "system_tour") {
+            typeBg = "rgba(14, 165, 233, 0.15)";
+            typeColor = "#0284c7";
+            typeText = t("type_refunded") || "Qaytarilgan";
+            typeIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6m-6-6l6-6"/></svg>`;
+        }
+
         return `
         <div class="biz-doc-row-wrap${expanded ? " expanded" : ""}">
           <div class="biz-row docs-cols">
@@ -1302,27 +1421,16 @@ const renderDocsFull = (statusF = "", numF = "") => {
               <span style="font-weight:600;font-size:13px;color:#1a1d2e">${typeText}</span>
             </div>
 
-            <span class="biz-cell" style="font-weight:700;color:${amountColor}">${amountSign}${fmt(p.amount)}</span>
-
-            <div style="display:flex;flex-direction:column;gap:2px">
-              <span style="font-weight:600;font-size:12px;color:#1a1d2e">${paymentMethodText}</span>
-              <span style="font-size:10px;color:#8892a4">${paymentMethodSub}</span>
-            </div>
+            <span class="biz-cell" style="font-weight:700;color:${amountColor}">${amountSign}${fmt(p.amount, (isSent ? senderMethod : receiverMethod) ? (isSent ? senderMethod : receiverMethod).cardName === "Visa" : false)}</span>
 
             <span class="biz-cell biz-small">${date}</span>
 
-            <span class="biz-cell" style="font-size:12px;font-weight:500;color:#1a1d2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${activityText}</span>
-
-            <div>
-              <div class="biz-status-badge ${badgeClass}">
-                ${badgeIcon}
-                ${badgeText}
-              </div>
-            </div>
+            ${senderCell}
+            ${receiverCell}
 
             <div style="display:flex;gap:5px;align-items:center">
               ${isWait ? `<button class="biz-icon-btn send-btn" data-tid="${p._id}" style="background:#5b6ef5;color:#fff;width:auto;padding:0 9px;font-size:11px;font-weight:700">${t("send")}</button>` : ""}
-              ${!isWait ? `<button class="biz-icon-btn receipt-btn" data-tid="${p._id}" style="background:#e0f2fe;color:#0284c7" title="Chekni ko'rish"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></button><button class="biz-icon-btn qr-btn" data-tid="${p._id}" style="background:#fef3c7;color:#d97706" title="QR orqali ko'rish"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></button>` : ""}
+              ${!isWait ? `<button class="biz-icon-btn receipt-btn" data-tid="${p._id}" style="background:#f1f3fa;color:#1a1d2e" title="Chekni ko'rish"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></button><button class="biz-icon-btn qr-btn" data-tid="${p._id}" style="background:#f1f3fa;color:#1a1d2e" title="QR orqali ko'rish"><svg width="12" height="12" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-qr-code-icon lucide-qr-code"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg></button>` : ""}
               <button class="biz-icon-btn expand-btn" data-tid="${p._id}" style="background:#f1f3fa;color:#5a6279">
                 <svg width="11" height="11" fill="none" viewBox="0 0 24 24"><path d="${expanded ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"}" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
               </button>
@@ -1396,30 +1504,62 @@ const showView = (name) => {
   const dashboard = $("view-dashboard");
   const clients = $("view-clients");
   const docs = $("view-docs");
+  const allCards = $("view-all-cards");
   const dashRight = document.querySelector(".biz-dash-right");
   const bizRoot = document.querySelector(".biz-root");
   const statsRow = document.querySelector(".biz-stats-row");
   const header = document.querySelector(".biz-header");
+
+  // Reset opacity/transform for smooth transitions
+  [dashboard, clients, docs, allCards].forEach(view => {
+    if (view) {
+      view.style.opacity = "0";
+      view.style.transform = "translateY(8px)";
+      view.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+    }
+  });
+
+  const triggerTransition = (view) => {
+    if (!view) return;
+    view.style.display = "flex";
+    setTimeout(() => {
+      view.style.opacity = "1";
+      view.style.transform = "translateY(0)";
+    }, 30);
+  };
+
   if (name === "view-dashboard") {
-    dashboard.style.display = "flex";
-    clients.style.display = "none";
-    docs.style.display = "none";
+    if (dashboard) triggerTransition(dashboard);
+    if (clients) clients.style.display = "none";
+    if (docs) docs.style.display = "none";
+    if (allCards) allCards.style.display = "none";
     if (dashRight) dashRight.style.display = "flex";
     if (bizRoot) bizRoot.classList.remove("full-width");
     if (statsRow) statsRow.style.display = "flex";
     if (header) header.style.display = "";
   } else if (name === "view-clients") {
-    dashboard.style.display = "none";
-    clients.style.display = "flex";
-    docs.style.display = "none";
+    if (dashboard) dashboard.style.display = "none";
+    if (clients) triggerTransition(clients);
+    if (docs) docs.style.display = "none";
+    if (allCards) allCards.style.display = "none";
     if (dashRight) dashRight.style.display = "none";
     if (bizRoot) bizRoot.classList.add("full-width");
     if (statsRow) statsRow.style.display = "none";
     if (header) header.style.display = "none";
   } else if (name === "view-docs") {
-    dashboard.style.display = "none";
-    clients.style.display = "none";
-    docs.style.display = "flex";
+    if (dashboard) dashboard.style.display = "none";
+    if (clients) clients.style.display = "none";
+    if (docs) triggerTransition(docs);
+    if (allCards) allCards.style.display = "none";
+    if (dashRight) dashRight.style.display = "none";
+    if (bizRoot) bizRoot.classList.add("full-width");
+    if (statsRow) statsRow.style.display = "none";
+    if (header) header.style.display = "none";
+  } else if (name === "view-all-cards") {
+    if (dashboard) dashboard.style.display = "none";
+    if (clients) clients.style.display = "none";
+    if (docs) docs.style.display = "none";
+    if (allCards) triggerTransition(allCards);
     if (dashRight) dashRight.style.display = "none";
     if (bizRoot) bizRoot.classList.add("full-width");
     if (statsRow) statsRow.style.display = "none";
@@ -1717,7 +1857,7 @@ const showReceiverStep = (user, specificMethodId = null) => {
        <div class="pmt-method-icon">${m.type === "card" ? cardSvg : bankSvg}</div>
        <div class="pmt-method-info">
           <p class="pmt-method-name">${m.displayNumber || m.number}</p>
-          <p class="pmt-method-sub">${m.bank || t("method_account") || "Hisob"}</p>
+          <p class="pmt-method-sub">${m.cardName || m.bank || t("method_account") || "Hisob"}</p>
        </div>
     </div>`;
   }).join("") : `<p style="color:#8892a4; font-size:13px;">${t("no_type_methods")}</p>`;
@@ -1731,7 +1871,80 @@ const showReceiverStep = (user, specificMethodId = null) => {
   const checkNextStepReady = () => {
      const amount = parseFloat($("pmt-amount").value.replace(/[\s,]/g, ""));
      const senderSelected = window.currentSenderMethodSelection ? window.currentSenderMethodSelection() : null;
-     if (selRecipMethodId && senderSelected && !isNaN(amount) && amount > 0) {
+     const senderObj = myMethods.find(m => m._id === senderSelected);
+     const recObj = methods.find(m => m._id === selRecipMethodId);
+     
+     const currEl = document.querySelector(".pmt-currency");
+     if (currEl) {
+        if (senderObj) {
+            currEl.textContent = senderObj.cardName === "Visa" ? "USD" : "UZS";
+        } else if (recObj) {
+            currEl.textContent = recObj.cardName === "Visa" ? "USD" : "UZS";
+        } else {
+            currEl.textContent = "UZS";
+        }
+     }
+     
+     const isSenderVisa = senderObj ? senderObj.cardName === "Visa" : null;
+     const isRecVisa = recObj ? recObj.cardName === "Visa" : null;
+     
+     let validReceiverExists = true;
+     let validSenderExists = true;
+
+     if (senderObj) {
+         validReceiverExists = false;
+         document.querySelectorAll("#pmt-receiver-methods .pmt-method-card").forEach(c => {
+             const rObj = methods.find(m => m._id === c.dataset.id);
+             if (rObj) {
+                 if (isSenderVisa !== (rObj.cardName === "Visa")) {
+                     c.style.display = "none";
+                     if (c.classList.contains("selected")) {
+                         c.classList.remove("selected");
+                         selRecipMethodId = null;
+                     }
+                 } else {
+                     c.style.display = "flex";
+                     validReceiverExists = true;
+                 }
+             }
+         });
+     } else {
+         document.querySelectorAll("#pmt-receiver-methods .pmt-method-card").forEach(c => c.style.display = "flex");
+     }
+
+     if (recObj && selRecipMethodId) {
+         validSenderExists = false;
+         document.querySelectorAll("#pmt-sender-methods .pmt-method-card").forEach(c => {
+             const sObj = myMethods.find(m => m._id === c.dataset.id);
+             if (sObj) {
+                 if (isRecVisa !== (sObj.cardName === "Visa")) {
+                     c.style.display = "none";
+                     if (c.classList.contains("selected")) {
+                         c.classList.remove("selected");
+                         if (window.currentSenderMethodClear) window.currentSenderMethodClear();
+                     }
+                 } else {
+                     c.style.display = "flex";
+                     validSenderExists = true;
+                 }
+             }
+         });
+     } else {
+         document.querySelectorAll("#pmt-sender-methods .pmt-method-card").forEach(c => c.style.display = "flex");
+     }
+     
+     const errEl = $("pmt-step3-error");
+     if (errEl) {
+         if (!validReceiverExists && senderObj) {
+             errEl.textContent = isSenderVisa ? "Qabul qiluvchida Visa karta mavjud emas (Faqat Visa'dan Visa'ga o'tkazma)." : "Qabul qiluvchida mos karta mavjud emas (Faqat Visa bo'lmagan kartalar arasi).";
+         } else if (!validSenderExists && recObj) {
+             errEl.textContent = isRecVisa ? "Sizda Visa karta mavjud emas (Faqat Visa'dan Visa'ga o'tkazma)." : "Sizda mos karta mavjud emas (Faqat Visa bo'lmagan kartalar arasi).";
+         } else {
+             errEl.textContent = "";
+         }
+     }
+     
+     if (selRecipMethodId && window.currentSenderMethodSelection && window.currentSenderMethodSelection() && !isNaN(amount) && amount > 0) {
         $("pmt-next-3").disabled = false;
      } else {
         $("pmt-next-3").disabled = true;
@@ -1771,13 +1984,14 @@ const renderSenderMethods = (onChangeCallback) => {
        <div class="pmt-method-icon">${m.type === "card" ? cardSvg : bankSvg}</div>
        <div class="pmt-method-info">
           <p class="pmt-method-name">${m.displayNumber || m.number}</p>
-          <p class="pmt-method-sub">${m.bank || t("method_account") || "Hisob"} — ${fmt(m.balance)}</p>
+          <p class="pmt-method-sub">${m.bank || t("method_account") || "Hisob"} — ${fmt(m.balance, m.cardName === "Visa")}</p>
        </div>
     </div>
    `).join("") : `<p style="color:#8892a4; font-size:13px;">${t("err_no_funds")}</p>`;
    
    let selectedMyMethod = null;
    window.currentSenderMethodSelection = () => selectedMyMethod;
+   window.currentSenderMethodClear = () => { selectedMyMethod = null; };
    
    document.querySelectorAll("#pmt-sender-methods .pmt-method-card").forEach(el => {
       el.onclick = () => {
@@ -1806,7 +2020,13 @@ const initPusher = () => {
     if (tx.senderId !== tx.receiverId) {
       showToast(`💰 ${tx.senderName} ${fmt(tx.amount)} to'lov yaratdi`, "success");
     }
-    loadPaymentData().then(() => { refreshStats(); renderDocsMini(); renderAccounts(); });
+    loadPaymentData().then(() => { 
+        refreshStats(); 
+        renderDocsMini(); 
+        renderDocsFull();
+        renderAccounts(); 
+        if ($("view-all-cards") && $("view-all-cards").style.display !== "none") renderAllCards(); 
+    });
   });
 
   pusherChannel.bind("transaction-completed", (data) => {
@@ -1815,15 +2035,29 @@ const initPusher = () => {
     if (tx.senderId !== tx.receiverId) {
       showToast(`✅ ${fmt(tx.amount)} to'lov amalga oshirildi`, "success");
     }
-    loadPaymentData().then(() => { refreshStats(); renderDocsMini(); renderAccounts(); });
+    loadPaymentData().then(() => { 
+        refreshStats(); 
+        renderDocsMini(); 
+        renderDocsFull();
+        renderAccounts(); 
+        if ($("view-all-cards") && $("view-all-cards").style.display !== "none") renderAllCards(); 
+    });
   });
 
   pusherChannel.bind("method-added", () => {
-    loadPaymentData().then(() => { renderAccounts(); refreshStats(); });
+    loadPaymentData().then(() => { 
+        renderAccounts(); 
+        refreshStats(); 
+        if ($("view-all-cards") && $("view-all-cards").style.display !== "none") renderAllCards(); 
+    });
   });
 
   pusherChannel.bind("method-deleted", () => {
-    loadPaymentData().then(() => { renderAccounts(); refreshStats(); });
+    loadPaymentData().then(() => { 
+        renderAccounts(); 
+        refreshStats(); 
+        if ($("view-all-cards") && $("view-all-cards").style.display !== "none") renderAllCards(); 
+    });
   });
 };
 
@@ -1893,18 +2127,18 @@ const translateUI = () => {
   if (headers.length >= 7) {
     headers[0].textContent = t("col_type");
     headers[1].textContent = t("col_amount");
-    headers[2].textContent = t("col_payment_method");
-    headers[3].textContent = t("col_date");
-    headers[4].textContent = t("col_activity");
+    headers[2].textContent = t("col_date");
+    headers[3].textContent = t("col_sender");
+    headers[4].textContent = t("col_receiver");
     headers[5].textContent = t("col_status");
     headers[6].textContent = t("col_action");
     
     if (headers.length >= 14) {
       headers[7].textContent = t("col_type");
       headers[8].textContent = t("col_amount");
-      headers[9].textContent = t("col_payment_method");
-      headers[10].textContent = t("col_date");
-      headers[11].textContent = t("col_activity");
+      headers[9].textContent = t("col_date");
+      headers[10].textContent = t("col_sender");
+      headers[11].textContent = t("col_receiver");
       headers[12].textContent = t("col_status");
       headers[13].textContent = t("col_action");
     }
@@ -1981,6 +2215,45 @@ export const initBusinessLogic = async () => {
   $("back-clients")?.addEventListener("click", () => { showView("view-dashboard"); });
   $("btn-view-docs")?.addEventListener("click", () => { showView("view-docs"); dPage = 1; renderDocsFull(); });
   $("back-docs")?.addEventListener("click", () => { showView("view-dashboard"); renderDocsMini(); });
+  
+  $("btn-view-all-cards")?.addEventListener("click", () => { showView("view-all-cards"); selectedInspectorCardId = null; renderAllCards(); });
+  $("back-all-cards")?.addEventListener("click", () => { showView("view-dashboard"); renderAccounts(); });
+  $("all-cards-add-btn")?.addEventListener("click", () => { $("add-card-btn").click(); });
+  const customFilter = $("all-cards-type-filter-custom");
+  if (customFilter) {
+    const selected = customFilter.querySelector(".selected");
+    const options = customFilter.querySelector(".options");
+    const items = customFilter.querySelectorAll(".options li");
+    const textSpan = selected.querySelector("span");
+
+    selected.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isOpen = options.style.display === "block";
+      options.style.display = isOpen ? "none" : "block";
+      const chevron = selected.querySelector(".chevron-icon");
+      if (chevron) chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
+    });
+
+    items.forEach(item => {
+      item.addEventListener("click", () => {
+         const val = item.getAttribute("data-value");
+         textSpan.textContent = item.textContent;
+         customFilter.dataset.value = val;
+         options.style.display = "none";
+         const chevron = selected.querySelector(".chevron-icon");
+         if (chevron) chevron.style.transform = "rotate(0deg)";
+         renderAllCards();
+      });
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!customFilter.contains(e.target)) {
+        options.style.display = "none";
+        const chevron = selected.querySelector(".chevron-icon");
+        if (chevron) chevron.style.transform = "rotate(0deg)";
+      }
+    });
+  }
   $("mp-prev")?.addEventListener("click", () => { if (mPage > 1) { mPage--; renderDocsMini(); } });
   $("mp-next")?.addEventListener("click", () => {
      const total = myTransactions.length;
@@ -2126,6 +2399,7 @@ export const initBusinessLogic = async () => {
       const selectedMyMethod = window.currentSenderMethodSelection ? window.currentSenderMethodSelection() : null;
       const myMeth = myMethods.find(m => m._id === selectedMyMethod);
       if (!myMeth) { $("pmt-step3-error").textContent = t("err_select_method"); return; }
+      if (blockedCardIds.has(selectedMyMethod)) { $("pmt-step3-error").textContent = "Muzlatilgan kartadan to'lov qilish mumkin emas"; return; }
       if (myMeth.balance < amount) { $("pmt-step3-error").textContent = t("err_insufficient"); return; }
       
       pendingPayment = {
@@ -2218,15 +2492,93 @@ export const initBusinessLogic = async () => {
     }
   });
 
+  let detectedCardName = "";
+
   // ── Add card ──
   $("add-card-btn")?.addEventListener("click", () => {
-    ["cm-number", "cm-holder", "cm-expiry", "cm-balance"].forEach((id) => { $(id).value = ""; $(id).style.borderColor = ""; });
-    if ($("cm-card-type")) $("cm-card-type").value = "Humo";
+    ["cm-number", "cm-holder", "cm-expiry", "cm-balance", "cm-cvv"].forEach((id) => { 
+        if($(id)) { $(id).value = ""; $(id).style.borderColor = ""; }
+    });
+    detectedCardName = "";
+    if ($("cm-card-detector")) $("cm-card-detector").style.display = "none";
+    if ($("cm-number-error")) $("cm-number-error").style.display = "none";
+    if ($("cm-cvv-container")) {
+      $("cm-cvv-container").style.maxWidth = "0";
+      $("cm-cvv-container").style.opacity = "0";
+      $("cm-cvv-container").style.marginLeft = "0";
+    }
+    if ($("cm-currency-label")) $("cm-currency-label").textContent = "UZS";
     $("card-modal").style.display = "flex";
   });
+
   $("cm-number")?.addEventListener("input", (e) => {
     const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
     e.target.value = raw.match(/.{1,4}/g)?.join(" ") || raw;
+    
+    const detector = $("cm-card-detector");
+    const detectedNameEl = $("cm-detected-card");
+    const errorEl = $("cm-number-error");
+    const cvvContainer = $("cm-cvv-container");
+    const currencyLabel = $("cm-currency-label");
+    const rawUnspaced = e.target.value.replace(/\s/g, "");
+
+    detectedCardName = "";
+    if (rawUnspaced.length > 0) {
+      if (detector) detector.style.display = "flex";
+      if (rawUnspaced.startsWith("9860")) {
+        detectedCardName = "Humo";
+      } else if (rawUnspaced.startsWith("8600") || rawUnspaced.startsWith("5614")) {
+        detectedCardName = "Uzcard";
+      } else if (rawUnspaced.startsWith("4")) {
+        detectedCardName = "Visa";
+      }
+      
+      if (detectedCardName) {
+        if (detectedNameEl) {
+          detectedNameEl.style.display = "block";
+          detectedNameEl.textContent = detectedCardName;
+          if (detectedCardName === "Visa") {
+            detectedNameEl.style.background = "#e0e7ff";
+            detectedNameEl.style.color = "#3730a3";
+          } else if (detectedCardName === "Humo") {
+            detectedNameEl.style.background = "#fef3c7";
+            detectedNameEl.style.color = "#92400e";
+          } else {
+            detectedNameEl.style.background = "#dcfce7";
+            detectedNameEl.style.color = "#166534";
+          }
+        }
+        if (errorEl) errorEl.style.display = "none";
+        if ($("cm-number")) $("cm-number").style.borderColor = "";
+      } else {
+        if (rawUnspaced.length >= 4 || (rawUnspaced.length > 0 && !["9", "8", "5", "4"].includes(rawUnspaced[0]))) {
+          if (detectedNameEl) detectedNameEl.style.display = "none";
+          if (errorEl) errorEl.style.display = "block";
+          if ($("cm-number")) $("cm-number").style.borderColor = "#ef4444";
+        } else {
+          if (detectedNameEl) detectedNameEl.style.display = "none";
+          if (errorEl) errorEl.style.display = "none";
+          if ($("cm-number")) $("cm-number").style.borderColor = "";
+        }
+      }
+    } else {
+      if (detector) detector.style.display = "none";
+      if ($("cm-number")) $("cm-number").style.borderColor = "";
+    }
+    
+    const isVisa = detectedCardName === "Visa";
+    if (cvvContainer) {
+      if (isVisa) {
+        cvvContainer.style.maxWidth = "80px";
+        cvvContainer.style.opacity = "1";
+        cvvContainer.style.marginLeft = "12px";
+      } else {
+        cvvContainer.style.maxWidth = "0";
+        cvvContainer.style.opacity = "0";
+        cvvContainer.style.marginLeft = "0";
+      }
+    }
+    if (currencyLabel) currencyLabel.textContent = isVisa ? "$" : "UZS";
   });
   $("cm-expiry")?.addEventListener("input", (e) => {
     const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
@@ -2279,13 +2631,23 @@ export const initBusinessLogic = async () => {
     const raw = $("cm-number").value.trim().replace(/\s/g, "");
     const holder = $("cm-holder").value.trim();
     const expiry = $("cm-expiry").value.trim();
-    const cardName = $("cm-card-type")?.value || "Humo";
+    const cardName = detectedCardName || "Humo";
+    const cvv = $("cm-cvv")?.value.trim() || "";
 
     let hasError = false;
-    if (raw.length !== 16) { $("cm-number").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-number").style.borderColor = ""; }
+    if (raw.length !== 16 || !detectedCardName) { $("cm-number").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-number").style.borderColor = ""; }
     if (holder.length < 3) { $("cm-holder").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-holder").style.borderColor = ""; }
     if (expiry.length !== 5) { $("cm-expiry").style.borderColor = "#ef4444"; hasError = true; } else { $("cm-expiry").style.borderColor = ""; }
+    if (cardName === "Visa" && cvv.length !== 3) { if($("cm-cvv")) $("cm-cvv").style.borderColor = "#ef4444"; hasError = true; } else { if($("cm-cvv")) $("cm-cvv").style.borderColor = ""; }
     if (hasError) return;
+
+    const saveBtn = $("cm-save");
+    const origText = saveBtn ? saveBtn.innerHTML : "";
+    if (saveBtn) {
+      saveBtn.innerHTML = `<span style="display:flex;align-items:center;justify-content:center;gap:8px;"><div class="global-spinner" style="width:16px;height:16px;border-width:2px;border-top-color:transparent;border-color:rgba(255,255,255,0.3) rgba(255,255,255,0.3) #fff rgba(255,255,255,0.3);"></div> ${t("save")}</span>`;
+      saveBtn.disabled = true;
+      saveBtn.style.opacity = "0.7";
+    }
 
     try {
       const newMethod = await apiFetch("/api/payments/methods", {
@@ -2297,16 +2659,26 @@ export const initBusinessLogic = async () => {
           displayNumber: raw.slice(0, 4) + " **** **** " + raw.slice(-4),
           holder,
           expiry,
+          cvv: cardName === "Visa" ? cvv : "",
           balance: parseFloat($("cm-balance").value.replace(/[\s,]/g, "")) || 0,
         }),
       });
       myMethods.push(newMethod);
       $("card-modal").style.display = "none";
       renderAccounts();
+      if ($("view-all-cards") && $("view-all-cards").style.display !== "none") {
+        renderAllCards();
+      }
       refreshStats();
       showToast("Karta qo'shildi ✓", "success");
     } catch (e) {
       alert(e.message);
+    } finally {
+      if (saveBtn) {
+        saveBtn.innerHTML = origText;
+        saveBtn.disabled = false;
+        saveBtn.style.opacity = "1";
+      }
     }
   });
 
@@ -2344,7 +2716,7 @@ const openCardSettingsModal = (card) => {
       <div style="display:flex;justify-content:space-between;align-items:flex-end">
         <div style="text-align:left">
           <p style="font-size:9px;opacity:.55;margin:0;text-transform:uppercase;letter-spacing:.5px">BALANCE</p>
-          <p style="font-size:18px;font-weight:700;margin:4px 0 0">${fmt(card.balance)}</p>
+          <p style="font-size:18px;font-weight:700;margin:4px 0 0">${fmt(card.balance, card.cardName === "Visa")}</p>
         </div>
       </div>
     </div>
@@ -2356,6 +2728,12 @@ const openCardSettingsModal = (card) => {
   
   if ($("cs-expiry-container")) {
     $("cs-expiry-container").style.display = card.type === "bank" ? "none" : "block";
+  }
+
+  if ($("cs-cvv-container")) {
+    const isVisa = card.cardName === "Visa";
+    $("cs-cvv").textContent = card.cvv || "—";
+    $("cs-cvv-container").style.display = isVisa ? "block" : "none";
   }
   
   $("cs-details-content").style.maxHeight = "0";
@@ -2524,6 +2902,11 @@ const openSelfTransferModal = () => {
             $("ts-error").style.display = "block";
             return;
         }
+        if (blockedCardIds.has(senderCard._id)) {
+            $("ts-error").textContent = "Muzlatilgan kartadan to'lov qilish mumkin emas";
+            $("ts-error").style.display = "block";
+            return;
+        }
         
         const btn = $("ts-confirm");
         const oldTxt = btn.innerHTML;
@@ -2572,4 +2955,623 @@ const openSelfTransferModal = () => {
             btn.style.opacity = "1";
         }
     };
+};
+
+const openCurrencyExchangeModal = () => {
+    const modal = $("ce-modal");
+    if (!modal) return;
+    
+    const visaCards = myMethods.filter(m => m.type === "card" && m.cardName === "Visa");
+    const nonVisaCards = myMethods.filter(m => m.type === "card" && m.cardName !== "Visa");
+    
+    if (visaCards.length === 0 || nonVisaCards.length === 0) {
+        showToast("Valyuta almashtirish uchun sizda kamida bitta Visa va bitta boshqa karta bo'lishi kerak.", "error");
+        return;
+    }
+    
+    let senderCard = nonVisaCards[0];
+    let receiverCard = visaCards[0];
+
+    const renderCardSelect = (containerId, selectedMethod, isSender) => {
+        const container = $(containerId);
+        container.innerHTML = `
+            <div class="ce-custom-select" style="margin:0; position:relative; border-radius:12px;">
+                <div class="ce-select-trigger" style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px; font-weight:700; color:#1e293b; display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size:14px;">${selectedMethod.cardName || selectedMethod.bank || "Hisob"} ${selectedMethod.number ? " • " + selectedMethod.number.slice(-4) : ""}</span>
+                        <span style="font-size:12px; color:#64748b; font-weight:500; margin-top:2px;">${t("account_balance")}: ${fmt(selectedMethod.balance, selectedMethod.cardName === "Visa")}</span>
+                    </div>
+                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#8892a4" stroke-width="2"><path d="M19 9l-7 7-7-7"/></svg>
+                </div>
+                <div class="ce-options" style="display:none; position:absolute; width:100%; top:100%; left:0; margin-top:6px; background:#fff; border:1px solid #cbd5e1; border-radius:12px; z-index:50; box-shadow:0 10px 30px rgba(0,0,0,0.2); overflow:hidden;">
+                    ${(isSender ? (receiverCard.cardName === "Visa" ? nonVisaCards : visaCards) : (senderCard.cardName === "Visa" ? nonVisaCards : visaCards)).map(m => `
+                        <div class="ce-option" data-value="${m._id}" style="padding:12px; border-bottom:1px solid #f1f5f9; cursor:pointer; transition:background 0.2s;">
+                            <div style="font-weight:700; font-size:14px; color:#1e293b; pointer-events:none;">${m.cardName || m.bank || "Hisob"} ${m.number ? " • " + m.number.slice(-4) : ""}</div>
+                            <div style="font-size:12px; color:#64748b; font-weight:500; margin-top:2px; pointer-events:none;">${t("account_balance")}: ${fmt(m.balance, m.cardName === "Visa")}</div>
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+        `;
+        
+        const selDiv = container.querySelector(".ce-custom-select");
+        const trigger = selDiv.querySelector(".ce-select-trigger");
+        const optionsDiv = selDiv.querySelector(".ce-options");
+        
+        trigger.onclick = (e) => {
+            e.stopPropagation();
+            document.querySelectorAll(".ce-options").forEach(el => {
+                if (el !== optionsDiv) el.style.display = "none";
+            });
+            optionsDiv.style.display = optionsDiv.style.display === "none" ? "block" : "none";
+        };
+        
+        selDiv.querySelectorAll(".ce-option").forEach(opt => {
+            opt.onmouseenter = () => opt.style.background = "#f8fafc";
+            opt.onmouseleave = () => opt.style.background = "#fff";
+            
+            opt.onclick = (e) => {
+                e.stopPropagation();
+                const newId = opt.getAttribute("data-value");
+                const newMethod = myMethods.find(x => x._id === newId);
+                if (isSender) {
+                    senderCard = newMethod;
+                    if (senderCard.cardName === "Visa" && receiverCard.cardName === "Visa") receiverCard = nonVisaCards[0];
+                    if (senderCard.cardName !== "Visa" && receiverCard.cardName !== "Visa") receiverCard = visaCards[0];
+                } else {
+                    receiverCard = newMethod;
+                    if (receiverCard.cardName === "Visa" && senderCard.cardName === "Visa") senderCard = nonVisaCards[0];
+                    if (receiverCard.cardName !== "Visa" && senderCard.cardName !== "Visa") senderCard = visaCards[0];
+                }
+                optionsDiv.style.display = "none";
+                updateCardSelects();
+                updateCalculations();
+            };
+        });
+    };
+
+    const updateCardSelects = () => {
+        renderCardSelect("ce-sender-card-container", senderCard, true);
+        renderCardSelect("ce-receiver-card-container", receiverCard, false);
+        $("ce-currency-send").textContent = senderCard.cardName === "Visa" ? "USD" : "UZS";
+        $("ce-currency-receive").textContent = receiverCard.cardName === "Visa" ? "USD" : "UZS";
+    };
+
+    const updateCalculations = () => {
+        const val = parseFloat($("ce-amount-send").value.replace(/[\s,]/g, "")) || 0;
+        let result = 0;
+        const rate = exchangeRates.USD || 12800; // default if not loaded
+        
+        if (senderCard.cardName === "Visa") {
+            // USD to UZS
+            result = val * rate;
+        } else {
+            // UZS to USD
+            result = val / rate;
+        }
+        
+        if (receiverCard.cardName === "Visa") {
+            $("ce-amount-receive").value = result > 0 ? result.toFixed(2) : "0";
+        } else {
+            $("ce-amount-receive").value = result > 0 ? Math.floor(result).toLocaleString('en-US').replace(/,/g, ' ') : "0";
+        }
+        
+        $("ce-rate-display").textContent = `1 USD = ${rate.toLocaleString('en-US').replace(/,/g, ' ')} UZS`;
+    };
+
+    $("ce-swap-btn").onclick = () => {
+        const temp = senderCard;
+        senderCard = receiverCard;
+        receiverCard = temp;
+        updateCardSelects();
+        updateCalculations();
+    };
+
+    $("ce-amount-send").oninput = (e) => {
+        let val = e.target.value.replace(/[^\d.]/g, "");
+        if (val.split('.').length > 2) val = val.replace(/\.+$/, "");
+        if (senderCard.cardName !== "Visa") {
+            val = val.replace(/\./g, ""); // No decimals for UZS
+        }
+        e.target.value = val.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        updateCalculations();
+    };
+
+    $("ce-close").onclick = () => {
+        modal.style.display = "none";
+    };
+    
+    modal.onclick = (e) => { if(e.target === modal) modal.style.display = "none"; };
+
+    const confirmBtn = $("ce-confirm");
+    confirmBtn.onclick = async () => {
+        const raw = $("ce-amount-send").value.replace(/[\s,]/g, "");
+        const amount = parseFloat(raw);
+        if (!amount || amount <= 0) {
+            $("ce-error").textContent = t("invalid_amount") || "Noto'g'ri summa kiritildi";
+            $("ce-error").style.display = "block";
+            return;
+        }
+        if (amount > senderCard.balance) {
+            $("ce-error").textContent = t("insufficient_balance") || "Balans yetarli emas";
+            $("ce-error").style.display = "block";
+            return;
+        }
+        
+        $("ce-error").style.display = "none";
+        const oldTxt = confirmBtn.innerHTML;
+        confirmBtn.innerHTML = `<span class="ts-spinner"></span>`;
+        confirmBtn.disabled = true;
+        confirmBtn.style.opacity = "0.7";
+
+        try {
+            const currentUserId = getCurrent().userId || getCurrent()._id;
+            const res = await fetch(`${API_URL}/api/payments/send/new`, {
+                method: "POST",
+                headers: {
+                    ...getAuthHeaders(),
+                    "Content-Type": "application/json"
+                },
+                credentials: "include",
+                body: JSON.stringify({
+                    senderMethodId: senderCard._id,
+                    receiverMethodId: receiverCard._id,
+                    amount: amount,
+                    description: "Valyuta almashtirish",
+                    receiverId: currentUserId
+                })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || "Xatolik yuz berdi");
+            }
+
+            showToast("Valyuta muvaffaqiyatli almashtirildi!", "success");
+            modal.style.display = "none";
+            await loadPaymentData();
+            refreshStats();
+            renderDocsMini();
+            renderAccounts();
+            if ($("view-all-cards") && $("view-all-cards").style.display !== "none") renderAllCards(); 
+        } catch (err) {
+            $("ce-error").textContent = err.message || "Xatolik yuz berdi";
+            $("ce-error").style.display = "block";
+        } finally {
+            confirmBtn.innerHTML = oldTxt;
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = "1";
+        }
+    };
+
+    updateCardSelects();
+    $("ce-amount-send").value = "";
+    $("ce-amount-receive").value = "";
+    $("ce-error").style.display = "none";
+    updateCalculations();
+    
+    modal.style.display = "flex";
+};
+
+// ── BARCHA KARTALAR FUNCTIONS ──
+let selectedInspectorCardId = null;
+let blockedCardIds = new Set();
+
+const renderAllCards = () => {
+  const grid = $("all-cards-grid-container");
+  if (!grid) return;
+
+  const typeFilter = $("all-cards-type-filter-custom")?.dataset.value || "";
+
+  // Filter methods
+  const filtered = myMethods.filter(m => {
+    let matchType = true;
+    if (typeFilter) {
+       if (typeFilter === "Bank") {
+          matchType = m.type === "bank";
+       } else {
+          // Humo, Uzcard, Visa
+          const name = (m.cardName || m.brand || "").toLowerCase();
+          matchType = m.type === "card" && name.includes(typeFilter.toLowerCase());
+       }
+    }
+    return matchType;
+  });
+
+  // Removed total balance logic
+
+  let cardsHtml = "";
+  if (!filtered.length) {
+    cardsHtml = `
+      <div style="grid-column: 1 / -1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 60px 20px; color:#8892a4; text-align:center;">
+        <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="margin-bottom:8px;"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+        <p style="font-weight:600; margin:0 0 4px; font-size:14px; color:#1a1d2e;">Kartalar topilmadi</p>
+        <p style="font-size:12px; margin:0;">Kiritilgan filtrlar bo'yicha hech qanday karta topilmadi.</p>
+      </div>
+    `;
+    const isSelectedFiltered = filtered.some(m => m._id === selectedInspectorCardId);
+    if (!isSelectedFiltered) {
+      showCardInspector(null);
+    }
+  } else {
+    cardsHtml = filtered.map(m => {
+      const label = m.cardName || (m.type === "card" ? "VISA" : "BANK");
+      const fullNum = (m.number || m.displayNumber || "0000 0000 0000 0000").replace(/\s/g, "");
+      let formatted = fullNum;
+      if (fullNum.length > 8) {
+        const start = fullNum.substring(0, 4);
+        const end = fullNum.substring(fullNum.length - 4);
+        const midLen = fullNum.length - 8;
+        const mask = "*".repeat(midLen).match(/.{1,4}/g)?.join("  ") || "****";
+        formatted = `${start}  ${mask}  ${end}`;
+      } else {
+        formatted = fullNum.match(/.{1,4}/g)?.join("  ") || fullNum;
+      }
+
+      const isActive = selectedInspectorCardId === m._id ? " active-card" : "";
+      const isBlocked = blockedCardIds.has(m._id);
+      const defaultBadge = m.isDefault ? `<span class="card-default-badge">Asosiy</span>` : "";
+
+      return `
+        <div class="all-cards-item${isActive}" data-id="${m._id}">
+          <div class="biz-acc-card ${m.type === "card" ? "card-grad" : "bank-grad"}" style="min-height:160px; display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden; border-radius:16px;">
+            ${defaultBadge}
+            
+            <!-- Blocked Overlay -->
+            ${isBlocked ? `
+              <div style="position:absolute; inset:0; background:rgba(15, 23, 42, 0.7); backdrop-filter:blur(3px); display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; gap:8px; z-index:2;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-snowflake-icon lucide-snowflake"><path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/></svg>
+                <span style="font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Karta muzlatilgan</span>
+              </div>
+            ` : ""}
+
+            <div style="display:flex; justify-content:space-between; align-items:flex-start">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-nfc-icon lucide-nfc"><path d="M6 8.32a7.43 7.43 0 0 1 0 7.36"/><path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58"/><path d="M12.91 4.1a15.91 15.91 0 0 1 .01 15.8"/><path d="M16.37 2a20.16 20.16 0 0 1 0 20"/></svg>
+              <span style="font-size:13px; font-weight:700; letter-spacing:1.5px; opacity:.9">${label}</span>
+            </div>
+            
+            <div style="margin: 10px 0;">
+              <span style="font-size:14px; font-weight:700; letter-spacing:1.5px;">${formatted}</span>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:flex-end">
+              <div>
+                <p style="font-size:8px; opacity:.55; margin:0; text-transform:uppercase; letter-spacing:.5px;">BALANCE</p>
+                <p style="font-size:16px; font-weight:700; margin:2px 0 0">${fmt(m.balance, m.cardName === "Visa")}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  const addCardHtml = `
+    <div class="all-cards-item-add" style="display:flex; cursor:pointer;" onclick="document.getElementById('add-card-btn')?.click()">
+      <div class="biz-acc-card" style="flex:1; min-height:160px; background:transparent; border:2px dashed #cbd5e1; border-radius:16px; display:flex; align-items:center; justify-content:center; color:#8892a4; transition:all 0.3s;" onmouseover="this.style.borderColor='#5b6ef5'; this.style.color='#5b6ef5'" onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#8892a4'">
+        <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path d="M12 4v16m8-8H4" />
+        </svg>
+      </div>
+    </div>
+  `;
+
+  grid.innerHTML = cardsHtml + addCardHtml;
+
+
+  // Attach card click handlers
+  grid.querySelectorAll(".all-cards-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const id = item.getAttribute("data-id");
+      selectedInspectorCardId = id;
+      grid.querySelectorAll(".all-cards-item").forEach(el => el.classList.remove("active-card"));
+      item.classList.add("active-card");
+      
+      const card = myMethods.find(m => m._id === id);
+      showCardInspector(card);
+    });
+  });
+
+  // Keep showing the selected card in inspector if still valid
+  const currentCard = myMethods.find(m => m._id === selectedInspectorCardId);
+  if (currentCard && filtered.some(m => m._id === selectedInspectorCardId)) {
+    showCardInspector(currentCard);
+  } else {
+    showCardInspector(null);
+  }
+};
+
+const showCardInspector = (card) => {
+  const noSelection = $("all-cards-no-selection");
+  const panel = $("all-cards-details-panel");
+  if (!noSelection || !panel) return;
+
+  if (!card) {
+    noSelection.style.display = "flex";
+    panel.style.display = "none";
+    return;
+  }
+
+  noSelection.style.display = "none";
+  panel.style.display = "flex";
+
+  const label = card.cardName || (card.type === "card" ? "VISA" : "BANK");
+  const fullNum = (card.number || card.displayNumber || "0000 0000 0000 0000").replace(/\s/g, "");
+  let formatted = fullNum;
+  if (fullNum.length > 8) {
+    const start = fullNum.substring(0, 4);
+    const end = fullNum.substring(fullNum.length - 4);
+    const midLen = fullNum.length - 8;
+    const mask = "*".repeat(midLen).match(/.{1,4}/g)?.join("  ") || "****";
+    formatted = `${start}  ${mask}  ${end}`;
+  } else {
+    formatted = fullNum.match(/.{1,4}/g)?.join("  ") || fullNum;
+  }
+  const fullNumSpaced = fullNum.match(/.{1,4}/g)?.join(" ") || fullNum;
+
+  // Filter transactions for this card
+  const sId = card._id;
+  const cardTx = myTransactions.filter(tx => {
+    const txSenderId = typeof tx.senderMethodId === 'object' && tx.senderMethodId ? tx.senderMethodId._id : tx.senderMethodId;
+    const txReceiverId = typeof tx.receiverMethodId === 'object' && tx.receiverMethodId ? tx.receiverMethodId._id : tx.receiverMethodId;
+    return txSenderId === sId || txReceiverId === sId;
+  }).reverse().slice(0, 5); // top 5 recent
+
+  const isBlocked = blockedCardIds.has(card._id);
+
+  panel.innerHTML = `
+    <!-- Large Card Preview -->
+    <div class="biz-acc-card ${card.type === "card" ? "card-grad" : "bank-grad"}" style="min-height:165px; margin:0; padding:20px; color:#fff; border-radius:18px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 8px 18px rgba(0,0,0,0.1); position:relative; overflow:hidden;">
+      <!-- Blocked Overlay -->
+      ${isBlocked ? `
+        <div style="position:absolute; inset:0; background:rgba(15, 23, 42, 0.7); backdrop-filter:blur(3px); display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; gap:8px; z-index:2;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-snowflake-icon lucide-snowflake"><path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/></svg>
+          <span style="font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Karta muzlatilgan</span>
+        </div>
+      ` : ""}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-nfc-icon lucide-nfc"><path d="M6 8.32a7.43 7.43 0 0 1 0 7.36"/><path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58"/><path d="M12.91 4.1a15.91 15.91 0 0 1 .01 15.8"/><path d="M16.37 2a20.16 20.16 0 0 1 0 20"/></svg>
+        <span style="font-size:14px;font-weight:700;letter-spacing:1.5px;opacity:.9">${label}</span>
+      </div>
+      <div style="margin:16px 0;">
+        <span style="font-size:16px;font-weight:700;letter-spacing:2px; display:flex; align-items:center; gap:8px;">
+          <span id="inspector-masked-num">${formatted}</span>
+          <button id="inspector-toggle-num" style="background:transparent; border:none; color:inherit; opacity:0.7; cursor:pointer; display:flex; align-items:center;">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div style="text-align:left">
+          <p style="font-size:9px;opacity:.55;margin:0;text-transform:uppercase;letter-spacing:.5px">BALANCE</p>
+          <p style="font-size:18px;font-weight:700;margin:4px 0 0">${fmt(card.balance, card.cardName === "Visa")}</p>
+        </div>
+        <button class="biz-card-settings-btn" id="inspector-settings-btn" style="background:transparent;border:none;color:inherit;cursor:pointer;opacity:0.8;transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Switch lock card -->
+    <div class="switch-container">
+      <div class="switch-label-wrap">
+        <span class="switch-title">Kartani muzlatish</span>
+        <span class="switch-desc">${isBlocked ? "Karta muzlatilgan, tranzaksiyalar to'xtatildi" : "Kartani vaqtincha muzlatib qo'yish"}</span>
+      </div>
+      <label class="switch-element">
+        <input type="checkbox" id="inspector-lock-switch" ${isBlocked ? "checked" : ""}>
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+
+    <!-- Metadata Details -->
+    <div style="background:#fff; padding:16px; border-radius:14px; border:1px solid #f0f2fa; display:flex; flex-direction:column;">
+      <div class="inspector-detail-row">
+        <span class="inspector-detail-label">Karta nomi</span>
+        <span class="inspector-detail-value">${card.cardName || 'Bilinmagan'}</span>
+      </div>
+      <div class="inspector-detail-row">
+        <span class="inspector-detail-label">Karta turi</span>
+        <span class="inspector-detail-value" style="text-transform:uppercase;">${card.type === 'card' ? 'Karta' : 'Bank hisobi'}</span>
+      </div>
+      <div class="inspector-detail-row">
+        <span class="inspector-detail-label">Karta egasi</span>
+        <span class="inspector-detail-value">${card.holder || '—'}</span>
+      </div>
+      ${card.expiry ? `
+      <div class="inspector-detail-row">
+        <span class="inspector-detail-label">Amal qilish muddati</span>
+        <span class="inspector-detail-value">${card.expiry}</span>
+      </div>` : ""}
+      ${card.cardName === 'Visa' ? `
+      <div class="inspector-detail-row">
+        <span class="inspector-detail-label">CVV</span>
+        <span class="inspector-detail-value" style="display:flex; align-items:center; gap:8px;">
+          <span id="inspector-masked-cvv" style="font-family:monospace; font-size:12px;">***</span>
+          <button id="inspector-toggle-cvv" style="background:transparent; border:none; color:inherit; opacity:0.7; cursor:pointer; display:flex; align-items:center; padding:0;">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button id="inspector-copy-cvv" style="background:#f1f3fa; border:none; border-radius:4px; padding:3px 6px; font-size:10px; font-weight:700; cursor:pointer; color:#5a6279;">Nusxalash</button>
+        </span>
+      </div>` : ""}
+      <div class="inspector-detail-row" style="border-bottom:none; padding-bottom:0;">
+        <span class="inspector-detail-label">To'liq raqam</span>
+        <span class="inspector-detail-value" style="display:flex; align-items:center; gap:8px;">
+          <span id="inspector-full-num" style="font-family:monospace; font-size:12px;">${fullNumSpaced}</span>
+          <button id="inspector-copy-num" style="background:#f1f3fa; border:none; border-radius:4px; padding:3px 6px; font-size:10px; font-weight:700; cursor:pointer; color:#5a6279;">Nusxalash</button>
+        </span>
+      </div>
+    </div>
+
+    <!-- Card Actions Buttons -->
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      ${!card.isDefault ? `
+        <button class="inspector-action-btn inspector-action-secondary" id="inspector-set-default-btn">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>
+          Asosiy hisob sifatida sozlash
+        </button>
+      ` : `
+        <div style="display:flex; align-items:center; justify-content:center; gap:6px; color:#10b981; font-weight:700; font-size:12px; background:#e6f9f0; padding:10px; border-radius:12px;">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+          Ushbu hisobingiz asosiy hisob qilingan
+        </div>
+      `}
+      
+      ${!card.isDefault ? `
+        <button class="inspector-action-btn inspector-action-danger" id="inspector-delete-btn">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Kartani o'chirish
+        </button>
+      ` : ""}
+    </div>
+
+    <!-- Recent Transactions For This Card -->
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <h4 style="font-size:13px; font-weight:700; color:#1a1d2e; margin:10px 0 2px;">So'nggi to'lovlar</h4>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${cardTx.length ? cardTx.map(tx => {
+          const isPending = tx.status === "waiting";
+          const me = getCurrent();
+          const userId = me?.userId || me?._id;
+          const isSent = tx.senderId === userId;
+          const isInternal = tx.senderId === userId && tx.receiverId === userId;
+          
+          let title = isSent ? `Yuborildi: ${tx.receiverName || "User"}` : `Qabul qilindi: ${tx.senderName || "User"}`;
+          if (isInternal) title = "O'z hisobiga o'tkazma";
+          if (tx.receiverId === "system_tour") title = tx.description || "Tur xaridi";
+          
+          const badgeClass = tx.status === "paid" ? "biz-status-success" : (isPending ? "biz-status-pending" : "biz-status-failed");
+          const d = new Date(tx.createdAt);
+          const date = `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+          
+          const amtColor = isPending ? "#f59e0b" : (isSent ? "#ef4444" : "#16a34a");
+          const amtSign = isSent ? "-" : "+";
+
+          return `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:#fff; border:1px solid #f0f2fa; border-radius:12px; transition:transform 0.2s;">
+              <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                <div style="width:28px; height:28px; border-radius:50%; background:${isSent ? '#fee2e2' : '#dcfce7'}; color:${isSent ? '#ef4444' : '#16a34a'}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="${isSent ? 'M12 19V5M5 12l7-7 7 7' : 'M12 5v14M5 12l7 7 7-7'}"/></svg>
+                </div>
+                <div style="min-width:0;">
+                  <p style="margin:0; font-size:12px; font-weight:600; color:#1a1d2e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${title}</p>
+                  <p style="margin:2px 0 0; font-size:10px; color:#8892a4;">${date} • <span class="biz-status-badge ${badgeClass}" style="padding:1px 4px; font-size:8px;">${tx.status}</span></p>
+                </div>
+              </div>
+              <span style="font-size:12px; font-weight:700; color:${amtColor}; flex-shrink:0;">${amtSign} ${tx.amount.toLocaleString()} UZS</span>
+            </div>
+          `;
+        }).join("") : `<p style="font-size:11px; color:#8892a4; text-align:center; padding:12px; background:#fff; border-radius:12px; border:1px dashed #cbd5e1; margin:0;">Ushbu karta orqali hali to'lov qilinmagan.</p>`}
+      </div>
+    </div>
+  `;
+
+  // Attach inspector event handlers
+  // Settings btn
+  const insSettingsBtn = $("inspector-settings-btn");
+  if (insSettingsBtn) {
+    insSettingsBtn.onclick = () => {
+      openCardSettingsModal(card);
+    };
+  }
+
+  // CVV interactions
+  if (card.cardName === "Visa") {
+    const cvvVal = card.cvv || "—";
+    let isCvvMasked = true;
+    const tglBtn = $("inspector-toggle-cvv");
+    if (tglBtn) {
+      tglBtn.onclick = () => {
+        isCvvMasked = !isCvvMasked;
+        $("inspector-masked-cvv").textContent = isCvvMasked ? "***" : cvvVal;
+        tglBtn.innerHTML = isCvvMasked 
+          ? `<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
+          : `<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+      };
+    }
+    const copyCvvBtn = $("inspector-copy-cvv");
+    if (copyCvvBtn) {
+      copyCvvBtn.onclick = () => {
+        if (cvvVal !== "—") {
+          navigator.clipboard.writeText(cvvVal);
+          showToast("CVV nusxalandi!", "success");
+        } else {
+          showToast("CVV mavjud emas", "error");
+        }
+      };
+    }
+  }
+
+  // Copy card num
+  $("inspector-copy-num").onclick = () => {
+    navigator.clipboard.writeText(fullNum);
+    showToast("Karta raqami nusxalandi!", "success");
+  };
+
+  // Toggle card mask
+  let isMasked = true;
+  $("inspector-toggle-num").onclick = () => {
+    isMasked = !isMasked;
+    $("inspector-masked-num").textContent = isMasked ? formatted : fullNumSpaced;
+    $("inspector-toggle-num").innerHTML = isMasked 
+      ? `<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
+      : `<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+  };
+
+  // Lock/unlock toggle
+  $("inspector-lock-switch").onchange = (e) => {
+    if (e.target.checked) {
+      blockedCardIds.add(card._id);
+      showToast("Karta bloklandi!", "warning");
+    } else {
+      blockedCardIds.delete(card._id);
+      showToast("Karta faollashtirildi!", "success");
+    }
+    // Re-render
+    renderAllCards();
+  };
+
+  // Set default
+  const defaultBtn = $("inspector-set-default-btn");
+  if (defaultBtn) {
+    defaultBtn.onclick = () => {
+      myMethods.forEach(m => {
+        m.isDefault = m._id === card._id;
+      });
+      showToast("Asosiy hisob o'rnatildi!", "success");
+      renderAllCards();
+      renderAccounts();
+    };
+  }
+
+  // Delete card
+  const deleteBtn = $("inspector-delete-btn");
+  if (deleteBtn) {
+    deleteBtn.onclick = () => {
+      $("del-card-title").textContent = t("delete_card_title") || "Kartani o'chirish";
+      $("del-card-desc").textContent = t("delete_card_desc") || "Haqiqatan ham ushbu kartani o'chirmoqchimisiz?";
+      $("del-card-cancel").textContent = t("cancel") || "Bekor qilish";
+      $("del-card-confirm").textContent = t("delete_confirm_btn") || "O'chirish";
+      $("del-card-modal").style.display = "flex";
+      
+      const confirmBtn = $("del-card-confirm");
+      const newConfirm = confirmBtn.cloneNode(true);
+      confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
+      
+      newConfirm.onclick = async () => {
+        $("del-card-modal").style.display = "none";
+        try {
+          await apiFetch(`/api/payments/methods/${card._id}`, { method: "DELETE" });
+          myMethods = myMethods.filter((m) => m._id !== card._id);
+          selectedInspectorCardId = null;
+          renderAllCards();
+          renderAccounts();
+          refreshStats();
+          showToast("Karta muvaffaqiyatli o'chirildi ✓", "success");
+        } catch (e) {
+          showToast(e.message, "error");
+        }
+      };
+    };
+  }
 };

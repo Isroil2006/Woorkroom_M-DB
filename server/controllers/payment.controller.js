@@ -28,7 +28,7 @@ exports.getMethods = async (req, res) => {
 exports.addMethod = async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
-    const { type, cardName, number, displayNumber, holder, expiry, bank, balance } = req.body;
+    const { type, cardName, number, displayNumber, holder, expiry, bank, balance, cvv } = req.body;
 
     const method = new PaymentMethod({
       userId,
@@ -39,6 +39,7 @@ exports.addMethod = async (req, res) => {
       holder: holder || "",
       expiry: expiry || "",
       bank: bank || "",
+      cvv: cvv || "",
       balance: balance || 0,
       isDefault: false,
     });

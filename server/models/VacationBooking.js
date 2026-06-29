@@ -20,7 +20,8 @@ const vacationBookingSchema = new mongoose.Schema(
     roomName: { type: String },
     roomBeds: { type: Number },
     roomPrice: { type: Number },
-    status: { type: String, enum: ["pending", "confirmed", "cancelled"], default: "confirmed" },
+    paymentMethodId: { type: mongoose.Schema.Types.ObjectId, ref: "PaymentMethod", default: null },
+    status: { type: String, enum: ["pending", "confirmed", "cancelled"], default: "pending" },
   },
   { timestamps: true }
 );

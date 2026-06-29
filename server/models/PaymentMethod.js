@@ -10,6 +10,7 @@ const paymentMethodSchema = new mongoose.Schema(
     holder: { type: String, default: "" },
     expiry: { type: String, default: "" },
     bank: { type: String, default: "" },
+    cvv: { type: String, default: "" },
     balance: { type: Number, default: 0 },
     isDefault: { type: Boolean, default: false },
   },

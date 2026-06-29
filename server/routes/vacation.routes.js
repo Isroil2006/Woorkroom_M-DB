@@ -17,6 +17,9 @@ const auth = require("../middleware/auth.middleware");
 
 router.get("/", auth, vacationController.getAllVacations);
 router.get("/my-bookings", auth, vacationController.getMyBookings);
+router.get("/admin/bookings", auth, vacationController.getAllBookingsAdmin);
+router.post("/bookings/:id/approve", auth, vacationController.approveBooking);
+router.post("/bookings/:id/reject", auth, vacationController.rejectBooking);
 router.post("/", auth, vacationController.createVacation);
 router.put("/:id", auth, vacationController.updateVacation);
 router.delete("/:id", auth, vacationController.deleteVacation);

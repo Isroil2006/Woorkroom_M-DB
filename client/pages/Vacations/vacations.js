@@ -78,6 +78,36 @@ let bookSelectedRoomBeds = null;
 let bookSelectedRoomPrice = 0;
 let bookStep = 1; // 1: dates, 2: hotel, 3: payment, 4: success
 
+// main tabs state
+let activeMainTab = "user"; // "user" or "admin"
+let activeUserSubTab = "tours"; // "tours" or "bookings"
+let userBookings = [];
+let adminBookings = [];
+let adminStatusFilter = "all";
+let adminBookingsPage = 1;
+let adminBookingsLimit = 10;
+let bookingDetailId = null; // current booking detail view
+
+const fetchMyBookings = async () => {
+    try {
+        const res = await fetch(`${API_URL}/api/vacations/my-bookings`, { headers: getAuthHeaders(), credentials: "include" });
+        const json = await res.json();
+        if (json.success) userBookings = json.data;
+    } catch (e) {
+        console.error("fetchMyBookings error:", e);
+    }
+};
+
+const fetchAdminBookings = async () => {
+    try {
+        const res = await fetch(`${API_URL}/api/vacations/admin/bookings`, { headers: getAuthHeaders(), credentials: "include" });
+        const json = await res.json();
+        if (json.success) adminBookings = json.data;
+    } catch (e) {
+        console.error("fetchAdminBookings error:", e);
+    }
+};
+
 const $v = (id) => document.getElementById(id);
 const esc = (s) =>
     String(s || "")
@@ -99,39 +129,907 @@ const renderRoot = () => {
         return;
     }
 
-    root.innerHTML = `
-        <div class="vac-header">
-            <h1 class="vac-title">${tr.title}</h1>
-            <div class="vac-header-btns">
-                <button data-perm="vac_add_tour" class="vac-add-btn" id="vac-add-btn">
-                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-                    ${tr.add_btn}
+    if (bookingDetailId) {
+        root.innerHTML = renderBookingDetail();
+        attachBookingDetailEvents();
+        return;
+    }
+
+    // Main Tab selector HTML
+    const mainTabsHtml = ``;
+
+    // Render User view or Admin view
+    let bodyHtml = "";
+
+    if (activeMainTab === "user") {
+        bodyHtml = `
+            <div class="vac-subtabs">
+                <button class="vac-subtab-btn ${activeUserSubTab === 'tours' ? 'active' : ''}" id="vac-subtab-tours">
+                    ${tr.subtab_catalog || "Turlar katalogi"}
+                </button>
+                <button class="vac-subtab-btn ${activeUserSubTab === 'bookings' ? 'active' : ''}" id="vac-subtab-bookings">
+                    ${tr.subtab_bookings || "Mening buyurtmalarim"}
+                    ${userBookings.length ? `<span class="vac-subtab-badge">${userBookings.length}</span>` : ""}
                 </button>
             </div>
-        </div>
-        <div class="vac-controls">
-            <div class="vac-search-wrap">
-                <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#aaa" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#aaa" stroke-width="2" stroke-linecap="round"/></svg>
-                <input type="text" id="vac-search" class="vac-search-input" placeholder="${tr.search_ph}" value="${esc(vacSearch)}"/>
+        `;
+
+        if (activeUserSubTab === "tours") {
+            bodyHtml += `
+                <div class="vac-controls">
+                    <div class="vac-search-wrap">
+                        <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#aaa" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#aaa" stroke-width="2" stroke-linecap="round"/></svg>
+                        <input type="text" id="vac-search" class="vac-search-input" placeholder="${tr.search_ph}" value="${esc(vacSearch)}"/>
+                    </div>
+                    <div class="vac-filters">
+                        ${["all", "beach", "mountain", "city", "nature"]
+                            .map(
+                                (f) => `
+                        <button class="vac-filter-btn ${vacFilter === f ? "active" : ""}" data-filter="${f}">
+                            ${filterIcon(f)} ${tr["filter_" + f]}
+                        </button>`,
+                            )
+                            .join("")}
+                    </div>
+                </div>
+                <div class="vac-grid" id="vac-grid">${renderCards()}</div>
+            `;
+        } else {
+            // Render user's bookings
+            bodyHtml += `
+                <div class="vac-bookings-container">
+                    ${renderUserBookings()}
+                </div>
+            `;
+        }
+    } else {
+        // Render Admin panel
+        bodyHtml = `
+            <div class="vac-admin-panel">
+                <div class="vac-admin-controls">
+                    <div class="vac-admin-filter">
+                        <label>${tr.admin_booking_status || "Holati"}:</label>
+                        <select id="vac-admin-filter-status" class="vac-admin-select">
+                            <option value="all" ${adminStatusFilter === "all" ? "selected" : ""}>${tr.admin_filter_status || "Barcha holatlar"}</option>
+                            <option value="pending" ${adminStatusFilter === "pending" ? "selected" : ""}>${tr.status_pending || "Jarayonda"}</option>
+                            <option value="confirmed" ${adminStatusFilter === "confirmed" ? "selected" : ""}>${tr.status_approved || "Tasdiqlandi"}</option>
+                            <option value="cancelled" ${adminStatusFilter === "cancelled" ? "selected" : ""}>${tr.status_rejected || "Tasdiqlanmadi"}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="vac-admin-table-wrap">
+                    ${renderAdminBookingsTable()}
+                </div>
             </div>
-            <div class="vac-filters">
-                ${["all", "beach", "mountain", "city", "nature"]
-                    .map(
-                        (f) => `
-                <button class="vac-filter-btn ${vacFilter === f ? "active" : ""}" data-filter="${f}">
-                    ${filterIcon(f)} ${tr["filter_" + f]}
-                </button>`,
-                    )
-                    .join("")}
+        `;
+    }
+
+    const adminBtnHtml = `
+        <button data-perm="vac_admin" class="vac-btn-secondary" id="vac-tab-admin" style="display:flex; align-items:center; gap:8px; padding: 12px 18px; border-radius:12px; font-weight:600; font-size:14px; border: 1.5px solid #e2e8f0; background: #fff; cursor: pointer; color: #1e293b; transition: all 0.2s;">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            ${tr.tab_admin_confirmations || "Tasdiqlashlar (Admin)"}
+        </button>
+    `;
+
+    const backToUserBtnHtml = `
+        <button class="vac-btn-secondary" id="vac-tab-user" style="display:flex; align-items:center; gap:8px; padding: 12px 18px; border-radius:12px; font-weight:600; font-size:14px; border: 1.5px solid #e2e8f0; background: #fff; cursor: pointer; color: #1e293b; transition: all 0.2s;">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            ${tr.back_btn || "Orqaga (Sayohatlar)"}
+        </button>
+    `;
+
+    root.innerHTML = `
+        <div class="vac-header">
+            <div style="display:flex; align-items:center; gap:24px; flex-wrap:wrap">
+                <h1 class="vac-title">${activeMainTab === 'admin' ? (tr.tab_admin_confirmations || "Tasdiqlashlar (Admin)") : tr.title}</h1>
+            </div>
+            <div class="vac-header-btns" style="display:flex; gap:12px;">
+                ${activeMainTab === 'admin' ? backToUserBtnHtml : adminBtnHtml}
+                ${activeMainTab === 'user' ? `
+                <button data-perm="vac_add_tour" class="vac-add-btn" id="vac-add-btn">
+                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                    ${tr.add_btn}
+                </button>
+                ` : ''}
             </div>
         </div>
-        <div class="vac-grid" id="vac-grid">${renderCards()}</div>
+        ${bodyHtml}
         ${addModalOpen ? renderAddModal() : ""}
     `;
+
     attachRootEvents();
+    attachTabEvents();
 
     const cu = getCurrentUser();
     if (cu) applyPermissions(cu.userId || cu._id);
+};
+
+const renderUserBookings = () => {
+    const vacLang = getCurrentLang();
+    const tr = vacTranslations[vacLang] || vacTranslations.uz;
+    
+    if (!userBookings.length) {
+        return `
+            <div class="vac-empty" style="margin-top: 40px">
+                <div class="vac-empty-icon">🎒</div>
+                <div class="vac-empty-title">${tr.admin_empty_bookings || "Sizda hozircha buyurtmalar yo'q"}</div>
+                <div class="vac-empty-sub">Turlar katalogidan mos sayohatni tanlang va bron qiling.</div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="vac-grid">
+            ${userBookings.map(b => {
+                const tour = b.vacationId;
+                if (!tour) return "";
+                const tourName = ml(tour.name, vacLang);
+                const tourCountry = ml(tour.country, vacLang);
+                const tourCity = ml(tour.city, vacLang);
+                const tourImg = tour.coverImage || (tour.images && tour.images[0]) || "https://images.unsplash.com/photo-1488085061387-422e29b40080?w=600&q=80";
+                
+                // Status badge
+                let statusClass = "vac-status-pending";
+                let statusLabel = tr.status_pending || "Jarayonda";
+                if (b.status === "confirmed") {
+                    statusClass = "vac-status-approved";
+                    statusLabel = tr.status_approved || "Tasdiqlandi";
+                } else if (b.status === "cancelled" || b.status === "rejected") {
+                    statusClass = "vac-status-rejected";
+                    statusLabel = tr.status_rejected || "Tasdiqlanmadi";
+                }
+
+                return `
+                    <div class="vac-card vac-booking-card-new" data-booking-id="${b._id || b.id}">
+                        <div class="vac-card-img-wrap">
+                            <img src="${esc(tourImg)}" class="vac-card-img" alt="${esc(tourName)}" loading="lazy"
+                                 onerror="this.src='https://images.unsplash.com/photo-1488085061387-422e29b40080?w=600&q=80'"/>
+                            <div class="vac-card-img-overlay"></div>
+                            ${tour.category ? categoryBadge(tour.category, tr) : ''}
+                            <span class="vac-booking-status-badge ${statusClass}" style="position:absolute; top:12px; right:12px; z-index:3;">${statusLabel}</span>
+                        </div>
+                        <div class="vac-card-body">
+                            <div class="vac-card-location">
+                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/></svg>
+                                ${esc(tourCity)}, ${esc(tourCountry)}
+                            </div>
+                            <div class="vac-card-name">${esc(tourName)}</div>
+                            <div class="vac-card-meta">
+                                <div class="vac-card-stars">${starsHtml(tour.rating)}<span>${tour.rating}</span></div>
+                                <div class="vac-card-duration">
+                                    <svg width="11" height="11" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                    ${tour.days} ${tr.days_short}
+                                </div>
+                            </div>
+                            <div class="vac-card-footer">
+                                <div class="vac-card-price">
+                                    <span class="vac-price-num">$${Number(b.totalCost).toLocaleString()}</span>
+                                </div>
+                                <button class="vac-details-btn vac-booking-view-btn" data-booking-id="${b._id || b.id}">${tr.details || "Batafsil"}</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join("")}
+        </div>
+    `;
+};
+
+// ─── BOOKING DETAIL ──────────────────────────────
+const renderBookingDetail = () => {
+    const vacLang = getCurrentLang();
+    const tr = vacTranslations[vacLang] || vacTranslations.uz;
+    const b = userBookings.find(x => (x._id || x.id) === bookingDetailId);
+    if (!b) return "";
+    const tour = b.vacationId;
+    if (!tour) return "";
+
+    const imgs = tour.images && tour.images.length ? tour.images : [tour.coverImage || "https://images.unsplash.com/photo-1488085061387-422e29b40080?w=800&q=80"];
+    const name = ml(tour.name, vacLang);
+    const city = ml(tour.city, vacLang);
+    const country = ml(tour.country, vacLang);
+    const desc = ml(tour.description, vacLang);
+
+    // Status badge
+    let statusClass = "vac-status-pending";
+    let statusLabel = tr.status_pending || "Jarayonda";
+    let statusIcon = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+    if (b.status === "confirmed") {
+        statusClass = "vac-status-approved";
+        statusLabel = tr.status_approved || "Tasdiqlandi";
+        statusIcon = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    } else if (b.status === "cancelled" || b.status === "rejected") {
+        statusClass = "vac-status-rejected";
+        statusLabel = tr.status_rejected || "Tasdiqlanmadi";
+        statusIcon = `<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+    }
+
+    const startDate = b.selectedDate && b.selectedDate.start ? new Date(b.selectedDate.start).toLocaleDateString(vacLang) : "-";
+    const endDate = b.selectedDate && b.selectedDate.end ? new Date(b.selectedDate.end).toLocaleDateString(vacLang) : "-";
+
+    // Gallery (same as detail)
+    const mainImg = imgs[0] || "";
+    const thumbs = imgs.slice(1, 13);
+    const lastIdx = thumbs.length - 1;
+    const isBottomRight = (i) => i === lastIdx;
+
+    const galleryHtml = `
+    <div class="vac-bk-gallery">
+        <div class="vac-bk-main">
+            <img src="${esc(mainImg)}" class="vac-bk-main-img" id="vac-bk-main-img" alt="${esc(name)}"
+            onerror="this.src='https://images.unsplash.com/photo-1488085061387-422e29b40080?w=800&q=80'"/>
+            <div class="vac-bk-counter" id="vac-bk-counter">${imgs.length > 1 ? `1/${imgs.length}` : ""}</div>
+            ${imgs.length > 1 ? `
+            <button class="vac-bk-arrow-btn vac-bk-arrow-prev" id="vac-bk-prev">
+                <svg width="10" height="18" fill="none" viewBox="0 0 10 18"><path d="M9 1L1 9l8 8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            </button>
+            <button class="vac-bk-arrow-btn vac-bk-arrow-next" id="vac-bk-next">
+                <svg width="10" height="18" fill="none" viewBox="0 0 10 18"><path d="M1 1l8 8-8 8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            </button>` : ''}
+            <button class="vac-bk-zoom-btn" id="vac-bk-zoom">
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+        </div>
+        <div class="vac-bk-thumbs">
+            <div class="vac-bk-thumbs-grid">
+                ${thumbs.map((img, i) => `
+                <div class="vac-bk-thumb${i === 0 ? ' vac-bk-thumb--tr' : ''}${isBottomRight(i) ? ' vac-bk-thumb--br' : ''}" data-idx="${i + 1}">
+                    <img src="${esc(img)}" alt="photo ${i + 2}"
+                    onerror="this.src='https://images.unsplash.com/photo-1488085061387-422e29b40080?w=300&q=70'"/>
+                </div>`).join('')}
+            </div>
+            <button class="vac-bk-show-more" id="vac-bk-show-more">Barcha rasmlarni ko'rish</button>
+        </div>
+    </div>`;
+
+    // What is included
+    const included = ml(tour.included, vacLang);
+    let includedHtml = '';
+    if (Array.isArray(included) && included.length) {
+        includedHtml = `
+        <div class="vac-detail-includes">
+            <div class="vac-detail-section-title">${tr.includes_title || "Nimalarga kiritilgan"}</div>
+            <div class="vac-includes-grid">
+                ${included.map(item => `
+                <div class="vac-include-item">
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    ${esc(item)}
+                </div>`).join("")}
+            </div>
+        </div>`;
+    }
+
+    // Hotel & room info from booking
+    let hotelRoomHtml = '';
+    if (b.hotelName) {
+        let matchedHotel = null;
+        let matchedRoom = null;
+        
+        if (tour.hotels) {
+            matchedHotel = tour.hotels.find(h => ml(h.name, vacLang) === b.hotelName || (h.id && h.id === b.hotelId));
+            if (matchedHotel && matchedHotel.rooms && b.roomName) {
+                matchedRoom = matchedHotel.rooms.find(r => ml(r.name, vacLang) === b.roomName || (r.id && r.id === b.roomId));
+            }
+        }
+        
+        if (matchedHotel) {
+            const h = matchedHotel;
+            const hName = ml(h.name, vacLang);
+            const hCity = ml(h.city, vacLang);
+            const hCountry = ml(h.country, vacLang);
+            const hDesc = ml(h.description, vacLang);
+            const hIncluded = h.included?.[vacLang] || h.included?.uz || [];
+            const hCover = h.coverImage || h.images?.[0] || 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80';
+            const hImages = h.images || [];
+            const amenityIcons = {
+                'WiFi': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M12 20h.01M8.5 16.5a5 5 0 017 0M5 13a10 10 0 0114 0M1.5 9.5a15 15 0 0121 0"/></svg>',
+                'Baseyn': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2c1.3 0 1.9.5 2.5 1M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2c1.3 0 1.9.5 2.5 1"/></svg>',
+                'Pool': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2c1.3 0 1.9.5 2.5 1M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2c1.3 0 1.9.5 2.5 1"/></svg>',
+                'Бассейн': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2c1.3 0 1.9.5 2.5 1"/></svg>',
+                'Restoran': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v4M17 2v18M17 8h4"/></svg>',
+                'Restaurant': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v4M17 2v18M17 8h4"/></svg>',
+                'Ресторан': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v4M17 2v18M17 8h4"/></svg>',
+                'Spa': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z"/></svg>',
+                'Sport zal': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6.5 6.5h11M14 6.5v11M10 6.5v11"/></svg>',
+                'Gym': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6.5 6.5h11M14 6.5v11M10 6.5v11"/></svg>',
+                'Спортзал': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M6.5 6.5h11M14 6.5v11M10 6.5v11"/></svg>',
+                'Parking': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 17V7h4a3 3 0 010 6H9"/></svg>',
+                'Парковка': '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 17V7h4a3 3 0 010 6H9"/></svg>',
+            };
+            
+            hotelRoomHtml = `
+            <div class="vac-detail-hotels-section">
+                <div class="vac-detail-section-title" style="font-size:18px; font-weight:700; color:#1e293b; margin-bottom:20px; display:flex; align-items:center; gap:10px;">
+                    <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M3 21V7a2 2 0 012-2h6V3a2 2 0 012-2h0a2 2 0 012 2v2h6a2 2 0 012 2v14" stroke="#5b6ef5" stroke-width="2" stroke-linecap="round"/><path d="M3 21h18M9 21v-4a2 2 0 012-2h2a2 2 0 012 2v4" stroke="#5b6ef5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 9h2M7 13h2M15 9h2M15 13h2" stroke="#5b6ef5" stroke-width="2" stroke-linecap="round"/></svg>
+                    Tanlangan mehmonxona va xona
+                </div>
+                <div class="vac-premium-hotel-card">
+                    <div class="vac-premium-hotel-left">
+                        <div class="vac-premium-hotel-img-wrap" style="cursor:pointer;" onclick="openGalleryModal(${esc(JSON.stringify(hImages && hImages.length ? hImages : [hCover]).replace(/"/g, `'`))}, 0)">
+                            <img src="${esc(hCover)}" class="vac-premium-hotel-img" alt="${esc(hName)}" onerror="this.src='https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80'"/>
+                            <div class="vac-premium-hotel-img-overlay"></div>
+                            <div class="vac-premium-hotel-rating-badge">
+                                <span class="vac-premium-hotel-stars">${'★'.repeat(h.rating || 5)}</span>
+                            </div>
+                            ${hImages.length > 1 ? `
+                            <div class="vac-premium-hotel-gallery-strip" style="margin-top:8px;">
+                                ${hImages.slice(0, 4).map((img, i) => `
+                                    <div class="vac-premium-hotel-gallery-thumb" style="cursor:pointer;" onclick="event.stopPropagation(); openGalleryModal(${esc(JSON.stringify(hImages).replace(/"/g, `'`))}, ${i})"><img src="${esc(img)}" alt="photo ${i+1}" onerror="this.style.display='none'"/></div>
+                                `).join('')}
+                                ${hImages.length > 4 ? `<div class="vac-premium-hotel-gallery-more" style="cursor:pointer;" onclick="event.stopPropagation(); openGalleryModal(${esc(JSON.stringify(hImages).replace(/"/g, `'`))}, 4)">+${hImages.length - 4}</div>` : ''}
+                            </div>` : ''}
+                        </div>
+                        <div class="vac-premium-hotel-left-body">
+                            <div class="vac-premium-hotel-header">
+                                <h3 class="vac-premium-hotel-name">${esc(hName)}</h3>
+                            </div>
+                            <div class="vac-premium-hotel-location-text" style="display:flex; align-items:center; gap:6px; color:#64748b; font-size:14px; margin-bottom:12px;">
+                                <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2.5"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2.5"/></svg>
+                                ${hCity ? esc(hCity) + ', ' : ''}${esc(hCountry)}
+                            </div>
+                            <p class="vac-premium-hotel-desc">${esc(hDesc)}</p>
+                            ${hIncluded.length ? `
+                            <div class="vac-premium-hotel-amenities">
+                                ${hIncluded.map(item => `
+                                    <span class="vac-premium-amenity-badge">
+                                        ${amenityIcons[item] || '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>'}
+                                        ${esc(item)}
+                                    </span>
+                                `).join('')}
+                            </div>` : ''}
+                        </div>
+                    </div>
+                    ${matchedRoom ? (() => {
+                        const r = matchedRoom;
+                        const rName = esc(ml(r.name, vacLang));
+                        const rCover = r.images && r.images.length ? r.images[0] : 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=600&q=80';
+                        const bookedPriceObj = r.prices.find(p => p.beds == b.beds) || r.prices[0];
+                        return `
+                        <div class="vac-premium-hotel-right">
+                            <div class="vac-premium-rooms-title">
+                                <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                Tanlangan xona
+                            </div>
+                            <div class="vac-premium-rooms-list" style="margin-top:12px;">
+                                <div class="vac-premium-room-card" style="border-color:#5b6ef5; background:#f5f7ff;">
+                                    <div class="vac-premium-room-img-wrap" style="cursor:pointer;" onclick="openGalleryModal(${esc(JSON.stringify(r.images && r.images.length ? r.images : [rCover]).replace(/"/g, `'`))}, 0)">
+                                        <img src="${esc(rCover)}" class="vac-premium-room-img" alt="${rName}" onerror="this.src='https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=600&q=80'"/>
+                                    </div>
+                                    <div class="vac-premium-room-info">
+                                        <span class="vac-premium-room-name" title="${rName}">${rName}</span>
+                                        <div class="vac-premium-room-prices">
+                                            <div class="vac-premium-room-price-tag">
+                                                <span class="vac-beds">${bookedPriceObj.beds} ${tr.room_beds || 'yotoqli'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                    })() : ''}
+                </div>
+            </div>`;
+        } else {
+            hotelRoomHtml = `
+            <div class="vac-detail-hotels-section">
+                <div class="vac-detail-section-title" style="font-size:18px; font-weight:700; color:#1e293b; margin-bottom:16px; display:flex; align-items:center; gap:10px;">
+                    <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M3 21V7a2 2 0 012-2h6V3a2 2 0 012-2h0a2 2 0 012 2v2h6a2 2 0 012 2v14" stroke="#5b6ef5" stroke-width="2" stroke-linecap="round"/><path d="M3 21h18M9 21v-4a2 2 0 012-2h2a2 2 0 012 2v4" stroke="#5b6ef5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 9h2M7 13h2M15 9h2M15 13h2" stroke="#5b6ef5" stroke-width="2" stroke-linecap="round"/></svg>
+                    Tanlangan mehmonxona va xona
+                </div>
+                <div class="vac-bd-hotel-room-cards">
+                    <div class="vac-bd-hotel-card">
+                        <div class="vac-bd-hotel-card-info">
+                            <div class="vac-bd-hotel-card-label">🏨 Mehmonxona</div>
+                            <div class="vac-bd-hotel-card-name">${esc(b.hotelName)}</div>
+                        </div>
+                    </div>
+                    ${b.roomName ? `
+                    <div class="vac-bd-hotel-card">
+                        <div class="vac-bd-hotel-card-info">
+                            <div class="vac-bd-hotel-card-label">🛏️ Xona</div>
+                            <div class="vac-bd-hotel-card-name">${esc(b.roomName)}${b.beds ? ` (${b.beds} yotoqli)` : ''}</div>
+                        </div>
+                    </div>` : ''}
+                </div>
+            </div>`;
+        }
+    }
+
+    return `
+    <div class="vac-detail-page" id="vac-booking-detail-page">
+        <button class="vac-back-btn" id="vac-booking-detail-back">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            Orqaga
+        </button>
+
+        <div class="vac-gallery-wrap">
+            ${galleryHtml}
+        </div>
+
+        <div class="vac-detail-body">
+            <div class="vac-detail-main">
+                <div class="vac-detail-top-row">
+                    <div class="vac-detail-location">
+                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="#5b6ef5" stroke-width="2"/><circle cx="12" cy="9" r="2.5" stroke="#5b6ef5" stroke-width="2"/></svg>
+                        ${esc(city)}, ${esc(country)}
+                    </div>
+                </div>
+                <h2 class="vac-detail-name">${esc(name)}</h2>
+                <div class="vac-detail-stars">${starsHtml(tour.rating)}<span class="vac-detail-rating-num">${tour.rating} ${tr.rating}</span></div>
+                <p class="vac-detail-desc">${esc(desc)}</p>
+
+                ${includedHtml}
+
+                ${hotelRoomHtml}
+
+                ${tour.lat && tour.lng ? `
+                <div class="vac-detail-map-section">
+                    <div class="vac-detail-section-title">${tr.location_title}</div>
+                    <div class="vac-detail-map-wrap">
+                        <iframe
+                            src="https://yandex.ru/map-widget/v1/?ll=${tour.lng}%2C${tour.lat}&z=12&pt=${tour.lng}%2C${tour.lat}%2Cpm2rdm&l=map"
+                            class="vac-yandex-iframe" frameborder="0" allowfullscreen loading="lazy">
+                        </iframe>
+                    </div>
+                    <div class="vac-map-coords">${tour.lat.toFixed(4)}°N, ${tour.lng.toFixed(4)}°E</div>
+                </div>` : ''}
+            </div>
+            <div class="vac-detail-side">
+                <div class="vac-bd-info-card">
+                    <div class="vac-bd-status-banner ${statusClass}">
+                        ${statusIcon}
+                        <span>${statusLabel}</span>
+                    </div>
+                    <div class="vac-bd-info-rows">
+                        <div class="vac-bd-info-row">
+                            <span class="vac-bd-info-label">
+                                <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                Muddat
+                            </span>
+                            <span class="vac-bd-info-val">${startDate} - ${endDate}</span>
+                        </div>
+                        <div class="vac-bd-info-row">
+                            <span class="vac-bd-info-label">
+                                <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/></svg>
+                                Mehmonlar
+                            </span>
+                            <span class="vac-bd-info-val">${b.guests} kishi</span>
+                        </div>
+                        ${b.hotelName ? `
+                        <div class="vac-bd-info-row">
+                            <span class="vac-bd-info-label">
+                                <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M3 21V7a2 2 0 012-2h6V3a2 2 0 012-2h0a2 2 0 012 2v2h6a2 2 0 012 2v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                Mehmonxona
+                            </span>
+                            <span class="vac-bd-info-val">${esc(b.hotelName)}</span>
+                        </div>` : ''}
+                        ${b.roomName ? `
+                        <div class="vac-bd-info-row">
+                            <span class="vac-bd-info-label">
+                                <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                Xona
+                            </span>
+                            <span class="vac-bd-info-val">${esc(b.roomName)}</span>
+                        </div>` : ''}
+                        <div class="vac-bd-info-row">
+                            <span class="vac-bd-info-label">
+                                <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                Davomiylik
+                            </span>
+                            <span class="vac-bd-info-val">${tour.days} ${tr.days} / ${tour.nights} ${tr.nights}</span>
+                        </div>
+                    </div>
+                    <div class="vac-bd-total-section">
+                        <span class="vac-bd-total-label">Jami narx</span>
+                        <span class="vac-bd-total-val">$${Number(b.totalCost).toLocaleString()}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+};
+
+const attachBookingDetailEvents = () => {
+    // Back button
+    $v("vac-booking-detail-back")?.addEventListener("click", () => {
+        bookingDetailId = null;
+        mainImgIdx = 0;
+        autosave();
+        renderRoot();
+    });
+
+    // Gallery arrows (reuse same logic as detail)
+    const b = userBookings.find(x => (x._id || x.id) === bookingDetailId);
+    if (!b) return;
+    const tour = b.vacationId;
+    if (!tour) return;
+    const imgs = tour.images && tour.images.length ? tour.images : [tour.coverImage || ""];
+    const name = ml(tour.name || "", getCurrentLang());
+
+    let localMainIdx = 0;
+    const updateBkImg = () => {
+        const imgEl = $v("vac-bk-main-img");
+        const ctr = $v("vac-bk-counter");
+        if (imgEl) imgEl.src = imgs[localMainIdx];
+        if (ctr) ctr.textContent = `${localMainIdx + 1}/${imgs.length}`;
+    };
+    $v("vac-bk-prev")?.addEventListener("click", () => { if (localMainIdx > 0) { localMainIdx--; updateBkImg(); } });
+    $v("vac-bk-next")?.addEventListener("click", () => { if (localMainIdx < imgs.length - 1) { localMainIdx++; updateBkImg(); } });
+
+    // Thumb clicks
+    document.querySelectorAll("#vac-booking-detail-page .vac-bk-thumb").forEach(th => {
+        th.addEventListener("click", () => {
+            localMainIdx = parseInt(th.dataset.idx, 10) || 0;
+            updateBkImg();
+        });
+    });
+
+    // Zoom
+    $v("vac-bk-zoom")?.addEventListener("click", () => {
+        if (typeof openGalleryModal === 'function') openGalleryModal(imgs, localMainIdx);
+    });
+
+    // Show more
+    $v("vac-bk-show-more")?.addEventListener("click", () => {
+        if (typeof openGalleryModal === 'function') openGalleryModal(imgs, 0);
+    });
+};
+
+const getUniqueBookedTours = () => {
+    const vacLang = getCurrentLang();
+    const map = new Map();
+    adminBookings.forEach(b => {
+        const tour = b.vacationId;
+        if (tour && !map.has(tour._id || tour.id)) {
+            map.set(tour._id || tour.id, ml(tour.name, vacLang));
+        }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+};
+
+const renderAdminBookingsTable = () => {
+    const vacLang = getCurrentLang();
+    const tr = vacTranslations[vacLang] || vacTranslations.uz;
+
+    let filtered = adminBookings.slice().reverse();
+
+    if (adminStatusFilter !== "all") {
+        filtered = filtered.filter(b => b.status === adminStatusFilter);
+    }
+
+    const totalFiltered = filtered.length;
+    const maxPage = Math.ceil(totalFiltered / adminBookingsLimit);
+    if (adminBookingsPage > maxPage && maxPage > 0) adminBookingsPage = maxPage;
+    
+    const start = (adminBookingsPage - 1) * adminBookingsLimit;
+    const paginated = filtered.slice(start, start + adminBookingsLimit);
+
+    if (!totalFiltered) {
+        return `
+            <div class="vac-empty" style="margin-top: 20px">
+                <div class="vac-empty-icon">📂</div>
+                <div class="vac-empty-title">${tr.admin_empty_bookings || "Buyurtmalar topilmadi"}</div>
+            </div>
+        `;
+    }
+
+    let html = `
+        <table class="vac-admin-table">
+            <thead>
+                <tr>
+                    <th>${tr.admin_booking_user || "Foydalanuvchi"}</th>
+                    <th>${tr.admin_booking_tour || "Tur nomi"}</th>
+                    <th>${tr.admin_booking_date || "Sana"}</th>
+                    <th>${tr.admin_booking_total || "Jami"}</th>
+                    <th>${tr.admin_booking_status || "Holati"}</th>
+                    <th>${tr.admin_booking_actions || "Amallar"}</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${paginated.map(b => {
+                    const tour = b.vacationId;
+                    const tourName = tour ? ml(tour.name, vacLang) : "Noma'lum tur";
+                    const u = b.userId || {};
+                    const uName = u.username || "User";
+                    const uEmail = u.email || "";
+
+                    const startDate = b.selectedDate && b.selectedDate.start ? new Date(b.selectedDate.start).toLocaleDateString(vacLang) : "-";
+                    const endDate = b.selectedDate && b.selectedDate.end ? new Date(b.selectedDate.end).toLocaleDateString(vacLang) : "-";
+
+                    let statusClass = "vac-status-pending";
+                    let statusLabel = tr.status_pending || "Jarayonda";
+                    if (b.status === "confirmed") {
+                        statusClass = "vac-status-approved";
+                        statusLabel = tr.status_approved || "Tasdiqlandi";
+                    } else if (b.status === "cancelled" || b.status === "rejected") {
+                        statusClass = "vac-status-rejected";
+                        statusLabel = tr.status_rejected || "Tasdiqlanmadi";
+                    }
+
+                    const isPending = b.status === "pending";
+
+                    return `
+                        <tr>
+                            <td>
+                                <div class="vac-admin-user-cell">
+                                    <div class="vac-admin-avatar">${uName.slice(0, 2).toUpperCase()}</div>
+                                    <div class="vac-admin-user-info">
+                                        <span class="vac-admin-username">${esc(uName)}</span>
+                                        <span class="vac-admin-email">${esc(uEmail)}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                    <span style="font-weight:600; color:#1a1d2e">${esc(tourName)}</span>
+                                    <div style="display:flex; flex-direction:column; gap:2px;">
+                                        <span style="font-size:12px; color:#475569; display:flex; align-items:center; gap:4px;">
+                                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                                            ${b.guests} kishi
+                                        </span>
+                                        ${b.hotelName ? `
+                                        <span style="font-size:12px; color:#475569; display:flex; align-items:center; gap:4px;" title="${esc(b.hotelName)}">
+                                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1v2H9V7zm0 4h1v2H9v-2zm0 4h1v2H9v-2zm3-8h2v2h-2V7zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2z" /></svg>
+                                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;">${esc(b.hotelName)}</span>
+                                        </span>` : ""}
+                                        ${b.roomName ? `
+                                        <span style="font-size:12px; color:#475569; display:flex; align-items:center; gap:4px;" title="${esc(b.roomName)}">
+                                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;">${esc(b.roomName)} ${b.beds ? `(${b.beds} yotoqli)` : ''}</span>
+                                        </span>` : ""}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span style="font-size:12px; color:#1a1d2e; font-weight:500">${startDate} - ${endDate}</span>
+                            </td>
+                            <td>
+                                <span style="font-weight:700; color:#1a1d2e">$${Number(b.totalCost).toLocaleString()}</span>
+                            </td>
+                            <td>
+                                <span class="vac-booking-status-badge ${statusClass}">${statusLabel}</span>
+                            </td>
+                            <td>
+                                <div class="vac-admin-actions">
+                                    ${isPending ? `
+                                        <button class="vac-admin-btn-approve" data-id="${b._id || b.id}">
+                                            <span class="btn-icon">
+                                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            </span>
+                                            <span class="btn-text">${tr.admin_approve_btn || "Tasdiqlash"}</span>
+                                        </button>
+                                        <button class="vac-admin-btn-reject" data-id="${b._id || b.id}">
+                                            <span class="btn-icon">
+                                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            </span>
+                                            <span class="btn-text">${tr.admin_reject_btn || "Rad etish"}</span>
+                                        </button>
+                                    ` : `
+                                        <span style="font-size:11px; color:#94a3b8; font-weight:600">—</span>
+                                    `}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join("")}
+            </tbody>
+        </table>
+    `;
+
+    if (totalFiltered > 0) {
+        const renderPageButtons = (total, limit, current) => {
+            const mPage = Math.ceil(total / limit);
+            if (mPage <= 1) return "";
+            let btnHtml = "";
+            for (let i = 1; i <= mPage; i++) {
+                if (i === 1 || i === mPage || (i >= current - 1 && i <= current + 1)) {
+                    btnHtml += `<button class="vac-pagination-page-btn ${i === current ? "active" : ""}" data-page="${i}">${i}</button>`;
+                } else if (i === 2 && current > 3) {
+                    btnHtml += `<span class="vac-pagination-ellipsis">...</span>`;
+                    i = current - 2;
+                } else if (i === current + 2 && current < mPage - 2) {
+                    btnHtml += `<span class="vac-pagination-ellipsis">...</span>`;
+                    i = mPage - 1;
+                }
+            }
+            return btnHtml;
+        };
+
+        html += `
+            <div class="vac-admin-pagination">
+                <div class="vac-admin-pagination-right">
+                    <div class="vac-rows-per-page-container">
+                        <button class="vac-rows-btn" id="vac-admin-rows-btn">
+                            <span>${tr.admin_show || "Ko'rsatish"}: <span id="vac-admin-rows-val">${adminBookingsLimit}</span></span>
+                            <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="vac-rows-dropdown" id="vac-admin-rows-dropdown">
+                            <div class="vac-rows-option ${adminBookingsLimit === 10 ? "active" : ""}" data-val="10">10</div>
+                            <div class="vac-rows-option ${adminBookingsLimit === 20 ? "active" : ""}" data-val="20">20</div>
+                            <div class="vac-rows-option ${adminBookingsLimit === 50 ? "active" : ""}" data-val="50">50</div>
+                        </div>
+                    </div>
+                    <div class="vac-pagination-controls">
+                        <button class="vac-pagination-btn vac-prev-btn" ${adminBookingsPage === 1 ? "disabled" : ""}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </button>
+                        <div class="vac-pagination-pages">
+                            ${renderPageButtons(totalFiltered, adminBookingsLimit, adminBookingsPage)}
+                        </div>
+                        <button class="vac-pagination-btn vac-next-btn" ${adminBookingsPage === maxPage || maxPage === 0 ? "disabled" : ""}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    return html;
+};
+
+const attachTabEvents = () => {
+    // Main tabs
+    $v("vac-tab-user")?.addEventListener("click", () => {
+        activeMainTab = "user";
+        autosave();
+        renderRoot();
+    });
+    $v("vac-tab-admin")?.addEventListener("click", () => {
+        activeMainTab = "admin";
+        autosave();
+        renderRoot();
+    });
+
+    // Subtabs (user view)
+    $v("vac-subtab-tours")?.addEventListener("click", () => {
+        activeUserSubTab = "tours";
+        autosave();
+        renderRoot();
+    });
+    $v("vac-subtab-bookings")?.addEventListener("click", () => {
+        activeUserSubTab = "bookings";
+        autosave();
+        renderRoot();
+    });
+
+    // Admin filters
+    const statusSelect = $v("vac-admin-filter-status");
+    if (statusSelect) {
+        statusSelect.addEventListener("change", (e) => {
+            adminStatusFilter = e.target.value;
+            autosave();
+            renderRoot();
+        });
+    }
+
+    const tourSelect = $v("vac-admin-filter-tour");
+    if (tourSelect) {
+        tourSelect.addEventListener("change", (e) => {
+            adminTourFilter = e.target.value;
+            autosave();
+            renderRoot();
+        });
+    }
+
+    // Admin approve actions
+    document.querySelectorAll(".vac-admin-btn-approve").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            const originalHtml = btn.innerHTML;
+            btn.classList.add("loading");
+            btn.innerHTML = `<span class="btn-icon"><svg width="12" height="12" viewBox="0 0 24 24" class="vac-spinner"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="31.4 31.4" stroke-dashoffset="0"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle></svg></span><span class="btn-text">Kutilmoqda...</span>`;
+            try {
+                const res = await fetch(`${API_URL}/api/vacations/bookings/${id}/approve`, {
+                    method: "POST",
+                    headers: getAuthHeaders(),
+                    credentials: "include"
+                });
+                if (res.ok) {
+                    await fetchAdminBookings();
+                    await fetchMyBookings();
+                    renderRoot();
+                } else {
+                    const err = await res.json();
+                    alert(err.message || "Tasdiqlashda xatolik yuz berdi");
+                    btn.classList.remove("loading");
+                    btn.innerHTML = originalHtml;
+                }
+            } catch (e) {
+                console.error(e);
+                btn.classList.remove("loading");
+                btn.innerHTML = originalHtml;
+            }
+        });
+    });
+
+    // Admin reject actions
+    document.querySelectorAll(".vac-admin-btn-reject").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            const originalHtml = btn.innerHTML;
+            btn.classList.add("loading");
+            btn.innerHTML = `<span class="btn-icon"><svg width="12" height="12" viewBox="0 0 24 24" class="vac-spinner"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="31.4 31.4" stroke-dashoffset="0"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle></svg></span><span class="btn-text">Kutilmoqda...</span>`;
+            try {
+                const res = await fetch(`${API_URL}/api/vacations/bookings/${id}/reject`, {
+                    method: "POST",
+                    headers: getAuthHeaders(),
+                    credentials: "include"
+                });
+                if (res.ok) {
+                    await fetchAdminBookings();
+                    await fetchMyBookings();
+                    renderRoot();
+                } else {
+                    const err = await res.json();
+                    alert(err.message || "Rad etishda xatolik yuz berdi");
+                    btn.classList.remove("loading");
+                    btn.innerHTML = originalHtml;
+                }
+            } catch (e) {
+                console.error(e);
+                btn.classList.remove("loading");
+                btn.innerHTML = originalHtml;
+            }
+        });
+    });
+
+    // Admin Pagination Events
+    const rowsDropdownBtn = document.getElementById("vac-admin-rows-btn");
+    const rowsDropdown = document.getElementById("vac-admin-rows-dropdown");
+    if (rowsDropdownBtn && rowsDropdown) {
+        rowsDropdownBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            rowsDropdown.classList.toggle("open");
+        });
+        document.addEventListener("click", () => {
+            if (rowsDropdown.classList.contains("open")) {
+                rowsDropdown.classList.remove("open");
+            }
+        });
+        rowsDropdown.querySelectorAll(".vac-rows-option").forEach(opt => {
+            opt.addEventListener("click", (e) => {
+                e.stopPropagation();
+                adminBookingsLimit = parseInt(opt.dataset.val, 10);
+                adminBookingsPage = 1;
+                renderRoot();
+            });
+        });
+    }
+
+    document.querySelectorAll(".vac-pagination-page-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            adminBookingsPage = parseInt(btn.dataset.page, 10);
+            renderRoot();
+        });
+    });
+
+    const prevBtn = document.querySelector(".vac-prev-btn");
+    if (prevBtn) {
+        prevBtn.addEventListener("click", () => {
+            if (adminBookingsPage > 1) {
+                adminBookingsPage--;
+                renderRoot();
+            }
+        });
+    }
+
+    const nextBtn = document.querySelector(".vac-next-btn");
+    if (nextBtn) {
+        nextBtn.addEventListener("click", () => {
+            let filtered = adminBookings.slice();
+            if (adminStatusFilter !== "all") {
+                filtered = filtered.filter(b => b.status === adminStatusFilter);
+            }
+            const maxPage = Math.ceil(filtered.length / adminBookingsLimit);
+            if (adminBookingsPage < maxPage) {
+                adminBookingsPage++;
+                renderRoot();
+            }
+        });
+    }
 };
 
 const filterIcon = (f) => {
@@ -1782,7 +2680,7 @@ const attachRootEvents = () => {
             renderRoot();
         });
     });
-    document.querySelectorAll(".vac-details-btn").forEach((b) =>
+    document.querySelectorAll(".vac-details-btn:not(.vac-booking-view-btn)").forEach((b) =>
         b.addEventListener("click", (e) => {
             e.stopPropagation();
             carouselIdx = 0;
@@ -1791,6 +2689,24 @@ const attachRootEvents = () => {
             renderRoot();
         }),
     );
+
+    // Booking cards ("Mening buyurtmalarim" tab)
+    document.querySelectorAll(".vac-booking-card-new").forEach((card) => {
+        card.addEventListener("click", (e) => {
+            if (e.target.closest(".vac-booking-view-btn")) return;
+            bookingDetailId = card.dataset.bookingId;
+            autosave();
+            renderRoot();
+        });
+    });
+    document.querySelectorAll(".vac-booking-view-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            bookingDetailId = btn.dataset.bookingId;
+            autosave();
+            renderRoot();
+        });
+    });
     document.querySelectorAll(".vac-edit-btn").forEach((b) =>
         b.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -2427,6 +3343,8 @@ const processTourPayment = async () => {
 
         bookStep = 4; // Success step
         updateBookModalUI();
+        fetchMyBookings();
+        fetchAdminBookings();
         fetchCurrentUser().then(u => {
             if (u && typeof window.updateMainBalance === "function") {
                 window.updateMainBalance();
@@ -2957,6 +3875,7 @@ const VAC_STATE_KEY = "vac_ui_state";
 const saveUiState = () => {
     const state = {
         detailTourId,
+        bookingDetailId,
         addModalOpen,
         editTourId,
         formContentLang,
@@ -2965,7 +3884,8 @@ const saveUiState = () => {
         vacFilter,
         vacSearch,
         activeModalTab,
-        formBuffer: window._vacFormBuffer || null,
+        activeMainTab,
+        activeUserSubTab,
         // save current form field values too
         formFields: addModalOpen
             ? {
@@ -2995,6 +3915,7 @@ const loadUiState = () => {
         if (!raw) return false;
         const s = JSON.parse(raw);
         detailTourId = s.detailTourId || null;
+        bookingDetailId = s.bookingDetailId || null;
         addModalOpen = s.addModalOpen || false;
         editTourId = s.editTourId || null;
         formContentLang = s.formContentLang || "uz";
@@ -3003,6 +3924,8 @@ const loadUiState = () => {
         vacFilter = s.vacFilter || "all";
         vacSearch = s.vacSearch || "";
         activeModalTab = s.activeModalTab || "tour";
+        activeMainTab = s.activeMainTab || "user";
+        activeUserSubTab = s.activeUserSubTab || "tours";
         window._vacFormBuffer = s.formBuffer || null;
         window._vacFormFields = s.formFields || null;
         return true;
@@ -3012,6 +3935,7 @@ const loadUiState = () => {
 };
 
 const clearUiState = () => {
+    bookingDetailId = null;
     localStorage.removeItem(VAC_STATE_KEY);
 };
 
@@ -3021,6 +3945,8 @@ const autosave = () => saveUiState();
 // ─── INIT ─────────────────────────────────────
 export const initVacationsLogic = async () => {
     await fetchToursAPI();
+    await fetchMyBookings();
+    await fetchAdminBookings();
     const cu = getCurrentUser();
     const vacLang = getCurrentLang();
     // Restore UI state from before refresh
@@ -3029,9 +3955,12 @@ export const initVacationsLogic = async () => {
         vacSearch = "";
         vacFilter = "all";
         detailTourId = null;
+        bookingDetailId = null;
         editTourId = null;
         addModalOpen = false;
         activeModalTab = "tour";
+        activeMainTab = "user";
+        activeUserSubTab = "tours";
         formCoverDataUrl = null;
         formGalleryImages = [];
         formContentLang = "uz";
