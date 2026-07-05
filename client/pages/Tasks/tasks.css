@@ -1,3 +1,5 @@
+@import url("./tasks_responsive.css");
+
 .tasks-container {
     display: flex;
     width: 100%;
@@ -2844,7 +2846,7 @@ input:checked + .slider:before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px 24px;
+    padding-bottom: 10px;
     border-bottom: 1px solid #f1f5f9;
     background: #fff;
 }
@@ -3258,18 +3260,20 @@ input:checked + .slider:before {
 
 .task-filter-large-menu {
     position: absolute;
-    top: calc(100% + 8px);
+    top: calc(100% + 12px);
     left: 0;
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1);
-    border: 1px solid #e2e8f0;
-    padding: 16px;
-    width: 300px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 20px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(91, 110, 245, 0.08);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    padding: 24px;
+    width: 380px;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-8px);
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: translateY(-12px);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     z-index: 1002;
     box-sizing: border-box;
 }
@@ -3284,9 +3288,9 @@ input:checked + .slider:before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #f1f5f9;
-    padding-bottom: 10px;
-    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(241, 245, 249, 0.8);
+    padding-bottom: 14px;
+    margin-bottom: 16px;
 }
 
 .filter-menu-header h3 {
@@ -3297,17 +3301,20 @@ input:checked + .slider:before {
 }
 
 .filter-reset-btn {
-    background: transparent;
+    background: rgba(239, 68, 68, 0.08);
     border: none;
-    color: #5b6ef5;
+    color: #ef4444;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
-    padding: 0;
+    padding: 6px 12px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
 }
 
 .filter-reset-btn:hover {
-    text-decoration: underline;
+    background: rgba(239, 68, 68, 0.15);
+    color: #dc2626;
 }
 
 .filter-menu-body {
@@ -3393,3 +3400,7 @@ input:checked + .slider:before {
     box-shadow: 0 0 0 3px rgba(91, 110, 245, 0.08);
 }
 
+select.todo-form-input { appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%2364748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpolyline points="6 9 12 15 18 9"%3E%3C/polyline%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 36px; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+select.todo-form-input:hover { border-color: #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+select.todo-form-input:focus { border-color: #5b6ef5; box-shadow: 0 0 0 3px rgba(91, 110, 245, 0.15); }
+select.todo-form-input option { padding: 10px; font-size: 13px; background: #fff; color: #1e293b; }

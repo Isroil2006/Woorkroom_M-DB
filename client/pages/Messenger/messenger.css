@@ -253,7 +253,7 @@
 
 /* search */
 .msg-search-wrap {
-    padding: 12px 14px 8px;
+    padding: 24px 14px 8px;
     flex-shrink: 0;
 }
 .msg-sidebar.collapsed .msg-search-wrap {
@@ -340,6 +340,11 @@
     justify-content: center;
     font-weight: 700;
     color: #fff;
+}
+.msg-avatar-spacer {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
 }
 .msg-status-dot {
     width: 11px;
@@ -430,6 +435,21 @@
 .msg-icon-btn:hover {
     background: #eef0fd;
     color: #5b6ef5;
+}
+
+.msg-back-btn,
+.msg-info-close-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: #8892a4;
+    padding: 6px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
 }
 
 /* ═══ CHAT AREA ═══ */
@@ -558,11 +578,14 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    max-width: 60%;
+    max-width: 85%;
     min-width: 0;
 }
 .msg-row--mine .msg-row-body {
     align-items: flex-end;
+}
+.msg-row--theirs .msg-row-body {
+    align-items: flex-start;
 }
 
 .msg-sender-label {
@@ -586,7 +609,7 @@
 /* bubble */
 .msg-bubble {
     position: relative;
-    padding: 8px 58px 8px 14px;
+    padding: 8px 14px 10px 14px;
     border-radius: 18px;
     font-size: 13.5px;
     line-height: 1.55;
@@ -613,6 +636,13 @@
 }
 .msg-bubble-text {
     display: inline;
+}
+/* Telegram-style trick: leave space for absolute time */
+.msg-bubble-text::after {
+    content: "";
+    display: inline-block;
+    width: 44px;
+    height: 1px;
 }
 .msg-bubble.emoji-only .msg-bubble-text {
     font-size: 34px;
@@ -770,7 +800,7 @@
 }
 .msg-input-row {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: 7px;
 }
 
@@ -794,6 +824,9 @@
     color: #4a5de4;
 }
 
+.msg-text-input::-webkit-scrollbar {
+    display: none;
+}
 .msg-text-input {
     flex: 1;
     border: none;
@@ -808,6 +841,8 @@
     background: transparent;
     line-height: 1.5;
     padding: 6px 0;
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
 }
 .msg-text-input::placeholder {
     color: #b0b8cc;
@@ -1385,3 +1420,220 @@
 .rows-option { padding: 6px 12px; font-size: 14px; font-weight: 500; color: #475569; cursor: pointer; border-radius: 6px; transition: 0.2s; text-align: center; }
 .rows-option:hover { background: #f8fafc; color: #0f172a; }
 .rows-option.active { background: #e0e7ff; color: #4f46e5; font-weight: 600; }
+
+/* ═══════════════════════════════════════════════
+   ═══ RESPONSIVE MOBILE OVERRIDES ═══
+   ═══════════════════════════════════════════════ */
+@media (max-width: 992px) {
+    .messenger-wrap {
+        padding: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        gap: 0 !important;
+        margin: -10px !important;
+        width: calc(100% + 20px) !important;
+        height: calc(100% + 20px) !important;
+    }
+
+    .messenger-title {
+        display: none !important;
+    }
+
+    .messenger-body {
+        height: 100% !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: row;
+    }
+
+    /* ─── Back Buttons ─── */
+    .msg-back-btn {
+        display: flex !important;
+    }
+    .msg-info-close-btn {
+        display: flex !important;
+        position: absolute;
+        top: 14px;
+        left: 14px;
+        z-index: 100;
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e2e8f0;
+    }
+
+    /* ─── Hide sidebar collapse button ─── */
+    .msg-sidebar-actions {
+        display: none !important;
+    }
+
+    /* ─── View Switcher with Slide Animation ─── */
+    .msg-sidebar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100% !important;
+        height: 100%;
+        display: flex !important;
+        border-right: none;
+        transition: transform 0.3s cubic-bezier(0.1, 0.76, 0.55, 0.94);
+        transform: translateX(0);
+        z-index: 1;
+    }
+
+    .msg-chat-area {
+        position: absolute;
+        top: 0;
+        left: 100%;
+        width: 100% !important;
+        height: 100%;
+        display: flex !important;
+        flex-direction: column;
+        transition: transform 0.3s cubic-bezier(0.1, 0.76, 0.55, 0.94);
+        transform: translateX(0);
+        z-index: 2;
+    }
+
+    .msg-info-panel {
+        position: absolute;
+        top: 0;
+        left: 100%;
+        width: 100% !important;
+        height: 100%;
+        display: flex !important;
+        flex-direction: column;
+        transition: transform 0.3s cubic-bezier(0.1, 0.76, 0.55, 0.94);
+        transform: translateX(0);
+        z-index: 3;
+        background: #fff !important;
+        border-left: none !important;
+    }
+
+    /* STATE: Active Chat Open */
+    .messenger-body.has-active-chat .msg-sidebar {
+        transform: translateX(-100%);
+    }
+    .messenger-body.has-active-chat .msg-chat-area {
+        transform: translateX(-100%);
+    }
+
+    /* STATE: Info Panel Open */
+    .messenger-body.show-info-panel .msg-sidebar {
+        transform: translateX(-200%);
+    }
+    .messenger-body.show-info-panel .msg-chat-area {
+        transform: translateX(-200%);
+    }
+    .messenger-body.show-info-panel .msg-info-panel {
+        transform: translateX(-100%);
+    }
+
+    /* ─── Layout Details & Paddings ─── */
+    .msg-feed {
+        padding: 12px 14px;
+    }
+    .msg-chat-header {
+        padding: 10px 14px;
+    }
+    .msg-avatar {
+        width: 34px !important;
+        height: 34px !important;
+        font-size: 13px !important;
+    }
+    .msg-avatar-spacer {
+        width: 34px !important;
+        height: 34px !important;
+    }
+    .msg-chat-recipient-name {
+        font-size: 14px;
+    }
+    .msg-chat-status-text {
+        font-size: 10px;
+    }
+    .msg-bubble {
+        max-width: 85%;
+        padding: 10px 14px;
+        font-size: 13.5px;
+    }
+    .msg-input-area {
+        padding: 10px;
+    }
+    .msg-input-row {
+        gap: 6px;
+    }
+    .msg-text-input {
+        font-size: 13.5px;
+        padding: 8px 10px;
+    }
+
+    /* Search trigger header */
+    .msg-search-wrap {
+        padding: 20px 14px 10px;
+    }
+
+    /* Lightbox and pickers */
+    .msg-emoji-picker {
+        width: 280px;
+        bottom: 70px;
+        right: 10px;
+    }
+
+    /* ─── Search Modal Mobile Overrides ─── */
+    .msg-search-modal {
+        width: 90% !important;
+        max-width: 420px !important;
+        border-radius: 14px !important;
+        height: 75vh !important;
+    }
+    .msg-search-modal-header {
+        padding: 16px 20px 12px !important;
+    }
+    .msg-search-modal-header h2 {
+        font-size: 15px !important;
+    }
+    .msg-search-modal-input-wrap {
+        margin: 0 20px 12px !important;
+        border-radius: 10px !important;
+        padding: 0 10px !important;
+    }
+    #msg-search-modal-input {
+        padding: 8px 6px !important;
+        font-size: 13px !important;
+    }
+    .msg-search-modal-list {
+        padding: 0 12px 12px !important;
+        gap: 2px !important;
+    }
+    .msg-search-modal-item {
+        padding: 8px !important;
+        border-radius: 10px !important;
+        gap: 10px !important;
+    }
+    .msg-search-modal-item-name {
+        font-size: 13.5px !important;
+    }
+    .msg-search-modal-item-email {
+        font-size: 11px !important;
+    }
+    .msg-search-modal-footer {
+        padding: 12px 20px !important;
+    }
+    .msg-page-info {
+        font-size: 12px !important;
+    }
+    .msg-page-btn {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 12px !important;
+        border-radius: 6px !important;
+    }
+    .rows-selector-btn {
+        font-size: 12px !important;
+        padding: 5px 10px !important;
+        border-radius: 6px !important;
+    }
+}

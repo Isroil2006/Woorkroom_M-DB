@@ -1,5 +1,6 @@
 import { API_URL, fetchCurrentUser } from "./api.js";
 import { signInForm, signUpForm } from "../../pages/login/auth.js";
+import { initResponsiveLogic } from "../../pages/login/login_responsive.js";
 
 // Agar user allaqachon login qilgan bo'lsa, asosiy sahifaga o'tkazamiz
 (async () => {
@@ -9,6 +10,8 @@ import { signInForm, signUpForm } from "../../pages/login/auth.js";
   }
 })();
 
+// Responsive logikani ishga tushirish
+initResponsiveLogic();
 
 const wrapper = document.querySelector(".auth-wrapper");
 const container = document.getElementById("auth-container");
@@ -32,6 +35,7 @@ function renderAuth(mode) {
   authBannerSignIn.classList.add("blur_animation");
   authBannerSignUp.classList.add("blur_animation");
 
+  // Start the background transition immediately
   if (mode === "signup") {
     wrapper.classList.add("signup-mode");
   } else {
@@ -39,6 +43,15 @@ function renderAuth(mode) {
   }
 
   setTimeout(() => {
+    // Update container sizes and content only after it has blurred out
+    if (mode === "signup") {
+      container.style.maxWidth = "800px";
+      container.style.width = "100%";
+    } else {
+      container.style.maxWidth = "400px";
+      container.style.width = "";
+    }
+
     container.innerHTML = mode === "signup" ? signUpForm : signInForm;
 
     if (mode === "signup") {
@@ -91,16 +104,22 @@ function attachEvents() {
     signupbtn.onclick = () => {
       clearErrors();
 
-      const username = document.getElementById("reg-username").value.trim();
+      const firstname = document.getElementById("reg-firstname").value.trim();
+      const lastname = document.getElementById("reg-lastname").value.trim();
       const tel = document.getElementById("reg-tel").value.trim();
       const email = document.getElementById("reg-email").value.trim();
       const password = document.getElementById("reg-password").value.trim();
       let hasError = false;
 
-      if (username.length < 3) {
-        showError("reg-username", "Username kamida 3 ta harf bo'lsin");
+      if (firstname.length < 3) {
+        showError("reg-firstname", "Ism kamida 3 ta harf bo'lsin");
         hasError = true;
       }
+      if (lastname.length < 3) {
+        showError("reg-lastname", "Familiya kamida 3 ta harf bo'lsin");
+        hasError = true;
+      }
+      const username = firstname + " " + lastname;
       if (!tel.includes("+998") || tel.length < 13) {
         showError("reg-tel", "Telefon raqamini to'liq kiriting");
         hasError = true;

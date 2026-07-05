@@ -12,7 +12,7 @@
     background-color: #F0F2F8;
     padding: 24px 28px;
     border-radius: 12px;
-    overflow-y: auto; /* Enable scrolling */
+    overflow: hidden; /* Prevent page scrolling */
 }
 
 /* Custom Scrollbar */
@@ -50,6 +50,9 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
+    flex: 1;
+    overflow-y: auto; /* Scroll list only */
+    padding-right: 4px;
 }
 
 /* ══════════════════════════════════════════════
@@ -76,22 +79,6 @@
     border-color: #d4d8f8;
 }
 
-/* Gradient accent bar on the left */
-.employee-card::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 4px;
-    background: linear-gradient(180deg, #5b6ef5, #7c3aed);
-    border-radius: 4px 0 0 4px;
-    opacity: 0;
-    transition: opacity 0.22s;
-}
-.employee-card:hover::before {
-    opacity: 1;
-}
 
 /* Inner padding wrapper */
 .employee-card-inner {
@@ -387,8 +374,7 @@
     padding-left: 4px;
 }
 
-.modal-body input,
-.modal-body select {
+.modal-body input {
     width: 100%;
     padding: 10px 13px;
     border: 1.5px solid #e2e6f5;
@@ -404,11 +390,46 @@
         box-shadow 0.15s;
     box-sizing: border-box;
 }
-.modal-body input:focus,
-.modal-body select:focus {
+
+.modal-body select {
+    width: 100%;
+    padding: 10px 13px;
+    padding-right: 36px; /* Space for custom arrow */
+    border: 1.5px solid #e2e6f5;
+    border-radius: 11px;
+    margin-top: 10px;
+    font-size: 13.5px;
+    font-family: inherit;
+    color: #1a1d2e;
+    background: #f9faff;
+    outline: none;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+    box-sizing: border-box;
+    
+    /* Custom chevron arrow */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238892a4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 14px;
+    cursor: pointer;
+}
+
+.modal-body input:focus {
     border-color: #5b6ef5;
     background: #fff;
     box-shadow: 0 0 0 3px rgba(91, 110, 245, 0.1);
+}
+
+.modal-body select:focus {
+    border-color: #5b6ef5;
+    background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(91, 110, 245, 0.1);
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6ef5' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
 }
 
 .modal-actions {
@@ -674,28 +695,43 @@
     color: #8892a4;
 }
 
-.rows-dropdown {
+.emp-rows-dropdown {
     position: absolute;
-    top: calc(100% + 8px); /* Changed from bottom to top */
+    bottom: calc(100% + 8px); /* Open upwards by default */
     right: 0;
     width: 80px;
     background: white;
     border: 1.5px solid #e2e8f0;
     border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.1);
     display: none;
     flex-direction: column;
     overflow: hidden;
     z-index: 1001;
-    animation: empSlideDown 0.2s ease-out;
+    animation: empSlideUpDropdown 0.2s ease-out;
+}
+.emp-rows-dropdown.active {
+    display: flex;
 }
 
-@keyframes empSlideDown {
-    from { opacity: 0; transform: translateY(-10px); }
+.employees-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1.5px solid #eef0f8;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+}
+
+@keyframes empSlideUpDropdown {
+    from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-.rows-option {
+.emp-rows-option {
     padding: 10px 16px;
     font-size: 14px;
     font-weight: 600;
@@ -705,16 +741,119 @@
     transition: background 0.2s;
 }
 
-.rows-option:hover {
+.emp-rows-option:hover {
     background: #f8fafc;
     color: #5b6ef5;
 }
 
-.rows-option.active {
+.emp-rows-option.active {
     background: #ebf3ff;
     color: #5b6ef5;
 } 
 .error-input {
     border-color: #ff4d4f !important;
     box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.2) !important;
+}
+
+/* ── Employee Count Badge (Desktop) ── */
+.emp-count-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #ebf3ff;
+    color: #5b6ef5;
+    padding: 0 16px;
+    height: 44px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 14px;
+    border: 1.5px solid #d4d8f8;
+    user-select: none;
+    transition: all 0.2s;
+}
+.emp-count-badge svg {
+    color: #5b6ef5;
+}
+.emp-count-badge:hover {
+    background: #e1ecfe;
+    border-color: #b5c7f8;
+}
+
+/* ── Custom Gender Select ── */
+.custom-gender-select {
+    position: relative;
+    width: 100%;
+    margin-top: 10px;
+    box-sizing: border-box;
+}
+
+.selected-gender {
+    width: 100%;
+    padding: 10px 13px;
+    border: 1.5px solid #e2e6f5;
+    border-radius: 11px;
+    font-size: 13.5px;
+    color: #1a1d2e;
+    background: #f9faff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+    user-select: none;
+}
+
+.selected-gender:hover {
+    background: #fff;
+    border-color: #cbd5e1;
+}
+
+/* Focused style via active container class or js */
+.custom-gender-select:has(.gender-options.active) .selected-gender {
+    border-color: #5b6ef5;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(91, 110, 245, 0.1);
+}
+
+.selected-gender .chevron {
+    color: #8892a4;
+    transition: transform 0.2s;
+}
+
+.gender-options {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 100%;
+    background: white;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 1002; /* higher than rows-dropdown */
+}
+
+.gender-options.active {
+    display: flex;
+}
+
+.gender-option {
+    padding: 10px 16px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #1a1d2e;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.gender-option:hover {
+    background: #f8fafc;
+    color: #5b6ef5;
+}
+
+.gender-option.active {
+    background: #ebf3ff;
+    color: #5b6ef5;
 }

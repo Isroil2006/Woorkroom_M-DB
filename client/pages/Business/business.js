@@ -3,6 +3,7 @@ import { translations } from "./translations.js";
 import { getCurrentUser, getAuthHeaders, fetchCurrentUser, API_URL } from "../../assets/js/api.js";
 import { getCurrentLang, createTranslationHelper, LANGUAGE_CHANGED_EVENT } from "../../assets/js/i18n.js";
 import { showNotification } from "../../components/Notification/notification.js";
+import { initResponsive, bindMiniRowClicks, bindFullRowClicks } from "./payment_responsive.js";
 
 const t = createTranslationHelper(translations);
 const getCurrent = () => getCurrentUser();
@@ -15,6 +16,7 @@ let myStats = {};
 let pusherChannel = null;
 let exchangeRates = { UZS: 1, USD: 12800, RUB: 130 };
 let cardCurrency = "UZS";
+let blockedCardIds = new Set();
 
 const fetchRates = async () => {
   try {
@@ -55,6 +57,7 @@ const loadPaymentData = async () => {
       fetchRates(),
     ]);
     myMethods = methods.sort((a, b) => (b.isDefault === true ? 1 : 0) - (a.isDefault === true ? 1 : 0));
+    blockedCardIds = new Set(myMethods.filter(m => m.isBlocked === true).map(m => m._id));
     myTransactions = transactions;
     myStats = stats;
     paymentUsers = users;
@@ -64,9 +67,11 @@ const loadPaymentData = async () => {
 };
 
 // ─── FORMAT HELPERS ─────────────────────────────────────────────
-const fmt = (n, isVisa = false) => {
+const fmt = (n, isVisaOrCurrency = false) => {
+  // Accept boolean (legacy) or currency string "USD"/"UZS"
+  const isUSD = isVisaOrCurrency === true || isVisaOrCurrency === "USD";
   const formatted = Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return isVisa ? "$" + formatted : formatted + " UZS";
+  return isUSD ? formatted + " USD" : formatted + " UZS";
 };
 const fmtCardBalance = (n, isVisa = false) => {
    if (isVisa) {
@@ -162,10 +167,11 @@ export const BusinessPage = () => `
           <div id="mini-filters-container" style="display:flex; gap:10px; z-index:10;"></div>
           <button class="biz-btn-secondary" id="btn-view-all-cards" style="height:32px; padding:0 12px; font-size:12px; border-radius:10px; font-weight:600; display:flex; align-items:center; gap:6px; cursor:pointer;">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-            Barcha kartalarni ko'rish
+            ${t("view_all_cards")}
           </button>
         </div>
         <button class="biz-btn-primary" id="mini-create-doc-btn" style="height:32px; padding:0 14px; font-size:12px;">${t("create")}</button>
+        <span class="mobile-barchasi-link" id="mobile-barchasi" style="display:none; font-size:14px; color:#5b6ef5; font-weight:600; cursor:pointer;">Barchasi &rsaquo;</span>
       </div>
       <div class="biz-full-table-header docs-cols mini-table-header">
         <span>${t("col_type")}</span>
@@ -218,23 +224,15 @@ export const BusinessPage = () => `
     <div class="biz-card" style="height:100%;display:flex;flex-direction:column;">
       <div class="biz-card-head">
         <div style="display:flex;align-items:center;gap:10px">
-          <button class="biz-back-btn" id="back-docs">${t("back")}</button>
+          <button class="biz-back-btn" id="back-docs" style="display:flex;align-items:center;justify-content:center;gap:4px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left" style="flex-shrink:0;"><path d="m15 18-6-6 6-6"/></svg>
+            <span>${t("back")}</span>
+          </button>
           <h3>${t("documents")}</h3>
         </div>
         <button class="biz-btn-primary" id="create-doc-btn">${t("create")}</button>
       </div>
-      <div class="biz-doc-filters">
-        <select id="doc-status-filter" class="biz-filter-select">
-          <option value="">${t("all_status")}</option>
-          <option value="waiting">${t("pending")}</option>
-          <option value="paid">${t("confirmed")}</option>
-          <option value="incoming">${t("incoming")}</option>
-        </select>
-        <div class="biz-search" style="flex:1;max-width:220px">
-          <svg width="13" height="13" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#aaa" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#aaa" stroke-width="2" stroke-linecap="round"/></svg>
-          <input type="text" id="doc-num-search" placeholder="${t("search_placeholder")}" />
-        </div>
-      </div>
+      <div class="biz-doc-filters" id="full-doc-filters-container"></div>
       <div class="biz-full-table-header docs-cols">
         <span>${t("col_type")}</span>
         <span>${t("col_amount")}</span>
@@ -244,14 +242,7 @@ export const BusinessPage = () => `
         <span>${t("col_action")}</span>
       </div>
       <div id="docs-full-list" style="flex:1;overflow-y:auto;"></div>
-      <div class="biz-pagination">
-        <span id="dp-info"></span>
-        <div class="biz-page-btns">
-          <button id="dp-prev">&#8249;</button>
-          <span id="dp-num">1</span>
-          <button id="dp-next">&#8250;</button>
-        </div>
-      </div>
+      <div id="docs-pagination-container" class="biz-pagination"></div>
     </div>
   </div>
 
@@ -262,7 +253,7 @@ export const BusinessPage = () => `
       <div class="biz-card-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; border-bottom: 1px solid #f0f2fa; padding: 16px 20px;">
         <div style="display:flex; align-items:center; gap:12px;">
           <button class="biz-back-btn" id="back-all-cards">${t("back")}</button>
-          <h3 style="font-size:18px; font-weight:700; color:#1a1d2e;">Barcha hisob va kartalar</h3>
+          <h3 style="font-size:18px; font-weight:700; color:#1a1d2e;">${t("all_accounts_and_cards")}</h3>
         </div>
       </div>
 
@@ -272,17 +263,17 @@ export const BusinessPage = () => `
           <!-- Filter Select Type -->
           <div class="custom-select" id="all-cards-type-filter-custom" style="font-size: 14px;">
             <div class="selected" style="font-size: 14px; padding: 8px 12px; border-radius: 9px; gap: 8px;">
-                <span id="all-cards-filter-text">Barchasi</span>
+                <span id="all-cards-filter-text">${t("all")}</span>
                 <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;">
                     <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
             </div>
             <ul class="options" style="font-size: 14px; min-width: 140px; right: auto; left: 0;">
-                <li data-value="">Barchasi</li>
+                <li data-value="">${t("all")}</li>
                 <li data-value="Humo">Humo</li>
                 <li data-value="Uzcard">Uzcard</li>
                 <li data-value="Visa">Visa</li>
-                <li data-value="Bank">Bank hisobi</li>
+                <li data-value="Bank">${t("bank_account_type")}</li>
             </ul>
           </div>
         </div>
@@ -304,8 +295,8 @@ export const BusinessPage = () => `
           <!-- If no card selected -->
           <div id="all-cards-no-selection" style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:#8892a4; padding:40px 20px; background-color:#EEF0FD;">
             <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="margin-bottom:12px; opacity:0.6;"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-            <p style="font-weight:600; margin:0 0 4px; font-size:14px; color:#1a1d2e;">Karta tanlanmagan</p>
-            <p style="font-size:12px; margin:0;">Batafsil ma'lumot olish va sozlamalarni o'zgartirish uchun istalgan kartani tanlang.</p>
+            <p style="font-weight:600; margin:0 0 4px; font-size:14px; color:#1a1d2e;">${t("card_no_selection_title")}</p>
+            <p style="font-size:12px; margin:0;">${t("card_no_selection_desc")}</p>
           </div>
           
           <!-- Card details panel (will be generated dynamically) -->
@@ -335,22 +326,22 @@ export const BusinessPage = () => `
 
 <!-- ══ PREMIUM PAYMENT MODAL ══ -->
 <div id="pmt-modal-overlay" class="biz-overlay" style="display:none; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
-  <div class="pmt-modal">
-    <div class="pmt-modal-header">
+  <div class="pmt-modal" style="padding:0 !important; overflow:hidden; max-width:600px;">
+    <div class="pmt-modal-header" style="padding:16px 20px; border-bottom:1px solid #f1f5f9; margin-bottom:0; display:flex; justify-content:space-between; align-items:center;">
       <div style="display:flex; align-items:center; gap: 12px;">
         <button class="biz-back-icon-btn" id="pmt-back-to-users">
           <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-        <h2 id="pmt-modal-title">${t("new_transfer")}</h2>
+        <h2 id="pmt-modal-title" style="font-size:18px; font-weight:700; color:#1a1d2e; margin:0;">${t("new_transfer")}</h2>
       </div>
-      <button class="biz-close-btn" id="pmt-close">
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <button class="biz-close-btn" id="pmt-close" style="background:#f1f5f9; color:#64748b;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'" onmouseout="this.style.background='#f1f5f9'; this.style.color='#64748b'">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </div>
 
     <!-- Step 1: Search & Users List -->
-    <div id="pmt-step-1" class="pmt-step">
-      <p class="pmt-step-desc">${t("search_receiver_title")}</p>
+    <div id="pmt-step-1" class="pmt-step" style="padding:20px; min-height:480px; display:flex; flex-direction:column;">
+      <p class="pmt-step-desc" style="margin-top:0;">${t("search_receiver_title")}</p>
       
       <div class="pmt-search-tabs">
         <button class="pmt-tab active" data-type="card">${t("search_card_tab")}</button>
@@ -369,9 +360,9 @@ export const BusinessPage = () => `
       </div>
       <p class="biz-error" id="pmt-search-error" style="text-align:center; margin-top:10px;"></p>
 
-      <div id="pmt-all-users-list" class="pmt-users-list no-scrollbar"></div>
+      <div id="pmt-all-users-list" class="pmt-users-list no-scrollbar" style="flex:1; min-height:250px;"></div>
       
-      <div class="pmt-pagination-bar">
+      <div class="pmt-pagination-bar" style="margin-top:auto; padding-top:12px;">
         <div class="pmt-page-size-wrap">
           <span id="pmt-page-size-label">Ko'rsatish:</span>
           <div class="biz-custom-select drop-up" id="pmt-page-size-custom">
@@ -395,41 +386,72 @@ export const BusinessPage = () => `
       </div>
     </div>
 
-    <!-- Step 2-3: Combined Side-by-side -->
-    <div id="pmt-step-2-3" class="pmt-step" style="display:none;">
+    <!-- Step 2-3: Combined Side-by-side (O'z hisobiga o'tkazma style) -->
+    <div id="pmt-step-2-3" class="pmt-step" style="display:none; width:100%; flex-direction:row !important; padding:0 !important; overflow:hidden;">
       
-      <div class="pmt-split-view">
-        <div class="pmt-split-col">
-          <p class="pmt-step-desc" style="margin-bottom:8px;">${t("receiver_info") || "Qabul qiluvchi"}</p>
-          <div class="pmt-user-card" id="pmt-found-user" style="margin-bottom: 16px; padding: 12px 16px;"></div>
-          
-          <p class="pmt-step-desc" style="margin-bottom:8px;">${t("choose_receiver_card")}</p>
-          <div id="pmt-receiver-methods" class="pmt-methods-grid no-scrollbar" style="flex:1;"></div>
-        </div>
-
-        <div class="pmt-split-col">
-          <p class="pmt-step-desc" style="margin-bottom:8px;">${t("transfer_details")}</p>
-          <div class="pmt-amount-box" style="margin-bottom: 16px;">
-            <input type="text" id="pmt-amount" placeholder="0" class="pmt-amount-input" />
-            <span class="pmt-currency" style="margin-left: 8px; margin-right: 0;">UZS</span>
+      <!-- Left Column: Form -->
+      <div style="flex:1; padding:20px 24px; border-right:1px solid #e2e8f0; display:flex; flex-direction:column; gap:16px; min-height:480px;">
+          <!-- Receiver info card header -->
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px; padding:12px; background:#f8fafc; border-radius:16px; border:1px solid #e2e8f0;">
+             <div class="pmt-user-avatar" id="pmt-found-avatar" style="width:36px; height:36px; border-radius:50%; background:#4F46E5; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px;">?</div>
+             <div>
+                <h4 style="margin:0; font-size:15px; font-weight:700; color:#0f172a;" id="pmt-found-name">Loading...</h4>
+                <p style="margin:2px 0 0; font-size:12px; color:#64748b;" id="pmt-found-contact"></p>
+             </div>
           </div>
           
-          <p class="pmt-step-desc" style="margin-bottom:8px;">${t("choose_sender_card")}</p>
-          <div id="pmt-sender-methods" class="pmt-methods-grid no-scrollbar" style="flex:1;"></div>
-          
-          <p class="biz-error" id="pmt-step3-error" style="margin-top:10px;"></p>
-          <button class="biz-btn-primary pmt-next-btn" id="pmt-next-3" style="margin-top:auto; width:100%" disabled>${t("proceed")}</button>
-        </div>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+              <div>
+                  <label style="color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; margin-bottom:6px; display:block;">Yuboruvchi karta (Qayerdan)</label>
+                  <div id="pmt-sender-box" style="cursor:pointer; transition:0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'"></div>
+              </div>
+
+              <div>
+                  <label style="color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; margin-bottom:6px; display:block;">Qabul qiluvchi karta (Qayerga)</label>
+                  <div id="pmt-receiver-box" style="cursor:pointer; transition:0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'"></div>
+              </div>
+          </div>
+
+          <!-- Amount -->
+          <div style="padding-top:4px;">
+              <label style="color:#0f172a; font-size:11px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:6px; display:block;">O'TKAZMA SUMMASI</label>
+              <div style="display:flex; align-items:baseline; justify-content:space-between; border-bottom:1px solid #e2e8f0; padding-bottom:6px; margin-bottom:8px;">
+                  <input type="text" id="pmt-amount" placeholder="0" style="background:transparent; border:none; font-size:32px; font-weight:700; color:#0f172a; width:100%; outline:none;" />
+                  <span class="pmt-currency" style="font-size:18px; font-weight:700; color:#5b6ef5;">UZS</span>
+              </div>
+              <p id="pmt-step3-error" style="color:#ef4444; font-size:13px; margin:8px 0 0; font-weight:500; min-height:18px;"></p>
+          </div>
+
+          <!-- Confirm Button -->
+          <div style="margin-top:auto;">
+              <button class="biz-btn-primary pmt-next-btn" id="pmt-next-3" style="background:#2563eb; color:#fff; width:100%; border-radius:16px; font-size:15px; font-weight:700; border:none; padding:14px; cursor:pointer; transition:0.2s; box-shadow:0 8px 16px rgba(37,99,235,0.15); display:flex; justify-content:center; align-items:center; gap:8px;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'" disabled>
+                <span class="btn-text">${t("proceed")}</span>
+                <div class="btn-loader pmt-spinner-small" style="display:none;"></div>
+              </button>
+          </div>
       </div>
+
+      <!-- Right Column: Selection List -->
+      <div id="pmt-right-panel" style="width:300px; border-bottom-right-radius:24px; background:#f8fafc; padding:20px; display:flex; flex-direction:column; min-height:480px;">
+         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h4 id="pmt-right-title" style="margin:0; font-size:15px; font-weight:700; color:#0f172a;">${t("choose_card_title")}</h4>
+         </div>
+         <div id="pmt-right-list" class="ts-options-scroll" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:4px; max-height:380px;">
+             <!-- Rendered by JS -->
+         </div>
+      </div>
+      
     </div>
 
     <!-- Step 4: SMS -->
-    <div id="pmt-step-sms" class="pmt-step" style="display:none; text-align:center; padding:20px 0;">
-       <div class="pmt-sms-icon">
-         <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8 19.79 19.79 0 01.06 2.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+    <div id="pmt-step-sms" class="pmt-step" style="display:none; text-align:center; padding:30px 24px;">
+       <div class="pmt-sms-icon" style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); margin:0 auto;">
+         <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path d="M4 7.00005L10.2 11.65C11.2667 12.45 12.7333 12.45 13.8 11.65L20 7" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="5" width="18" height="14" rx="2" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
        </div>
-       <h3 id="pmt-sms-title" style="margin:16px 0 6px; font-size:18px; font-weight:800;">${t("sms_title")}</h3>
-       <p id="pmt-sms-desc" style="color:#8892a4; font-size:13px; margin:0 0 24px; line-height:1.5;"></p>
+       <h3 id="pmt-sms-title" style="margin:16px 0 6px; font-size:18px; font-weight:800;">Email tasdiqlash</h3>
+       <p id="pmt-sms-desc" style="color:#8892a4; font-size:13px; margin:0 0 15px; line-height:1.5;"></p>
+       
+       <p id="pmt-sms-timer" style="color:#ef4444; font-weight:bold; font-size:14px; margin-bottom:15px;"></p>
        
        <div style="display:flex; gap:12px; justify-content:center; margin-bottom: 20px;">
          <input id="pmt-sms-1" class="biz-otp-input" maxlength="1" inputmode="numeric" />
@@ -439,11 +461,12 @@ export const BusinessPage = () => `
        </div>
        
        <p id="pmt-sms-error" class="biz-error" style="margin-bottom:15px;"></p>
-       <button class="biz-btn-primary" id="pmt-sms-confirm" style="width:100%; margin-bottom:12px;">${t("sms_confirm")}</button>
+       <button id="pmt-sms-resend" style="background:none; border:none; color:#4F46E5; font-size:14px; font-weight:600; cursor:pointer; text-decoration:underline; display:none; margin-bottom:15px;">Qayta yuborish</button>
+       <button class="biz-btn-primary" id="pmt-sms-confirm" style="width:100%; margin-bottom:12px; background-color:#2563eb; color:#ffffff;">Tasdiqlash</button>
     </div>
 
     <!-- Step 5: Success -->
-    <div id="pmt-step-success" class="pmt-step" style="display:none; text-align:center; padding: 40px 20px 20px;">
+    <div id="pmt-step-success" class="pmt-step" style="display:none; text-align:center; padding: 40px 24px 30px;">
        <div class="pmt-success-circle">
           <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" stroke="#22c55e" stroke-width="2"/><path d="M7 12l3.5 3.5L17 8" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
        </div>
@@ -525,64 +548,70 @@ export const BusinessPage = () => `
 
 <!-- ══ CARD SETTINGS MODAL ══ -->
 <div id="card-settings-modal" class="biz-overlay" style="display:none; align-items:center; justify-content:center; backdrop-filter:blur(8px); z-index:9999;">
-  <div class="biz-modal" style="width:100%; max-width:360px; border-radius: 24px; padding:24px; background:#fff; position:relative; box-shadow:0 20px 40px rgba(0,0,0,0.1); animation: popIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;">
-    <button id="cs-close" style="position:absolute; top:16px; right:16px; background:#f1f5f9; border:none; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#64748b; transition:all 0.2s;">
+  <div class="biz-modal" style="width:100%; max-width:720px; border-radius: 24px; padding:24px; background:#fff; position:relative; box-shadow:0 20px 40px rgba(0,0,0,0.1); animation: popIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both; display:block;">
+    <button id="cs-close" style="position:absolute; top:16px; right:16px; background:#f1f5f9; border:none; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#64748b; transition:all 0.2s; z-index:10;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
     </button>
-    <h3 style="margin:0 0 20px; font-size:18px; font-weight:800; color:#1e293b;">Karta ma'lumotlari</h3>
+    <h3 style="margin:0 0 24px; font-size:18px; font-weight:800; color:#1e293b;">${t("card_details_title")}</h3>
     
-    <div id="cs-card-preview" style="margin-bottom:20px;"></div>
-
-    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden;">
-      <div id="cs-toggle-details" style="padding:16px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; background:#f1f5f9; transition:background 0.2s;">
-        <span style="font-size:14px; font-weight:600; color:#334155;">To'liq ma'lumotlar</span>
-        <button style="background:transparent; border:none; color:#64748b; display:flex; align-items:center; justify-content:center; cursor:pointer;">
-          <svg id="cs-eye-icon" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
+    <div style="display:flex; gap:24px; align-items:stretch; flex-wrap:wrap;">
+      <div style="flex:1; min-width:300px; display:flex; flex-direction:column;">
+        <div id="cs-card-preview" style="margin-bottom:0; flex:1;"></div>
       </div>
-      <div id="cs-details-content" style="padding:0 16px; max-height:0; overflow:hidden; transition:max-height 0.3s ease, padding 0.3s ease;">
-        <div style="padding:16px 0; display:flex; flex-direction:column; gap:12px;">
-          <div>
-            <p style="font-size:12px; color:#64748b; margin:0 0 4px; font-weight:500;">Karta raqami</p>
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
-              <span id="cs-full-number" style="font-size:14px; font-weight:700; color:#1e293b; font-family:monospace; letter-spacing:1px;"></span>
-              <button class="cs-copy-btn" data-target="cs-full-number" style="background:transparent; border:none; color:#3b82f6; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;" title="Nusxa olish">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              </button>
-            </div>
+
+      <div style="flex:1; min-width:300px; display:flex; flex-direction:column; gap:16px;">
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden;">
+          <div id="cs-toggle-details" style="padding:16px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; background:#f1f5f9; transition:background 0.2s;">
+            <span style="font-size:14px; font-weight:600; color:#334155;">${t("full_details_title")}</span>
+            <button style="background:transparent; border:none; color:#64748b; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+              <svg id="cs-eye-icon" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
           </div>
-          <div id="cs-expiry-container">
-            <p style="font-size:12px; color:#64748b; margin:0 0 4px; font-weight:500;">Amal qilish muddati</p>
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
-              <span id="cs-expiry" style="font-size:14px; font-weight:700; color:#1e293b;"></span>
-              <button class="cs-copy-btn" data-target="cs-expiry" style="background:transparent; border:none; color:#3b82f6; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;" title="Nusxa olish">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              </button>
-            </div>
-          </div>
-          <div id="cs-cvv-container" style="display:none;">
-            <p style="font-size:12px; color:#64748b; margin:0 0 4px; font-weight:500;">CVV</p>
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
-              <span id="cs-cvv" style="font-size:14px; font-weight:700; color:#1e293b;"></span>
-              <button class="cs-copy-btn" data-target="cs-cvv" style="background:transparent; border:none; color:#3b82f6; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;" title="Nusxa olish">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              </button>
-            </div>
-          </div>
-          <div>
-            <p style="font-size:12px; color:#64748b; margin:0 0 4px; font-weight:500;">Karta egasi</p>
-            <div style="background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
-              <span id="cs-holder" style="font-size:14px; font-weight:700; color:#1e293b;"></span>
+          <div id="cs-details-content" style="padding:0 16px; max-height:0; overflow:hidden; transition:max-height 0.3s ease, padding 0.3s ease;">
+            <div style="padding:16px 0; display:flex; flex-direction:column; gap:12px;">
+              <div>
+                <p style="font-size:12px; color:#64748b; margin:0 0 4px; font-weight:500;">${t("card_number")}</p>
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                  <span id="cs-full-number" style="font-size:14px; font-weight:700; color:#1e293b; font-family:monospace; letter-spacing:1px;"></span>
+                  <button class="cs-copy-btn" data-target="cs-full-number" style="background:transparent; border:none; color:#3b82f6; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;" title="Nusxa olish">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div id="cs-expiry-container">
+                <p style="font-size:12px; color:#64748b; margin:0 0 4px; font-weight:500;">${t("expiry_date")}</p>
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                  <span id="cs-expiry" style="font-size:14px; font-weight:700; color:#1e293b;"></span>
+                  <button class="cs-copy-btn" data-target="cs-expiry" style="background:transparent; border:none; color:#3b82f6; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;" title="Nusxa olish">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div id="cs-cvv-container" style="display:none;">
+                <p style="font-size:12px; color:#64748b; margin:0 0 4px; font-weight:500;">CVV</p>
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                  <span id="cs-cvv" style="font-size:14px; font-weight:700; color:#1e293b;"></span>
+                  <button class="cs-copy-btn" data-target="cs-cvv" style="background:transparent; border:none; color:#3b82f6; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;" title="Nusxa olish">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <p style="font-size:12px; color:#64748b; margin:0 0 4px; font-weight:500;">${t("holder")}</p>
+                <div style="background:#fff; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                  <span id="cs-holder" style="font-size:14px; font-weight:700; color:#1e293b;"></span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+        
+        <button id="cs-delete-card-btn" class="biz-btn-primary" style="width:100%; margin-top:auto; background:#fee2e2; color:#ef4444; border:none; display:flex; align-items:center; justify-content:center; gap:8px;">
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          ${t("delete_card")}
+        </button>
       </div>
     </div>
-    
-    <button id="cs-delete-card-btn" class="biz-btn-primary" style="width:100%; margin-top:20px; background:#fee2e2; color:#ef4444; border:none; display:flex; align-items:center; justify-content:center; gap:8px;">
-      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-      Kartani o'chirish
-    </button>
   </div>
 </div>
 
@@ -684,85 +713,135 @@ export const BusinessPage = () => `
 </div>
 
 <!-- ══ TRANSFER TO SELF MODAL ══ -->
-<div id="ts-modal" class="biz-overlay" style="display:none; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
-  <div class="biz-modal" style="width:100%; max-width:380px; border-radius: 24px; padding:24px; animation: popIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both; background:#fff;">
-     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-        <h3 style="margin:0; font-size:20px; font-weight:800; color:#1a1d2e;">${t("transfer_to_self")}</h3>
-        <button class="biz-close-btn" id="ts-close">
-          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        </button>
-     </div>
-     
-     <div style="position:relative;">
-         <div style="background:#f4f5f7; border-radius:16px; padding:16px; margin-bottom:12px;">
-           <label style="color:#64748b; font-size:12px; margin-bottom:6px; display:block; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">${t("from_card")}</label>
-           <div id="ts-sender-card-container" style="position:relative;"></div>
+<div id="ts-modal" class="biz-overlay" style="display:none; align-items:center; justify-content:center; backdrop-filter:blur(8px); background:rgba(15, 23, 42, 0.4); z-index:9999;">
+  <div class="biz-modal" style="width:100%; max-width:820px; border-radius:24px; animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; background:#fff; box-shadow:0 24px 48px rgba(0,0,0,0.1); position:relative; display:flex; flex-direction:row !important; padding:0 !important; overflow:hidden;">
+      
+     <button class="biz-close-btn" id="ts-close" style="position:absolute; top:20px; right:20px; background:#f4f5f7; border:none; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#64748b; cursor:pointer; transition:0.2s; z-index:20;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'" onmouseout="this.style.background='#f4f5f7'; this.style.color='#64748b'">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+     </button>
+
+     <!-- Left Column: Form -->
+     <div style="flex:1; padding:32px 40px; border-right:1px solid #e2e8f0; display:flex; flex-direction:column; gap:24px;">
+         <h3 style="margin:0; font-size:22px; font-weight:700; color:#0f172a; letter-spacing:-0.5px;">${t("transfer_to_self")}</h3>
+         
+         <div style="display:flex; flex-direction:column; gap:16px; position:relative;">
+             <div>
+                 <label style="color:#64748b; font-size:12px; font-weight:700; text-transform:uppercase; margin-bottom:8px; display:block;">${t("from_card")}</label>
+                 <div id="ts-sender-box" style="cursor:pointer; transition:0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'"></div>
+             </div>
+
+             <div style="width:36px; height:36px; border-radius:50%; background:#fff; border:1px solid #e2e8f0; position:absolute; right:20px; top:calc(50% + 12px); transform:translateY(-50%); display:flex; align-items:center; justify-content:center; z-index:10; color:#0f172a; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+                <button id="ts-swap-btn" style="background:transparent; border:none; padding:0; display:flex; cursor:pointer; color:inherit; width:100%; height:100%; justify-content:center; align-items:center;">
+                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>
+                </button>
+             </div>
+
+             <div>
+                 <label style="color:#64748b; font-size:12px; font-weight:700; text-transform:uppercase; margin-bottom:8px; display:block;">${t("to_card")}</label>
+                 <div id="ts-receiver-box" style="cursor:pointer; transition:0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'"></div>
+             </div>
          </div>
 
-         <button id="ts-swap-btn" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:40px; height:40px; background:#fff; border:4px solid #f4f5f7; border-radius:50%; display:flex; justify-content:center; align-items:center; cursor:pointer; z-index:10; box-shadow:0 4px 12px rgba(0,0,0,0.05); color:#64748b; transition:transform 0.2s;">
-           <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>
-         </button>
+         <!-- Amount -->
+         <div style="padding-top:8px;">
+             <label style="color:#0f172a; font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:12px; display:block;">${t("transfer_amount")}</label>
+             <div style="display:flex; align-items:baseline; justify-content:space-between; border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px;">
+                 <input type="text" id="ts-amount" placeholder="0" style="background:transparent; border:none; font-size:40px; font-weight:700; color:#0f172a; width:100%; outline:none;" oninput="this.value = this.value.replace(/[^\\d]/g, '').replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',')" />
+                 <span id="ts-currency" style="font-size:20px; font-weight:700; color:#5b6ef5;">UZS</span>
+             </div>
+             <div style="display:flex; justify-content:space-between; align-items:center;">
+                 <span id="ts-commission" style="color:#64748b; font-size:13px; font-weight:500;">${t("commission")}: 0 UZS</span>
+             </div>
+             <p id="ts-error" style="color:#ef4444; font-size:13px; margin:12px 0 0; display:none; font-weight:500;"></p>
+         </div>
 
-         <div style="background:#f4f5f7; border-radius:16px; padding:16px; margin-bottom:24px;">
-           <label style="color:#64748b; font-size:12px; margin-bottom:6px; display:block; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">${t("to_card")}</label>
-           <div id="ts-receiver-card-container" style="position:relative;"></div>
+         <!-- Confirm Button -->
+         <div style="margin-top:auto;">
+             <button class="biz-btn-primary" id="ts-confirm" style="background:#0f172a; color:#fff; width:100%; border-radius:16px; font-size:16px; font-weight:700; border:none; padding:16px; cursor:pointer; transition:0.2s; box-shadow:0 8px 16px rgba(15,23,42,0.15);" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">${t("proceed")}</button>
          </div>
      </div>
-     
-     <div style="background:#f1f5f9; border-radius:16px; padding:16px; margin-bottom:24px;">
-       <label style="color:#64748b; font-size:12px; margin-bottom:6px; display:block; font-weight:600;">${t("amount_dollar")}</label>
-       <div style="display:flex; align-items:center;">
-           <input type="text" id="ts-amount" placeholder="0" style="background:transparent; border:none; font-size:28px; font-weight:700; color:#1e293b; width:100%; outline:none;" oninput="this.value = this.value.replace(/[^\\d]/g, '').replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',')" />
-           <span style="font-size:24px; font-weight:700; color:#1e293b; margin-left:8px;">UZS</span>
-       </div>
-       <p id="ts-error" style="color:#ef4444; font-size:12px; margin:8px 0 0; display:none; font-weight:500;"></p>
-     </div>
 
-     <button class="biz-btn-primary" id="ts-confirm" style="width:100%; padding:16px; font-size:16px; background:#5b6ef5; color:#fff; box-shadow:0 8px 20px rgba(91,110,245,0.3); transition:all 0.2s;">${t("transfer_btn")}</button>
+     <!-- Right Column: Selection List -->
+     <div id="ts-right-panel" style="width:360px; background:#f8fafc; padding:32px 24px; display:flex; flex-direction:column;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+           <h4 id="ts-right-title" style="margin:0; font-size:16px; font-weight:700; color:#0f172a;">${t("choose_card_title")}</h4>
+        </div>
+        <div id="ts-right-list" class="ts-options-scroll" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding-right:8px; max-height:450px;">
+            <!-- Rendered by JS -->
+        </div>
+     </div>
   </div>
 </div>
 
 <!-- ══ CURRENCY EXCHANGE MODAL ══ -->
-<div id="ce-modal" class="biz-overlay" style="display:none; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
-  <div class="biz-modal" style="width:100%; max-width:380px; border-radius: 24px; padding:24px; animation: popIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both; background:#fff;">
-     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-        <h3 style="margin:0; font-size:20px; font-weight:800; color:#1a1d2e;">Valyuta almashtirish</h3>
-        <button class="biz-close-btn" id="ce-close">
-          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        </button>
-     </div>
-     
-     <div style="position:relative;">
-         <div style="background:#f4f5f7; border-radius:16px; padding:16px; margin-bottom:12px;">
-           <label style="color:#64748b; font-size:12px; margin-bottom:6px; display:block; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Yuborish</label>
-           <div id="ce-sender-card-container" style="position:relative;"></div>
-           <div style="display:flex; align-items:center; margin-top:12px; border-top:1px solid #e2e8f0; padding-top:12px;">
-               <input type="text" id="ce-amount-send" placeholder="0" style="background:transparent; border:none; font-size:24px; font-weight:700; color:#1e293b; width:100%; outline:none;" />
-               <span id="ce-currency-send" style="font-size:20px; font-weight:700; color:#1e293b; margin-left:8px;">UZS</span>
-           </div>
+<div id="ce-modal" class="biz-overlay" style="display:none; align-items:center; justify-content:center; backdrop-filter:blur(8px); background:rgba(15, 23, 42, 0.4); z-index:9999;">
+  <div class="biz-modal" style="width:100%; max-width:820px; border-radius:24px; animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; background:#fff; box-shadow:0 24px 48px rgba(0,0,0,0.1); position:relative; display:flex; flex-direction:row !important; padding:0 !important; overflow:hidden;">
+      
+     <button class="biz-close-btn" id="ce-close" style="position:absolute; top:20px; right:20px; background:#f4f5f7; border:none; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#64748b; cursor:pointer; transition:0.2s; z-index:20;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'" onmouseout="this.style.background='#f4f5f7'; this.style.color='#64748b'">
+       <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+     </button>
+
+     <!-- Left Column: Form -->
+     <div style="flex:1; padding:32px 40px; border-right:1px solid #e2e8f0; display:flex; flex-direction:column; gap:24px; max-width:460px;">
+         <h3 style="margin:0; font-size:24px; font-weight:800; color:#0f172a; letter-spacing:-0.5px;">${t("currency_exchange")}</h3>
+         
+         <div style="display:flex; flex-direction:column; gap:24px; position:relative;">
+             <!-- Yuborish Box -->
+             <div>
+                 <label style="color:#64748b; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; display:block;">${t("from_card")}</label>
+                 <div id="ce-sender-box" style="cursor:pointer;"></div>
+             </div>
+
+             <!-- Swap Button -->
+             <button id="ce-swap-btn" style="position:absolute; top:50%; right:24px; transform:translateY(calc(-50% + 12px)); width:36px; height:36px; background:#fff; border:1px solid #e2e8f0; border-radius:50%; display:flex; justify-content:center; align-items:center; cursor:pointer; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.05); color:#64748b; transition:0.2s;" onmouseover="this.style.borderColor='#cbd5e1'; this.style.color='#0f172a'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b'">
+                 <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>
+             </button>
+
+             <!-- Qabul qilish Box -->
+             <div>
+                 <label style="color:#64748b; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; display:block;">${t("to_card")}</label>
+                 <div id="ce-receiver-box" style="cursor:pointer;"></div>
+             </div>
          </div>
 
-         <button id="ce-swap-btn" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:40px; height:40px; background:#5b6ef5; border:4px solid #fff; border-radius:50%; display:flex; justify-content:center; align-items:center; cursor:pointer; z-index:10; box-shadow:0 4px 12px rgba(91,110,245,0.2); color:#fff; transition:transform 0.2s;">
-           <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>
-         </button>
+         <!-- Amounts -->
+         <div style="padding-top:8px;">
+             <!-- Yuborish Summasi -->
+             <label style="color:#0f172a; font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:12px; display:block;">${t("amount_to_send")}</label>
+             <div style="display:flex; align-items:baseline; justify-content:space-between; border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px;">
+                 <input type="text" id="ce-amount-send" placeholder="0" style="background:transparent; border:none; font-size:32px; font-weight:700; color:#0f172a; width:100%; outline:none;" oninput="this.value = this.value.replace(/[^\\d]/g, '').replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',')" />
+                 <span id="ce-currency-send" style="font-size:18px; font-weight:700; color:#5b6ef5;">UZS</span>
+             </div>
 
-         <div style="background:#f4f5f7; border-radius:16px; padding:16px; margin-bottom:24px;">
-           <label style="color:#64748b; font-size:12px; margin-bottom:6px; display:block; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Qabul qilish</label>
-           <div id="ce-receiver-card-container" style="position:relative;"></div>
-           <div style="display:flex; align-items:center; margin-top:12px; border-top:1px solid #e2e8f0; padding-top:12px;">
-               <input type="text" id="ce-amount-receive" placeholder="0" style="background:transparent; border:none; font-size:24px; font-weight:700; color:#64748b; width:100%; outline:none;" disabled />
-               <span id="ce-currency-receive" style="font-size:20px; font-weight:700; color:#64748b; margin-left:8px;">USD</span>
-           </div>
+             <!-- Qabul Qilish Summasi -->
+             <label style="color:#0f172a; font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:12px; display:block;">${t("amount_to_receive")}</label>
+             <div style="display:flex; align-items:baseline; justify-content:space-between; border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px;">
+                 <input type="text" id="ce-amount-receive" placeholder="0" style="background:transparent; border:none; font-size:24px; font-weight:700; color:#64748b; width:100%; outline:none;" disabled />
+                 <span id="ce-currency-receive" style="font-size:18px; font-weight:700; color:#64748b;">USD</span>
+             </div>
+
+             <div style="display:flex; justify-content:space-between; align-items:center;">
+                 <span style="color:#64748b; font-size:13px; font-weight:500;">${t("exchange_rate_label")}</span>
+                 <span id="ce-rate-display" style="color:#0f172a; font-size:13px; font-weight:600;">1 USD = ... UZS</span>
+             </div>
+             <p id="ce-error" style="color:#ef4444; font-size:13px; margin:12px 0 0; display:none; font-weight:500;"></p>
+         </div>
+
+         <!-- Confirm Button -->
+         <div style="margin-top:auto;">
+             <button class="biz-btn-primary" id="ce-confirm" style="background:#0f172a; color:#fff; width:100%; border-radius:16px; font-size:16px; font-weight:700; border:none; padding:16px; cursor:pointer; transition:0.2s; box-shadow:0 8px 16px rgba(15,23,42,0.15);" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">${t("exchange_btn")}</button>
          </div>
      </div>
-     
-     <div style="display:flex; justify-content:space-between; margin-bottom:24px; font-size:12px; font-weight:600; color:#64748b;">
-        <span>Kurs:</span>
-        <span id="ce-rate-display">1 USD = ... UZS</span>
-     </div>
-     <p id="ce-error" style="color:#ef4444; font-size:12px; margin:0 0 16px 0; display:none; font-weight:500; text-align:center;"></p>
 
-     <button class="biz-btn-primary" id="ce-confirm" style="width:100%; padding:16px; font-size:16px; background:#5b6ef5; color:#fff; box-shadow:0 8px 20px rgba(91,110,245,0.3); transition:all 0.2s;">Almashtirish</button>
+     <!-- Right Column: Selection List -->
+     <div id="ce-right-panel" style="width:360px; background:#f8fafc; padding:32px 24px; display:flex; flex-direction:column;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+           <h4 id="ce-right-title" style="margin:0; font-size:16px; font-weight:700; color:#0f172a;">${t("choose_card_title")}</h4>
+        </div>
+        <div id="ce-right-list" class="ts-options-scroll" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding-right:8px; max-height:500px;">
+            <!-- Rendered by JS -->
+        </div>
+     </div>
   </div>
 </div>
 
@@ -770,7 +849,7 @@ export const BusinessPage = () => `
 `;
 
 const $ = (id) => document.getElementById(id);
-const PAGE = 5;
+let PAGE = 5;
 
 // ─── TOAST ──────────────────────────────────────────────────────
 const showToast = (msg, type = "info") => {
@@ -817,8 +896,10 @@ const refreshStats = () => {
   const expense = outgoing.reduce((s, t) => s + t.amount, 0);
   const income = incoming.reduce((s, t) => s + t.amount, 0);
 
-  if ($("stat-waiting")) $("stat-waiting").textContent = fmt(expense);
-  if ($("stat-paid")) $("stat-paid").textContent = fmt(income);
+  const isVisa = currentMethod ? (currentMethod.cardName === "Visa" || String(currentMethod.number || "").startsWith("4")) : false;
+
+  if ($("stat-waiting")) $("stat-waiting").textContent = fmt(expense, isVisa);
+  if ($("stat-paid")) $("stat-paid").textContent = fmt(income, isVisa);
   if ($("stat-clients")) $("stat-clients").textContent = paymentUsers.length;
   if ($("stat-balance")) $("stat-balance").textContent = fmt(cardBalance);
   if ($("biz-username")) $("biz-username").textContent = me?.username || "User";
@@ -903,13 +984,19 @@ const renderAccounts = () => {
         </button>
       </div>
     </div>
-    <button class="biz-btn-secondary" id="transfer-to-self-btn" style="width:100%; margin-top:16px; display:flex; justify-content:center; align-items:center; gap:8px;">
-      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>
-      ${t("transfer_to_self")}
-    </button>
+    <div class="mobile-action-buttons-row" style="display: flex; gap: 10px; width: 100%; margin-top: 16px;">
+      <button class="biz-btn-secondary" id="transfer-to-self-btn" style="flex: 1; display:flex; justify-content:center; align-items:center; gap:8px; margin:0;">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>
+        <span>${t("transfer_to_self")}</span>
+      </button>
+      <button class="biz-btn-primary" id="mobile-create-doc-btn" style="flex: 1; display: none; justify-content:center; align-items:center; gap:8px; background:#5b6ef5; color:#fff; border:none; padding:12px; border-radius:12px; font-weight:600; cursor:pointer; margin:0;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-credit-card"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+        <span>To'lov</span>
+      </button>
+    </div>
     <button class="biz-btn-primary" id="currency-exchange-btn" style="width:100%; margin-top:10px; display:flex; justify-content:center; align-items:center; gap:8px; background:#5b6ef5; color:#fff; border:none; padding:12px; border-radius:12px; font-weight:600; cursor:pointer;">
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left-right-icon lucide-arrow-left-right"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
-      Valyuta almashtirish
+      ${t("currency_exchange")}
     </button>
     
     <div class="biz-stats-col" style="margin-top:14px">
@@ -975,6 +1062,12 @@ const renderAccounts = () => {
      };
   }
 
+  if ($("mobile-create-doc-btn")) {
+    $("mobile-create-doc-btn").onclick = () => {
+      openPaymentModal("new");
+    };
+  }
+
   if ($("currency-exchange-btn")) {
      $("currency-exchange-btn").onclick = () => {
          openCurrencyExchangeModal();
@@ -997,7 +1090,7 @@ const renderAccounts = () => {
 
 
 // ─── FULL VIEWS ─────────────────────────────────────────────────
-const MINI_PAGE = 20;
+const getMiniPageLimit = () => (window.innerWidth <= 1024 ? 5 : 20);
 let mPage = 1;
 
 let miniTypeFilter = "all";
@@ -1077,6 +1170,82 @@ const renderMiniFilters = () => {
 };
 
 // Global click to close dropdowns
+let fullTypeFilter = "all";
+let fullCardFilter = "all";
+const renderFullFilters = () => {
+  const container = $("full-doc-filters-container");
+  if (!container) return;
+
+  const types = [
+    { value: "all", label: t("filter_all") || "Barchasi" },
+    { value: "sent", label: t("filter_sent") || "Yuborilgan" },
+    { value: "received", label: t("filter_received") || "Qabul qilingan" }
+  ];
+
+  const cards = [
+    { value: "all", label: t("filter_all_accounts") || "Barcha hisoblar" },
+    ...myMethods.map(m => {
+       const type = m.type === "card" ? t("method_card_via") : t("method_bank_via");
+       const last4 = m.number ? m.number.slice(-4) : "****";
+       return { value: m._id, label: `${type} ${last4}` };
+    })
+  ];
+
+  const createSelect = (id, options, currentValue, onChange) => {
+     const selectedOpt = options.find(o => o.value === currentValue) || options[0];
+     
+     const selDiv = document.createElement("div");
+     selDiv.className = "biz-custom-select";
+     selDiv.id = id;
+     
+     const svgIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+     
+     selDiv.innerHTML = `
+        <div class="biz-select-trigger" style="height:32px; padding:0 12px; font-size:12px; border-radius:10px; font-weight:600; color:#1a1d2e;">
+           <span class="biz-select-label">${selectedOpt.label}</span>
+           ${svgIcon}
+        </div>
+        <div class="biz-select-options" style="left:0; right:auto; min-width:140px;">
+           ${options.map(o => `<div class="biz-option ${o.value === currentValue ? 'biz-selected' : ''}" data-value="${o.value}">${o.label}</div>`).join('')}
+        </div>
+     `;
+     
+     const trigger = selDiv.querySelector(".biz-select-trigger");
+     trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        document.querySelectorAll(".biz-custom-select.open").forEach(el => {
+           if (el !== selDiv) el.classList.remove("open");
+        });
+        selDiv.classList.toggle("open");
+     });
+     
+     selDiv.querySelectorAll(".biz-option").forEach(opt => {
+        opt.addEventListener("click", (e) => {
+           e.stopPropagation();
+           onChange(opt.getAttribute("data-value"));
+           selDiv.classList.remove("open");
+        });
+     });
+     
+     return selDiv;
+  };
+
+  container.innerHTML = "";
+  container.appendChild(createSelect("full-type-select", types, fullTypeFilter, (val) => {
+     fullTypeFilter = val;
+     renderFullFilters();
+     dPage = 1;
+     renderDocsFull();
+  }));
+
+  container.appendChild(createSelect("full-card-select", cards, fullCardFilter, (val) => {
+     fullCardFilter = val;
+     renderFullFilters();
+     dPage = 1;
+     renderDocsFull();
+  }));
+};
+
 document.addEventListener("click", () => {
    document.querySelectorAll(".biz-custom-select.open").forEach(el => el.classList.remove("open"));
 });
@@ -1091,7 +1260,7 @@ const getMethodInfo = (methodObj, methodId, isMySide) => {
     return null;
 };
 
-const buildUserCell = (name, method) => {
+const buildUserCell = (name, method, isSender = true) => {
     const dispName = name || "User";
     const initial = dispName.charAt(0).toUpperCase();
     let cardStr = "****";
@@ -1104,7 +1273,7 @@ const buildUserCell = (name, method) => {
     }
     
     return `
-    <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
+    <div class="biz-user-cell ${isSender ? 'tx-sender-cell' : 'tx-receiver-cell'}" style="display:flex;align-items:center;gap:8px;overflow:hidden;">
       <div style="width:28px;height:28px;border-radius:50%;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;flex-shrink:0;">
         ${initial}
       </div>
@@ -1125,26 +1294,33 @@ const renderDocsMini = () => {
   let allPayments = myTransactions.slice().reverse();
   
   allPayments = allPayments.filter(p => {
-      const isSent = p.senderId === userId || (p.senderId && typeof p.senderId === 'object' && p.senderId._id === userId) || p.type === 'withdraw' || p.type === 'expense';
+      let isSent = p.senderId === userId || (p.senderId && typeof p.senderId === 'object' && p.senderId._id === userId) || p.type === 'withdraw' || p.type === 'expense';
+      const isInternal = p.senderId === userId && p.receiverId === userId;
+      
+      const sId = typeof p.senderMethodId === 'object' && p.senderMethodId ? p.senderMethodId._id : p.senderMethodId;
+      const rId = typeof p.receiverMethodId === 'object' && p.receiverMethodId ? p.receiverMethodId._id : p.receiverMethodId;
+      
+      if (isInternal && typeof miniCardFilter !== 'undefined' && miniCardFilter !== "all") {
+          if (rId === miniCardFilter) isSent = false;
+      }
       
       if (miniTypeFilter === "sent" && !isSent) return false;
       if (miniTypeFilter === "received" && isSent) return false;
       
       if (miniCardFilter !== "all") {
-          const sId = typeof p.senderMethodId === 'object' && p.senderMethodId ? p.senderMethodId._id : p.senderMethodId;
-          const rId = typeof p.receiverMethodId === 'object' && p.receiverMethodId ? p.receiverMethodId._id : p.receiverMethodId;
           const methodUsedId = isSent ? sId : rId;
           if (methodUsedId !== miniCardFilter) return false;
       }
       return true;
   });
 
+  const limit = getMiniPageLimit();
   const total = allPayments.length;
-  const pages = Math.max(1, Math.ceil(total / MINI_PAGE));
+  const pages = Math.max(1, Math.ceil(total / limit));
   if (mPage > pages) mPage = pages;
   
-  const start = (mPage - 1) * MINI_PAGE;
-  const payments = allPayments.slice(start, start + MINI_PAGE);
+  const start = (mPage - 1) * limit;
+  const payments = allPayments.slice(start, start + limit);
   
   if ($("mp-num")) {
     $("mp-num").textContent = mPage;
@@ -1155,8 +1331,16 @@ const renderDocsMini = () => {
   el.innerHTML = payments.length
     ? payments.map((p) => {
         const isPending = p.status === "waiting";
-        const isSent = p.senderId === userId;
+        let isSent = p.senderId === userId;
         const isInternal = p.senderId === userId && p.receiverId === userId;
+        
+        const sId = typeof p.senderMethodId === 'object' && p.senderMethodId ? p.senderMethodId._id : p.senderMethodId;
+        const rId = typeof p.receiverMethodId === 'object' && p.receiverMethodId ? p.receiverMethodId._id : p.receiverMethodId;
+
+        if (isInternal && typeof miniCardFilter !== 'undefined' && miniCardFilter !== "all") {
+            if (rId === miniCardFilter) isSent = false;
+        }
+
         const isWait = isPending && isSent;
         const expanded = expandedTxIds.has(p._id);
         
@@ -1173,20 +1357,42 @@ const renderDocsMini = () => {
         
         let amountColor = isPending ? "#f59e0b" : (isSent ? "#ef4444" : "#16a34a");
         if (p.senderId === "system_tour") amountColor = "#0284c7";
-        const amountSign = isSent ? "- " : "+ ";
+        let amountSign = isSent ? "- " : "+ ";
         
         let activityText = isSent ? `${t("sending_payment_to")} ${p.receiverName || "User"}` : `${t("received_payment_from")} ${p.senderName || "User"}`;
         if (p.receiverId === "system_tour") activityText = p.description || "Tur xaridi";
         if (isInternal) activityText = t("internal_transfer");
         
-        const sId = typeof p.senderMethodId === 'object' && p.senderMethodId ? p.senderMethodId._id : p.senderMethodId;
-        const rId = typeof p.receiverMethodId === 'object' && p.receiverMethodId ? p.receiverMethodId._id : p.receiverMethodId;
-        const senderMethod = getMethodInfo(p.senderMethodId, sId, isSent);
-        const receiverMethod = getMethodInfo(p.receiverMethodId, rId, !isSent);
+        const senderMethod = getMethodInfo(p.senderMethodId, sId, isInternal ? true : isSent);
+        const receiverMethod = getMethodInfo(p.receiverMethodId, rId, isInternal ? true : !isSent);
         const senderName = p.senderName || (p.senderId === "system_tour" ? "Sayohat" : "User");
         const receiverName = p.receiverName || (p.receiverId === "system_tour" ? "Sayohat" : "User");
-        const senderCell = buildUserCell(senderName, senderMethod);
-        const receiverCell = buildUserCell(receiverName, receiverMethod);
+        const senderCell = buildUserCell(senderName, senderMethod, true);
+        const receiverCell = buildUserCell(receiverName, receiverMethod, false);
+
+        let displayAmount = p.amount;
+        let isVisa = false;
+        
+        if (isInternal && (p.description === "Valyuta almashtirish" || p.description === "Currency Exchange" || p.description === "Обмен валюты")) {
+            const sIsVisa = senderMethod && senderMethod.cardName === "Visa";
+            const rIsVisa = receiverMethod && receiverMethod.cardName === "Visa";
+            if (!isSent) {
+                const rate = exchangeRates.USD || 12800;
+                if (sIsVisa && !rIsVisa) {
+                    displayAmount = p.amount * rate;
+                    isVisa = false;
+                } else if (!sIsVisa && rIsVisa) {
+                    displayAmount = p.amount / rate;
+                    isVisa = true;
+                } else {
+                    isVisa = rIsVisa;
+                }
+            } else {
+                isVisa = sIsVisa;
+            }
+        } else {
+            isVisa = (isSent ? senderMethod : receiverMethod) ? (isSent ? senderMethod : receiverMethod).cardName === "Visa" : false;
+        }
 
         let typeBg = isPending ? "#fef3c7" : (isSent ? "#fee2e2" : "#dcfce7");
         let typeColor = isPending ? "#f59e0b" : (isSent ? "#ef4444" : "#16a34a");
@@ -1201,41 +1407,36 @@ const renderDocsMini = () => {
             typeBg = "#f3e8ff";
             typeColor = "#9333ea";
             typeIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>`;
-            typeText = t("internal_transfer");
+            typeText = (p.description === "Valyuta almashtirish" || p.description === "Currency Exchange" || p.description === "Обмен валюты") 
+                ? t("currency_exchange") 
+                : ((p.description === "O'z hisobiga o'tkazma" || p.description === "Self Transfer" || p.description === "O'z hisobiga" || p.description === "Перевод себе") 
+                    ? t("internal_transfer") 
+                    : (p.description || t("internal_transfer")));
+            amountSign = isSent ? "- " : "+ ";
+            if (typeof miniCardFilter !== 'undefined' && miniCardFilter === "all") amountSign = "&nbsp;&nbsp;";
+            amountColor = "#9333ea";
         }
 
-        if (p.receiverId === "system_tour") {
-            typeBg = "rgba(91, 110, 245, 0.15)";
-            typeColor = "#5b6ef5";
-            typeText = "Sayohat";
-            typeIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
-        }
-
-        if (p.senderId === "system_tour") {
-            typeBg = "rgba(14, 165, 233, 0.15)";
-            typeColor = "#0284c7";
-            typeText = t("type_refunded") || "Qaytarilgan";
-            typeIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6m-6-6l6-6"/></svg>`;
-        }
-
+        const txDirectionClass = isSent ? "tx-sent" : "tx-received";
+        const txStatusClass = `tx-status-${p.status}`;
         return `
-        <div class="biz-doc-row-wrap mini-table-row${expanded ? " expanded" : ""}">
+        <div class="biz-doc-row-wrap mini-table-row ${txDirectionClass} ${txStatusClass}${expanded ? " expanded" : ""}">
           <div class="biz-row docs-cols mini-table-grid">
-            <div style="display:flex;align-items:center;gap:6px">
-              <div style="width:20px;height:20px;border-radius:50%;background:${typeBg};color:${typeColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <div class="tx-type-col" style="display:flex;align-items:center;gap:6px">
+              <div class="tx-type-icon-wrapper" style="width:20px;height:20px;border-radius:50%;background:${typeBg};color:${typeColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 ${typeIcon}
               </div>
-              <span style="font-weight:600;font-size:12px;color:#1a1d2e">${typeText}</span>
+              <span class="tx-type-text" style="font-weight:600;font-size:12px;color:#1a1d2e">${typeText}</span>
             </div>
 
-            <span class="biz-cell" style="font-weight:700;color:${amountColor};font-size:12px">${amountSign}${fmt(p.amount, (isSent ? senderMethod : receiverMethod) ? (isSent ? senderMethod : receiverMethod).cardName === "Visa" : false)}</span>
+            <span class="biz-cell tx-amount-cell" style="font-weight:700;color:${amountColor};font-size:12px">${amountSign}${fmt(displayAmount, p.currency === "USD" || isVisa)}</span>
 
-            <span class="biz-cell biz-small" style="font-size:10px">${date}</span>
+            <span class="biz-cell biz-small tx-date-cell" style="font-size:10px">${date}</span>
 
             ${senderCell}
             ${receiverCell}
 
-            <div style="display:flex;gap:4px;align-items:center">
+            <div class="tx-actions-cell" style="display:flex;gap:4px;align-items:center">
               ${isWait ? `
                 <button class="biz-icon-btn send-btn" data-tid="${p._id}" style="background:#5b6ef5;color:#fff;width:auto;padding:0 6px;font-size:10px;font-weight:700">${t("send")}</button>
                 <button class="biz-icon-btn del-btn" data-tid="${p._id}" style="background:#fee2e2;color:#ef4444;width:auto;padding:0 6px;" title="${t("cancel")}">
@@ -1295,6 +1496,9 @@ const renderDocsMini = () => {
       }
     };
   });
+
+  // Mobile card click handlers: click whole card to view receipt or pay draft
+  bindMiniRowClicks(el, openReceiptModal, openPaymentModal);
 };
 
 let cPage = 1, cFiltered = [];
@@ -1330,14 +1534,27 @@ const renderClientsFull = () => {
 let dPage = 1, dFiltered = [];
 const expandedTxIds = new Set();
 
-const renderDocsFull = (statusF = "", numF = "") => {
+const renderDocsFull = () => {
   const me = getCurrent();
   const userId = me?.userId || me?._id;
   dFiltered = myTransactions.filter((p) => {
-    const isIn = p.receiverId === userId && p.status === "paid";
-    const matchS = !statusF || (statusF === "incoming" ? isIn : (statusF === "waiting" ? p.status === "waiting" && p.senderId === userId : p.status === statusF && p.senderId === userId));
-    const matchN = !numF || (p.description || "").toLowerCase().includes(numF.toLowerCase()) || (p.receiverName || "").toLowerCase().includes(numF.toLowerCase());
-    return matchS && matchN;
+    // 1. Filter by Status/Type/Direction
+    let matchType = true;
+    if (fullTypeFilter === "sent") {
+        matchType = p.senderId === userId;
+    } else if (fullTypeFilter === "received") {
+        matchType = p.receiverId === userId;
+    }
+    
+    // 2. Filter by Card/Account
+    let matchCard = true;
+    if (fullCardFilter !== "all") {
+        const sId = typeof p.senderMethodId === 'object' && p.senderMethodId ? p.senderMethodId._id : p.senderMethodId;
+        const rId = typeof p.receiverMethodId === 'object' && p.receiverMethodId ? p.receiverMethodId._id : p.receiverMethodId;
+        matchCard = (sId === fullCardFilter || rId === fullCardFilter);
+    }
+    
+    return matchType && matchCard;
   }).reverse();
   const total = dFiltered.length;
   const pages = Math.max(1, Math.ceil(total / PAGE));
@@ -1368,7 +1585,7 @@ const renderDocsFull = (statusF = "", numF = "") => {
         
         let amountColor = isSent ? "#1a1d2e" : "#16a34a";
         if (p.senderId === "system_tour") amountColor = "#0284c7";
-        const amountSign = isSent ? "- " : "+ ";
+        let amountSign = isSent ? "- " : "+ ";
         
         let activityText = isSent ? `${t("sending_payment_to")} ${p.receiverName || "User"}` : `${t("received_payment_from")} ${p.senderName || "User"}`;
         if (p.receiverId === "system_tour") activityText = p.description || "Tur xaridi";
@@ -1380,8 +1597,8 @@ const renderDocsFull = (statusF = "", numF = "") => {
         const receiverMethod = getMethodInfo(p.receiverMethodId, rId, !isSent);
         const senderName = p.senderName || (p.senderId === "system_tour" ? "Sayohat" : "User");
         const receiverName = p.receiverName || (p.receiverId === "system_tour" ? "Sayohat" : "User");
-        const senderCell = buildUserCell(senderName, senderMethod);
-        const receiverCell = buildUserCell(receiverName, receiverMethod);
+        const senderCell = buildUserCell(senderName, senderMethod, true);
+        const receiverCell = buildUserCell(receiverName, receiverMethod, false);
 
         let typeBg = isSent ? '#fee2e2' : '#dcfce7';
         let typeColor = isSent ? '#ef4444' : '#16a34a';
@@ -1389,18 +1606,24 @@ const renderDocsFull = (statusF = "", numF = "") => {
             ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>` 
             : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>`;
         let typeText = isSent ? t("type_sent") : t("type_received");
-
+        
         if (isInternal) {
             typeBg = "#f3e8ff";
             typeColor = "#9333ea";
             typeIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/></svg>`;
-            typeText = t("internal_transfer");
+            typeText = (p.description === "Valyuta almashtirish" || p.description === "Currency Exchange" || p.description === "Обмен валюты") 
+                ? t("currency_exchange") 
+                : ((p.description === "O'z hisobiga o'tkazma" || p.description === "Self Transfer" || p.description === "O'z hisobiga" || p.description === "Перевод себе") 
+                    ? t("internal_transfer") 
+                    : (p.description || t("internal_transfer")));
+            amountSign = "&nbsp;&nbsp;";
+            amountColor = "#9333ea";
         }
 
         if (p.receiverId === "system_tour") {
             typeBg = "rgba(91, 110, 245, 0.15)";
             typeColor = "#5b6ef5";
-            typeText = "Sayohat";
+            typeText = t("tour_label");
             typeIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
         }
 
@@ -1411,24 +1634,26 @@ const renderDocsFull = (statusF = "", numF = "") => {
             typeIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6m-6-6l6-6"/></svg>`;
         }
 
+        const txDirectionClass = isSent ? "tx-sent" : "tx-received";
+        const txStatusClass = `tx-status-${p.status}`;
         return `
-        <div class="biz-doc-row-wrap${expanded ? " expanded" : ""}">
+        <div class="biz-doc-row-wrap ${txDirectionClass} ${txStatusClass}${expanded ? " expanded" : ""}">
           <div class="biz-row docs-cols">
-            <div style="display:flex;align-items:center;gap:8px">
-              <div style="width:24px;height:24px;border-radius:50%;background:${typeBg};color:${typeColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <div class="tx-type-col" style="display:flex;align-items:center;gap:8px">
+              <div class="tx-type-icon-wrapper" style="width:24px;height:24px;border-radius:50%;background:${typeBg};color:${typeColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 ${typeIcon}
               </div>
-              <span style="font-weight:600;font-size:13px;color:#1a1d2e">${typeText}</span>
+              <span class="tx-type-text" style="font-weight:600;font-size:13px;color:#1a1d2e">${typeText}</span>
             </div>
 
-            <span class="biz-cell" style="font-weight:700;color:${amountColor}">${amountSign}${fmt(p.amount, (isSent ? senderMethod : receiverMethod) ? (isSent ? senderMethod : receiverMethod).cardName === "Visa" : false)}</span>
+            <span class="biz-cell tx-amount-cell" style="font-weight:700;color:${amountColor}">${amountSign}${fmt(p.amount, p.currency === "USD" || ((isSent ? senderMethod : receiverMethod) ? (isSent ? senderMethod : receiverMethod).cardName === "Visa" : false))}</span>
 
-            <span class="biz-cell biz-small">${date}</span>
+            <span class="biz-cell biz-small tx-date-cell">${date}</span>
 
             ${senderCell}
             ${receiverCell}
 
-            <div style="display:flex;gap:5px;align-items:center">
+            <div class="tx-actions-cell" style="display:flex;gap:5px;align-items:center">
               ${isWait ? `<button class="biz-icon-btn send-btn" data-tid="${p._id}" style="background:#5b6ef5;color:#fff;width:auto;padding:0 9px;font-size:11px;font-weight:700">${t("send")}</button>` : ""}
               ${!isWait ? `<button class="biz-icon-btn receipt-btn" data-tid="${p._id}" style="background:#f1f3fa;color:#1a1d2e" title="Chekni ko'rish"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></button><button class="biz-icon-btn qr-btn" data-tid="${p._id}" style="background:#f1f3fa;color:#1a1d2e" title="QR orqali ko'rish"><svg width="12" height="12" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-qr-code-icon lucide-qr-code"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg></button>` : ""}
               <button class="biz-icon-btn expand-btn" data-tid="${p._id}" style="background:#f1f3fa;color:#5a6279">
@@ -1456,7 +1681,7 @@ const renderDocsFull = (statusF = "", numF = "") => {
               </div>
               <div class="biz-exp-footer-item biz-exp-total">
                 <span class="biz-exp-label">${t("total_amount")}</span>
-                <span class="biz-exp-total-val" style="color:${amountColor}">${amountSign}${fmt(p.amount)}</span>
+                <span class="biz-exp-total-val" style="color:${amountColor}">${amountSign}${fmt(p.amount, p.currency === "USD" || ((isSent ? senderMethod : receiverMethod) ? (isSent ? senderMethod : receiverMethod).cardName === "Visa" : false))}</span>
               </div>
             </div>
           </div>` : ""}
@@ -1464,8 +1689,71 @@ const renderDocsFull = (statusF = "", numF = "") => {
       }).join("")
     : `<p class="biz-empty">${t("no_docs_found")}</p>`;
 
-  if ($("dp-info")) $("dp-info").textContent = `${total === 0 ? 0 : start + 1}–${Math.min(start + PAGE, total)} ${t("of")} ${total}`;
-  if ($("dp-num")) $("dp-num").textContent = dPage;
+  const pagContainer = $("docs-pagination-container");
+  if (pagContainer) {
+    const hasPrev = dPage > 1;
+    const hasNext = dPage < pages;
+    
+    pagContainer.innerHTML = `
+      <div class="vac-rows-per-page-container">
+        <button class="vac-rows-btn" id="docs-rows-btn" style="height:32px; border-radius:10px;">
+          <span>Ko'rsatish: <span id="docs-rows-val">${PAGE}</span></span>
+          <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div class="vac-rows-dropdown" id="docs-rows-dropdown" style="bottom: calc(100% + 6px); right: auto; left: 0;">
+          <div class="vac-rows-option ${PAGE === 5 ? "active" : ""}" data-val="5">5</div>
+          <div class="vac-rows-option ${PAGE === 10 ? "active" : ""}" data-val="10">10</div>
+          <div class="vac-rows-option ${PAGE === 20 ? "active" : ""}" data-val="20">20</div>
+          <div class="vac-rows-option ${PAGE === 50 ? "active" : ""}" data-val="50">50</div>
+        </div>
+      </div>
+      
+      <span id="dp-info" style="font-size:12px; font-weight:600; color:#64748b;">${total === 0 ? 0 : start + 1}–${Math.min(start + PAGE, total)} / ${total}</span>
+
+      <div class="biz-page-btns" style="display:flex; align-items:center; gap:8px;">
+        <button id="dp-prev" ${hasPrev ? "" : "disabled"} style="width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center;">&#8249;</button>
+        <span id="dp-num" style="font-weight:700; font-size:13px;">${dPage}</span>
+        <button id="dp-next" ${hasNext ? "" : "disabled"} style="width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center;">&#8250;</button>
+      </div>
+    `;
+
+    const rowsBtn = pagContainer.querySelector("#docs-rows-btn");
+    const dropdown = pagContainer.querySelector("#docs-rows-dropdown");
+    if (rowsBtn && dropdown) {
+      rowsBtn.onclick = (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle("open");
+      };
+    }
+
+    pagContainer.querySelectorAll(".vac-rows-option").forEach(opt => {
+      opt.onclick = (e) => {
+        e.stopPropagation();
+        PAGE = parseInt(opt.getAttribute("data-val"));
+        dPage = 1;
+        renderDocsFull();
+      };
+    });
+
+    const prevBtn = pagContainer.querySelector("#dp-prev");
+    const nextBtn = pagContainer.querySelector("#dp-next");
+    if (prevBtn) {
+      prevBtn.onclick = () => {
+        if (dPage > 1) {
+          dPage--;
+          renderDocsFull();
+        }
+      };
+    }
+    if (nextBtn) {
+      nextBtn.onclick = () => {
+        if (dPage < pages) {
+          dPage++;
+          renderDocsFull();
+        }
+      };
+    }
+  }
 
   el.querySelectorAll(".expand-btn").forEach((btn) => {
     btn.onclick = (e) => {
@@ -1473,7 +1761,7 @@ const renderDocsFull = (statusF = "", numF = "") => {
       const tid = btn.dataset.tid;
       if (expandedTxIds.has(tid)) expandedTxIds.delete(tid);
       else { expandedTxIds.clear(); expandedTxIds.add(tid); }
-      renderDocsFull(statusF, numF);
+      renderDocsFull();
     };
   });
 
@@ -1497,6 +1785,9 @@ const renderDocsFull = (statusF = "", numF = "") => {
       openPaymentModal(btn.dataset.tid);
     };
   });
+
+  // Mobile card click handlers: click whole card to view receipt or pay draft
+  bindFullRowClicks(el, openReceiptModal, openPaymentModal);
 };
 
 // ─── VIEW SWITCHER ──────────────────────────────────────────────
@@ -1566,7 +1857,6 @@ const showView = (name) => {
     if (header) header.style.display = "none";
   }
 };
-
 // ─── PREMIUM PAYMENT MODAL ──────────────────────────────────────
 let activeTransactionId = null;
 let selRecipMethodId = null;
@@ -1617,20 +1907,17 @@ const showModalStep = (stepId) => {
   const activeSteps = Array.from(document.querySelectorAll(".pmt-step")).filter(el => el.style.display === "flex" || el.style.display === "block");
   
   if (activeSteps.length > 0 && modal && !activeSteps.includes($(stepId))) {
-      // 1. Fix current height before fading out
       const startHeight = modal.offsetHeight;
       modal.style.height = startHeight + "px";
       modal.style.overflow = "hidden";
-      modal.style.transition = "none"; // disable transition temporarily
+      modal.style.transition = "none";
       
-      // Fade out old content
       activeSteps.forEach(el => {
           el.style.transition = "opacity 0.15s ease";
           el.style.opacity = "0";
       });
       
       setTimeout(() => {
-          // 2. Hide old, show new
           activeSteps.forEach(el => el.style.display = "none");
           const step = $(stepId);
           if (step) {
@@ -1638,32 +1925,30 @@ const showModalStep = (stepId) => {
               step.style.display = "flex";
           }
           
-          // 3. Set new max-width without animating yet
           if (stepId === "pmt-step-sms" || stepId === "pmt-step-success") {
               modal.style.maxWidth = "480px";
+          } else if (stepId === "pmt-step-1") {
+              modal.style.maxWidth = "600px";
           } else {
-              modal.style.maxWidth = "900px";
+              modal.style.maxWidth = "800px";
           }
           
-          // 4. Measure new natural height
           modal.style.height = "auto";
           const endHeight = modal.offsetHeight;
-          modal.style.height = startHeight + "px"; // snap back to start
+          modal.style.height = startHeight + "px";
           
-          // Force reflow
           void modal.offsetHeight;
           
-          // 5. Animate height and width
           modal.style.transition = "height 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), max-width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)";
           modal.style.height = endHeight + "px";
           
-          // 6. Fade in new content
           setTimeout(() => {
               if (step) {
                   step.style.transition = "opacity 0.25s ease";
                   step.style.opacity = "1";
               }
           }, 100);
+ 
 
           // 7. Cleanup after animations
           setTimeout(() => {
@@ -1686,8 +1971,10 @@ const showModalStep = (stepId) => {
       if (modal) {
           if (stepId === "pmt-step-sms" || stepId === "pmt-step-success") {
               modal.style.maxWidth = "480px";
+          } else if (stepId === "pmt-step-1") {
+              modal.style.maxWidth = "600px";
           } else {
-              modal.style.maxWidth = "900px";
+              modal.style.maxWidth = "800px";
           }
       }
   }
@@ -1729,6 +2016,19 @@ const closePaymentModal = () => {
   selRecipMethodId = null;
   pendingPayment = null;
   foundReceiverUser = null;
+  
+  // Reset all steps to default step-1 state to prevent flashing on next open
+  document.querySelectorAll(".pmt-step").forEach(el => {
+    el.style.display = "none";
+    el.style.opacity = "1";
+  });
+  $("pmt-step-1").style.display = "flex";
+
+  const modal = document.querySelector(".pmt-modal");
+  if (modal) {
+    modal.style.maxWidth = "600px";
+    modal.style.height = "auto";
+  }
 };
 
 const openQRModal = (txId) => {
@@ -1795,13 +2095,19 @@ const openReceiptModal = (txId) => {
      receiverMethodText = "Sayohat tizimi";
   }
 
+  const isVisa = (c) => c && c.type === 'card' && (
+      (c.cardName && c.cardName.toLowerCase().includes('visa')) || 
+      (c.number && c.number.startsWith('4'))
+  );
+  
   const d = new Date(tx.paidAt || tx.createdAt);
   $("receipt-date").textContent = `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
   
-  const formattedAmt = fmt(tx.amount);
+  const txIsVisa = isVisa(senderMethodObj);
+  const formattedAmt = fmt(tx.amount, txIsVisa);
   const parts = formattedAmt.split(".");
   
-  $("receipt-amount-int").textContent = isSent ? "- " + (parts[0] || "$0") : "+ " + (parts[0] || "$0");
+  $("receipt-amount-int").textContent = isSent ? "- " + (parts[0] || "0") : "+ " + (parts[0] || "0");
   $("receipt-amount-dec").textContent = parts.length > 1 ? "." + parts[1] : ".00";
   
   $("receipt-total").textContent = formattedAmt;
@@ -1836,129 +2142,230 @@ const showReceiverStep = (user, specificMethodId = null) => {
   showModalStep("pmt-step-2-3");
   if ($("pmt-back-to-users")) $("pmt-back-to-users").classList.add("visible");
   
-  $("pmt-found-user").innerHTML = `
-    <div class="pmt-user-avatar">${user.username ? user.username.charAt(0).toUpperCase() : "?"}</div>
-    <div>
-      <h3 style="margin:0 0 4px; font-size:16px;">${user.username}</h3>
-      <p style="margin:0; font-size:13px; color:#8892a4;">${user.tel || user.email || ""}</p>
-    </div>
-  `;
-  
-  const methods = user.paymentMethods || [];
-  
-  const cardSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>`;
-  const bankSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11m16-11v11m-8-11v11m-4-11v11m8-11v11"/></svg>`;
+  // Set receiver profile details
+  $("pmt-found-avatar").textContent = user.username ? user.username.charAt(0).toUpperCase() : "?";
+  $("pmt-found-name").textContent = user.username;
+  $("pmt-found-contact").textContent = user.tel || user.email || "";
 
-  $("pmt-receiver-methods").innerHTML = methods.length ? methods.map(m => {
-    // If specificMethodId is provided, ONLY show that method
-    if (specificMethodId && m._id !== specificMethodId) return "";
-    return `
-    <div class="pmt-method-card ${specificMethodId === m._id ? "selected" : ""}" data-id="${m._id}">
-       <div class="pmt-method-icon">${m.type === "card" ? cardSvg : bankSvg}</div>
-       <div class="pmt-method-info">
-          <p class="pmt-method-name">${m.displayNumber || m.number}</p>
-          <p class="pmt-method-sub">${m.cardName || m.bank || t("method_account") || "Hisob"}</p>
-       </div>
-    </div>`;
-  }).join("") : `<p style="color:#8892a4; font-size:13px;">${t("no_type_methods")}</p>`;
-  
+  let senderCard = null;
+  let receiverCard = null;
+  let activeSelection = 'sender';
+
+  const recMethods = user.paymentMethods || [];
   if (specificMethodId) {
-    selRecipMethodId = specificMethodId;
+     receiverCard = recMethods.find(m => m._id === specificMethodId);
+     selRecipMethodId = specificMethodId;
+     activeSelection = 'sender'; // default to selecting sender
   } else {
-    selRecipMethodId = null;
+     receiverCard = null;
+     selRecipMethodId = null;
   }
+
+  // Set global function for the confirm step
+  window.currentSenderMethodSelection = () => senderCard ? senderCard._id : null;
+
+  const isVisa = (c) => c && c.type === 'card' && (
+      (c.cardName && c.cardName.toLowerCase().includes('visa')) || 
+      (c.number && c.number.startsWith('4'))
+  );
+
+  const renderBox = (containerId, card, isActive) => {
+      const container = $(containerId);
+      if (!container) return;
+      if (!card) {
+          container.innerHTML = `
+              <div style="height:60px; border:2px dashed ${isActive ? '#4F46E5' : '#cbd5e1'}; border-radius:12px; display:flex; align-items:center; justify-content:center; gap:8px; background:${isActive ? '#F5F3FF' : 'transparent'}; color:${isActive ? '#4F46E5' : '#94a3b8'}; transition:0.2s;">
+                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></svg>
+                  <span style="font-weight:600; font-size:13px;">${t("choose_card_title")}</span>
+              </div>
+          `;
+          return;
+      }
+
+      container.innerHTML = `
+          <div style="height:60px; border:2px solid ${isActive ? '#4F46E5' : '#e2e8f0'}; border-radius:12px; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,0.02); display:flex; align-items:center; justify-content:space-between; padding:0 12px; transition:0.2s;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                  <div style="width:32px; height:32px; border-radius:8px; background:${containerId === 'pmt-sender-box' ? '#4F46E5' : '#e2e8f0'}; display:flex; align-items:center; justify-content:center;">
+                      ${containerId === 'pmt-sender-box' 
+                        ? '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>' 
+                        : '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#64748b" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>'}
+                  </div>
+                  <div style="display:flex; flex-direction:column;">
+                      <span style="font-size:13px; font-weight:700; color:#0f172a; letter-spacing:-0.2px;">${card.type === "card" ? (card.cardName || "Karta") : (card.bank === "Woorkroom Bank" || card.bank === "Bank Hisobi" ? "Bank Hisobi" : card.bank)} ${card.number ? "•••• " + card.number.slice(-4) : ""}</span>
+                      ${containerId === 'pmt-receiver-box' ? '' : `<span style="font-size:11px; color:#64748b; font-weight:500; margin-top:1px;">${card.balance.toLocaleString('en-US').replace(/,/g, ' ')} ${isVisa(card) ? "USD" : "UZS"}</span>`}
+                  </div>
+              </div>
+          </div>
+      `;
+  };
+
+  const renderRightList = () => {
+      const titleEl = $("pmt-right-title");
+      const listEl = $("pmt-right-list");
+      if (!listEl) return;
+
+      if (!activeSelection) {
+          titleEl.innerHTML = "Karta tanlash";
+          listEl.innerHTML = `
+              <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; padding-top:60px; color:#cbd5e1;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-credit-card-icon lucide-credit-card"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+              </div>
+          `;
+          return;
+      }
+
+      titleEl.innerHTML = activeSelection === 'sender' ? t("choose_sender_card") : t("choose_receiver_card");
+      
+      let availableMethods = [];
+      if (activeSelection === 'sender') {
+          availableMethods = myMethods;
+          if (receiverCard) {
+              const recVisa = isVisa(receiverCard);
+              availableMethods = availableMethods.filter(m => isVisa(m) === recVisa);
+          }
+      } else {
+          availableMethods = user.paymentMethods || [];
+          if (senderCard) {
+              const sendVisa = isVisa(senderCard);
+              availableMethods = availableMethods.filter(m => isVisa(m) === sendVisa);
+          }
+      }
+
+      if (availableMethods.length === 0) {
+          listEl.innerHTML = `
+              <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; padding:40px 20px; color:#cbd5e1; text-align:center;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-alert-circle" style="margin-bottom:12px;"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                  <div style="font-size:13px; font-weight:600; color:#0f172a; margin-bottom:4px;">${t("cards_not_found")}</div>
+                  <div style="font-size:11px; font-weight:500; color:#64748b;">Visa kartadan faqat Visa kartaga, mahalliy hisobdan faqat mahalliy hisobga yuborish mumkin.</div>
+              </div>
+          `;
+          return;
+      }
+
+      listEl.innerHTML = availableMethods.map(m => {
+          const isBlocked = blockedCardIds.has(m._id) || m.isBlocked === true;
+          return `
+          <div class="pmt-option-card ${isBlocked ? 'blocked-option-card' : ''}" data-id="${m._id}" style="padding:12px; border-radius:12px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; transition:0.2s; background:#fff; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.01);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 10px rgba(0,0,0,0.04)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.01)'">
+              <div style="display:flex; align-items:center; gap:12px; pointer-events:none;">
+                  <div style="width:32px; height:32px; border-radius:8px; background:#f1f5f9; display:flex; align-items:center; justify-content:center;">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-credit-card-icon lucide-credit-card"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:2px;">
+                      <div style="font-weight:600; font-size:13px; color:#0f172a; letter-spacing:-0.2px;">${m.type === "card" ? (m.cardName || t("card")) : (m.bank === "Woorkroom Bank" || m.bank === "Bank Hisobi" ? "Bank Hisobi" : m.bank)} ${m.number ? "•••• " + m.number.slice(-4) : ""}</div>
+                      ${activeSelection === 'receiver' ? '' : `<div style="font-size:11px; color:#64748b; font-weight:500;">${m.balance ? m.balance.toLocaleString('en-US').replace(/,/g, ' ') : "0"} ${isVisa(m) ? "USD" : "UZS"}</div>`}
+                  </div>
+              </div>
+              ${isBlocked ? `
+              <div class="card-freeze-indicator">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-snowflake"><path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/></svg>
+              </div>
+              <div class="freeze-hover-overlay">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-snowflake"><path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/></svg>
+                <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">${t("card_frozen_label")}</span>
+              </div>
+              ` : ''}
+          </div>
+      `}).join("");
+
+      listEl.querySelectorAll(".pmt-option-card").forEach(el => {
+          el.onclick = () => {
+              const selId = el.getAttribute("data-id");
+              const isBlocked = blockedCardIds.has(selId) || (availableMethods.find(x => x._id === selId)?.isBlocked === true);
+              if (isBlocked) {
+                  showToast(t("frozen_card_click_error"), "error");
+                  return;
+              }
+              if (activeSelection === 'sender') {
+                  senderCard = myMethods.find(x => x._id === selId);
+                  window.currentSenderMethodSelection = () => senderCard ? senderCard._id : null;
+                  if (!receiverCard) {
+                      activeSelection = 'receiver';
+                  } else {
+                      if (isVisa(senderCard) !== isVisa(receiverCard)) {
+                          receiverCard = null;
+                          selRecipMethodId = null;
+                          activeSelection = 'receiver';
+                      } else {
+                          activeSelection = null;
+                      }
+                  }
+              } else {
+                  receiverCard = recMethods.find(x => x._id === selId);
+                  selRecipMethodId = receiverCard ? receiverCard._id : null;
+                  if (!senderCard) {
+                      activeSelection = 'sender';
+                  } else {
+                      if (isVisa(senderCard) !== isVisa(receiverCard)) {
+                          senderCard = null;
+                          window.currentSenderMethodSelection = () => null;
+                          activeSelection = 'sender';
+                      } else {
+                          activeSelection = null;
+                      }
+                  }
+              }
+              updateUI();
+          };
+      });
+  };
+
+  const updateUI = () => {
+      renderBox('pmt-sender-box', senderCard, activeSelection === 'sender');
+      renderBox('pmt-receiver-box', receiverCard, activeSelection === 'receiver');
+      renderRightList();
+      checkNextStepReady();
+  };
 
   const checkNextStepReady = () => {
      const amount = parseFloat($("pmt-amount").value.replace(/[\s,]/g, ""));
-     const senderSelected = window.currentSenderMethodSelection ? window.currentSenderMethodSelection() : null;
-     const senderObj = myMethods.find(m => m._id === senderSelected);
-     const recObj = methods.find(m => m._id === selRecipMethodId);
      
      const currEl = document.querySelector(".pmt-currency");
      if (currEl) {
-        if (senderObj) {
-            currEl.textContent = senderObj.cardName === "Visa" ? "USD" : "UZS";
-        } else if (recObj) {
-            currEl.textContent = recObj.cardName === "Visa" ? "USD" : "UZS";
+        if (senderCard) {
+            currEl.textContent = isVisa(senderCard) ? "USD" : "UZS";
+        } else if (receiverCard) {
+            currEl.textContent = isVisa(receiverCard) ? "USD" : "UZS";
         } else {
             currEl.textContent = "UZS";
         }
      }
      
-     const isSenderVisa = senderObj ? senderObj.cardName === "Visa" : null;
-     const isRecVisa = recObj ? recObj.cardName === "Visa" : null;
-     
-     let validReceiverExists = true;
-     let validSenderExists = true;
-
-     if (senderObj) {
-         validReceiverExists = false;
-         document.querySelectorAll("#pmt-receiver-methods .pmt-method-card").forEach(c => {
-             const rObj = methods.find(m => m._id === c.dataset.id);
-             if (rObj) {
-                 if (isSenderVisa !== (rObj.cardName === "Visa")) {
-                     c.style.display = "none";
-                     if (c.classList.contains("selected")) {
-                         c.classList.remove("selected");
-                         selRecipMethodId = null;
-                     }
-                 } else {
-                     c.style.display = "flex";
-                     validReceiverExists = true;
-                 }
-             }
-         });
-     } else {
-         document.querySelectorAll("#pmt-receiver-methods .pmt-method-card").forEach(c => c.style.display = "flex");
-     }
-
-     if (recObj && selRecipMethodId) {
-         validSenderExists = false;
-         document.querySelectorAll("#pmt-sender-methods .pmt-method-card").forEach(c => {
-             const sObj = myMethods.find(m => m._id === c.dataset.id);
-             if (sObj) {
-                 if (isRecVisa !== (sObj.cardName === "Visa")) {
-                     c.style.display = "none";
-                     if (c.classList.contains("selected")) {
-                         c.classList.remove("selected");
-                         if (window.currentSenderMethodClear) window.currentSenderMethodClear();
-                     }
-                 } else {
-                     c.style.display = "flex";
-                     validSenderExists = true;
-                 }
-             }
-         });
-     } else {
-         document.querySelectorAll("#pmt-sender-methods .pmt-method-card").forEach(c => c.style.display = "flex");
-     }
-     
      const errEl = $("pmt-step3-error");
-     if (errEl) {
-         if (!validReceiverExists && senderObj) {
-             errEl.textContent = isSenderVisa ? "Qabul qiluvchida Visa karta mavjud emas (Faqat Visa'dan Visa'ga o'tkazma)." : "Qabul qiluvchida mos karta mavjud emas (Faqat Visa bo'lmagan kartalar arasi).";
-         } else if (!validSenderExists && recObj) {
-             errEl.textContent = isRecVisa ? "Sizda Visa karta mavjud emas (Faqat Visa'dan Visa'ga o'tkazma)." : "Sizda mos karta mavjud emas (Faqat Visa bo'lmagan kartalar arasi).";
-         } else {
-             errEl.textContent = "";
-         }
+     if (errEl) errEl.textContent = "";
+
+     if (senderCard && receiverCard) {
+        if (isVisa(senderCard) !== isVisa(receiverCard)) {
+            if (errEl) {
+                errEl.textContent = isVisa(senderCard) 
+                    ? "Mos kelmaydigan valyuta: Visa'dan faqat Visa'ga o'tkazish mumkin." 
+                    : "Mos kelmaydigan valyuta: Mahalliy kartadan faqat mahalliy kartaga o'tkazish mumkin.";
+            }
+            $("pmt-next-3").disabled = true;
+            return;
+        }
      }
      
-     if (selRecipMethodId && window.currentSenderMethodSelection && window.currentSenderMethodSelection() && !isNaN(amount) && amount > 0) {
-        $("pmt-next-3").disabled = false;
+     if (senderCard && receiverCard && !isNaN(amount) && amount > 0) {
+        if (senderCard.balance < amount) {
+           if (errEl) errEl.textContent = t("err_insufficient") || "Mablag' yetarli emas";
+           $("pmt-next-3").disabled = true;
+        } else {
+           $("pmt-next-3").disabled = false;
+        }
      } else {
         $("pmt-next-3").disabled = true;
      }
   };
-  
-  document.querySelectorAll("#pmt-receiver-methods .pmt-method-card").forEach(el => {
-    el.onclick = () => {
-       document.querySelectorAll("#pmt-receiver-methods .pmt-method-card").forEach(c => c.classList.remove("selected"));
-       el.classList.add("selected");
-       selRecipMethodId = el.dataset.id;
-       checkNextStepReady();
-    };
-  });
+
+  // Click handlers on sender/receiver boxes to switch active list
+  $("pmt-sender-box").onclick = () => {
+      activeSelection = 'sender';
+      updateUI();
+  };
+  $("pmt-receiver-box").onclick = () => {
+      activeSelection = 'receiver';
+      updateUI();
+  };
 
   const tx = activeTransactionId && activeTransactionId !== "new" ? myTransactions.find((t) => t._id === activeTransactionId) : null;
   if (tx?.amount) {
@@ -1966,43 +2373,15 @@ const showReceiverStep = (user, specificMethodId = null) => {
   } else {
     $("pmt-amount").value = "";
   }
+  
   $("pmt-amount").oninput = (e) => {
     let val = e.target.value.replace(/[^\d]/g, "");
     e.target.value = val.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     checkNextStepReady();
   };
-  
-  renderSenderMethods(checkNextStepReady);
-};
 
-const renderSenderMethods = (onChangeCallback) => {
-   const cardSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>`;
-   const bankSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11m16-11v11m-8-11v11m-4-11v11m8-11v11"/></svg>`;
-
-   $("pmt-sender-methods").innerHTML = myMethods.length ? myMethods.map(m => `
-    <div class="pmt-method-card" data-id="${m._id}">
-       <div class="pmt-method-icon">${m.type === "card" ? cardSvg : bankSvg}</div>
-       <div class="pmt-method-info">
-          <p class="pmt-method-name">${m.displayNumber || m.number}</p>
-          <p class="pmt-method-sub">${m.bank || t("method_account") || "Hisob"} — ${fmt(m.balance, m.cardName === "Visa")}</p>
-       </div>
-    </div>
-   `).join("") : `<p style="color:#8892a4; font-size:13px;">${t("err_no_funds")}</p>`;
-   
-   let selectedMyMethod = null;
-   window.currentSenderMethodSelection = () => selectedMyMethod;
-   window.currentSenderMethodClear = () => { selectedMyMethod = null; };
-   
-   document.querySelectorAll("#pmt-sender-methods .pmt-method-card").forEach(el => {
-      el.onclick = () => {
-         document.querySelectorAll("#pmt-sender-methods .pmt-method-card").forEach(c => c.classList.remove("selected"));
-         el.classList.add("selected");
-         selectedMyMethod = el.dataset.id;
-         if (onChangeCallback) onChangeCallback();
-      };
-   });
-
-   if (onChangeCallback) onChangeCallback();
+  // Initial draw
+  updateUI();
 };
 
 // ─── PUSHER REAL-TIME ───────────────────────────────────────────
@@ -2188,6 +2567,9 @@ export const initBusinessLogic = async () => {
   refreshStats();
   renderAccounts();
   renderDocsMini();
+  renderFullFilters();
+
+  initResponsive(showView, (val) => { dPage = val; }, renderDocsFull);
 
   $("close-qr-btn")?.addEventListener("click", () => ($("qr-modal").style.display = "none"));
   $("qr-modal")?.addEventListener("click", (e) => { if (e.target === e.currentTarget) $("qr-modal").style.display = "none"; });
@@ -2203,6 +2585,7 @@ export const initBusinessLogic = async () => {
     translateUI();
     renderAccounts();
     renderDocsMini();
+    renderFullFilters();
     renderDocsFull();
     renderClientsFull();
     refreshStats();
@@ -2213,7 +2596,7 @@ export const initBusinessLogic = async () => {
 
   // ── View navigation ──
   $("back-clients")?.addEventListener("click", () => { showView("view-dashboard"); });
-  $("btn-view-docs")?.addEventListener("click", () => { showView("view-docs"); dPage = 1; renderDocsFull(); });
+  $("btn-view-docs")?.addEventListener("click", () => { showView("view-docs"); dPage = 1; renderFullFilters(); renderDocsFull(); });
   $("back-docs")?.addEventListener("click", () => { showView("view-dashboard"); renderDocsMini(); });
   
   $("btn-view-all-cards")?.addEventListener("click", () => { showView("view-all-cards"); selectedInspectorCardId = null; renderAllCards(); });
@@ -2257,13 +2640,12 @@ export const initBusinessLogic = async () => {
   $("mp-prev")?.addEventListener("click", () => { if (mPage > 1) { mPage--; renderDocsMini(); } });
   $("mp-next")?.addEventListener("click", () => {
      const total = myTransactions.length;
-     if (mPage < Math.ceil(total / MINI_PAGE)) { mPage++; renderDocsMini(); }
+     const limit = getMiniPageLimit();
+     if (mPage < Math.ceil(total / limit)) { mPage++; renderDocsMini(); }
   });
 
   $("cp-prev")?.addEventListener("click", () => { if (cPage > 1) { cPage--; renderClientsFull(); } });
   $("cp-next")?.addEventListener("click", () => { if (cPage < Math.ceil(cFiltered.length / PAGE)) { cPage++; renderClientsFull(); } });
-  $("doc-status-filter")?.addEventListener("change", (e) => { dPage = 1; renderDocsFull(e.target.value, $("doc-num-search")?.value || ""); });
-  $("doc-num-search")?.addEventListener("input", (e) => { dPage = 1; renderDocsFull($("doc-status-filter")?.value || "", e.target.value); });
   $("dp-prev")?.addEventListener("click", () => { if (dPage > 1) { dPage--; renderDocsFull(); } });
   $("dp-next")?.addEventListener("click", () => { if (dPage < Math.ceil(dFiltered.length / PAGE)) { dPage++; renderDocsFull(); } });
 
@@ -2390,7 +2772,7 @@ export const initBusinessLogic = async () => {
   }
 
   if ($("pmt-next-3")) {
-    $("pmt-next-3").addEventListener("click", () => {
+    $("pmt-next-3").addEventListener("click", async () => {
       $("pmt-step3-error").textContent = "";
       const amount = parseFloat($("pmt-amount").value.replace(/[\s,]/g, ""));
       if (isNaN(amount) || amount <= 0) {
@@ -2399,7 +2781,7 @@ export const initBusinessLogic = async () => {
       const selectedMyMethod = window.currentSenderMethodSelection ? window.currentSenderMethodSelection() : null;
       const myMeth = myMethods.find(m => m._id === selectedMyMethod);
       if (!myMeth) { $("pmt-step3-error").textContent = t("err_select_method"); return; }
-      if (blockedCardIds.has(selectedMyMethod)) { $("pmt-step3-error").textContent = "Muzlatilgan kartadan to'lov qilish mumkin emas"; return; }
+      if (blockedCardIds.has(selectedMyMethod)) { $("pmt-step3-error").textContent = t("frozen_card_tx_error"); return; }
       if (myMeth.balance < amount) { $("pmt-step3-error").textContent = t("err_insufficient"); return; }
       
       pendingPayment = {
@@ -2409,15 +2791,32 @@ export const initBusinessLogic = async () => {
          receiverId: foundReceiverUser.userId || foundReceiverUser._id
       };
       
-      showModalStep("pmt-step-sms");
-      
-      const me = getCurrent();
-      const phone = me?.tel || me?.email || "***";
-      const masked = phone.length > 4 ? phone.slice(0, -4).replace(/./g, "*") + phone.slice(-4) : "****";
-      $("pmt-sms-desc").textContent = (t("sms_desc") || "Raqamingizga SMS yuborildi:") + " " + masked;
-      ["pmt-sms-1", "pmt-sms-2", "pmt-sms-3", "pmt-sms-4"].forEach(id => { $(id).value = ""; $(id).style.borderColor = ""; });
-      $("pmt-sms-error").textContent = "";
-      setTimeout(() => $("pmt-sms-1").focus(), 100);
+      try {
+         $("pmt-next-3").disabled = true;
+         const btnText = $("pmt-next-3").querySelector(".btn-text");
+         const btnLoader = $("pmt-next-3").querySelector(".btn-loader");
+         if (btnText) btnText.style.display = "none";
+         if (btnLoader) btnLoader.style.display = "block";
+         const otpRes = await apiFetch(`/api/payments/send-otp`, { method: "POST" });
+         
+         showModalStep("pmt-step-sms");
+         
+         $("pmt-sms-desc").textContent = "Pochtangizga tasdiqlash kodi yuborildi: " + (otpRes.email || "***");
+         ["pmt-sms-1", "pmt-sms-2", "pmt-sms-3", "pmt-sms-4"].forEach(id => { $(id).value = ""; $(id).style.borderColor = ""; });
+         $("pmt-sms-error").textContent = "";
+         setTimeout(() => $("pmt-sms-1").focus(), 100);
+         
+         // Start 1:30 timer
+         startSmsTimer();
+      } catch (e) {
+         $("pmt-step3-error").textContent = e.message;
+      } finally {
+         $("pmt-next-3").disabled = false;
+         const btnText = $("pmt-next-3").querySelector(".btn-text");
+         const btnLoader = $("pmt-next-3").querySelector(".btn-loader");
+         if (btnText) btnText.style.display = "inline";
+         if (btnLoader) btnLoader.style.display = "none";
+      }
     });
   }
 
@@ -2431,21 +2830,76 @@ export const initBusinessLogic = async () => {
 
   if ($("pmt-sms-back")) {
     $("pmt-sms-back").addEventListener("click", () => {
+       clearInterval(window.smsTimerInterval);
        showModalStep("pmt-step-2-3");
     });
+  }
+
+  window.smsTimerInterval = null;
+  window.smsTimeLeft = 90;
+  
+  function startSmsTimer() {
+     clearInterval(window.smsTimerInterval);
+     window.smsTimeLeft = 90;
+     $("pmt-sms-timer").style.display = "block";
+     $("pmt-sms-resend").style.display = "none";
+     $("pmt-sms-error").textContent = "";
+     
+     const updateTimer = () => {
+        const m = Math.floor(window.smsTimeLeft / 60);
+        const s = window.smsTimeLeft % 60;
+        $("pmt-sms-timer").textContent = `Vaqt qoldi: ${m}:${s < 10 ? '0' : ''}${s}`;
+        if (window.smsTimeLeft <= 0) {
+           clearInterval(window.smsTimerInterval);
+           $("pmt-sms-timer").style.display = "none";
+           $("pmt-sms-resend").style.display = "inline-block";
+           $("pmt-sms-error").textContent = "Kodning vaqti tugadi. Iltimos qayta yuboring.";
+           ["pmt-sms-1", "pmt-sms-2", "pmt-sms-3", "pmt-sms-4"].forEach(id => { $(id).style.borderColor = "#ef4444"; });
+        }
+        window.smsTimeLeft--;
+     };
+     updateTimer();
+     window.smsTimerInterval = setInterval(updateTimer, 1000);
+  }
+
+  if ($("pmt-sms-resend")) {
+     $("pmt-sms-resend").addEventListener("click", async () => {
+        $("pmt-sms-resend").textContent = "Kutib turing...";
+        try {
+           const otpRes = await apiFetch(`/api/payments/send-otp`, { method: "POST" });
+           $("pmt-sms-desc").textContent = "Pochtangizga tasdiqlash kodi yuborildi: " + (otpRes.email || "***");
+           ["pmt-sms-1", "pmt-sms-2", "pmt-sms-3", "pmt-sms-4"].forEach(id => { $(id).value = ""; $(id).style.borderColor = ""; });
+           $("pmt-sms-error").textContent = "Yangi kod yuborildi!";
+           $("pmt-sms-error").style.color = "#22c55e";
+           setTimeout(() => { $("pmt-sms-error").style.color = ""; $("pmt-sms-error").textContent = ""; }, 3000);
+           startSmsTimer();
+        } catch (e) {
+           $("pmt-sms-error").textContent = e.message;
+        }
+        $("pmt-sms-resend").textContent = "Qayta yuborish";
+     });
   }
 
   if ($("pmt-sms-confirm")) {
     $("pmt-sms-confirm").addEventListener("click", async () => {
        const code = ["pmt-sms-1", "pmt-sms-2", "pmt-sms-3", "pmt-sms-4"].map(id => $(id).value).join("");
-       if (code !== "1234") {
-          $("pmt-sms-error").textContent = t("sms_wrong_code") || "Kod noto'g'ri. 1234 kiriting.";
+       if (code.length !== 4) {
+          $("pmt-sms-error").textContent = "Kodni to'liq kiriting.";
           ["pmt-sms-1", "pmt-sms-2", "pmt-sms-3", "pmt-sms-4"].forEach(id => { $(id).style.borderColor = "#ef4444"; });
+          return;
+       }
+       if (window.smsTimeLeft < 0) {
+          $("pmt-sms-error").textContent = "Kodning vaqti tugagan. Qayta yuborishni bosing.";
           return;
        }
        
        try {
           $("pmt-sms-confirm").classList.add("loading");
+          $("pmt-sms-confirm").disabled = true;
+          
+          // Artificial 1-second delay to mimic processing
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
           await apiFetch(`/api/payments/send/${activeTransactionId}`, {
             method: "POST",
             body: JSON.stringify({
@@ -2454,8 +2908,10 @@ export const initBusinessLogic = async () => {
               amount: pendingPayment.amount,
               description: pendingPayment.desc,
               receiverId: pendingPayment.receiverId,
+              otp: code
             }),
           });
+          clearInterval(window.smsTimerInterval);
           showModalStep("pmt-step-success");
           loadPaymentData().then(() => {
              refreshStats();
@@ -2467,6 +2923,7 @@ export const initBusinessLogic = async () => {
           $("pmt-sms-error").textContent = e.message;
        } finally {
           $("pmt-sms-confirm").classList.remove("loading");
+          $("pmt-sms-confirm").disabled = false;
        }
     });
   }
@@ -2723,7 +3180,7 @@ const openCardSettingsModal = (card) => {
   `;
 
   $("cs-full-number").textContent = fullNumSpaced;
-  $("cs-expiry").textContent = card.expiry || card.bank || "—";
+  $("cs-expiry").textContent = card.expiry || (card.bank === "Woorkroom Bank" ? "Bank Hisobi" : card.bank) || "—";
   $("cs-holder").textContent = card.holder || "—";
   
   if ($("cs-expiry-container")) {
@@ -2811,70 +3268,167 @@ const openSelfTransferModal = () => {
     // We need at least 2 cards
     if (myMethods.length < 2) return;
     
-    let senderCard = myMethods[0];
-    let receiverCard = myMethods[1];
+    window.tsSenderCard = null;
+    let senderCard = null;
+    let receiverCard = null;
+    let activeSelection = 'sender';
 
-    const renderCardSelect = (containerId, selectedMethod) => {
+    const isVisa = (c) => c && c.type === 'card' && (
+        (c.cardName && c.cardName.toLowerCase().includes('visa')) || 
+        (c.number && c.number.startsWith('4'))
+    );
+
+    const renderBox = (containerId, card, isActive) => {
         const container = $(containerId);
-        container.innerHTML = `
-            <div class="ts-custom-select" style="margin:0; position:relative; border-radius:12px;">
-                <div class="ts-select-trigger" style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px; font-weight:700; color:#1e293b; display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
-                    <div style="display:flex; flex-direction:column;">
-                        <span style="font-size:14px;">${selectedMethod.type === "card" ? selectedMethod.cardName : "Hisob"} ${selectedMethod.number ? " • " + selectedMethod.number.slice(-4) : ""}</span>
-                        <span style="font-size:12px; color:#64748b; font-weight:500; margin-top:2px;">${t("account_balance")}: ${selectedMethod.balance.toLocaleString('en-US').replace(/,/g, ' ')} UZS</span>
-                    </div>
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#8892a4" stroke-width="2"><path d="M19 9l-7 7-7-7"/></svg>
+        if (!card) {
+            container.innerHTML = `
+                <div style="height:64px; border:2px dashed ${isActive ? '#5b6ef5' : '#cbd5e1'}; border-radius:16px; display:flex; align-items:center; justify-content:center; gap:8px; background:${isActive ? '#eef2ff' : 'transparent'}; color:${isActive ? '#5b6ef5' : '#94a3b8'}; transition:0.2s;">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></svg>
+                    <span style="font-weight:600; font-size:14px;">${t("choose_card_title")}</span>
                 </div>
-                <div class="ts-options" style="display:none; position:absolute; width:100%; top:100%; left:0; margin-top:6px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; z-index:50; box-shadow:0 10px 25px rgba(0,0,0,0.1); overflow:hidden;">
-                    ${myMethods.map(m => `
-                        <div class="ts-option" data-value="${m._id}" style="padding:12px; border-bottom:1px solid #f1f5f9; cursor:pointer; transition:background 0.2s;">
-                            <div style="font-weight:700; font-size:14px; color:#1e293b; pointer-events:none;">${m.type === "card" ? m.cardName : "Hisob"} ${m.number ? " • " + m.number.slice(-4) : ""}</div>
-                            <div style="font-size:12px; color:#64748b; font-weight:500; margin-top:2px; pointer-events:none;">${t("account_balance")}: ${m.balance.toLocaleString('en-US').replace(/,/g, ' ')} UZS</div>
-                        </div>
-                    `).join("")}
+            `;
+            return;
+        }
+
+        container.innerHTML = `
+            <div style="height:64px; border:2px solid ${isActive ? '#5b6ef5' : '#e2e8f0'}; border-radius:16px; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,0.04); display:flex; align-items:center; justify-content:space-between; padding:0 16px; transition:0.2s;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="width:36px; height:36px; border-radius:10px; background:${containerId === 'ts-sender-box' ? '#5b6ef5' : '#e2e8f0'}; display:flex; align-items:center; justify-content:center;">
+                        ${containerId === 'ts-sender-box' ? '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>' : '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#64748b" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>'}
+                    </div>
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size:14px; font-weight:700; color:#0f172a; letter-spacing:-0.2px;">${card.type === "card" ? card.cardName : (card.bank === "Woorkroom Bank" || card.bank === "Bank Hisobi" ? "Bank Hisobi" : card.bank)} ${card.number ? "•••• " + card.number.slice(-4) : ""}</span>
+                        <span style="font-size:12px; color:#64748b; font-weight:500; margin-top:2px;">${card.balance.toLocaleString('en-US').replace(/,/g, ' ')} ${isVisa(card) ? "USD" : "UZS"}</span>
+                    </div>
                 </div>
             </div>
         `;
+    };
+
+    const renderRightList = () => {
+        const titleEl = $("ts-right-title");
+        const listEl = $("ts-right-list");
+
+        if (!activeSelection) {
+            titleEl.innerHTML = "Karta tanlash";
+            listEl.innerHTML = `
+                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; padding-top:60px; color:#cbd5e1;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-credit-card-icon lucide-credit-card"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                </div>
+            `;
+            return;
+        }
+
+        titleEl.innerHTML = activeSelection === 'sender' ? t("choose_sender_card") : t("choose_receiver_card");
         
-        const selDiv = container.querySelector(".ts-custom-select");
-        const trigger = selDiv.querySelector(".ts-select-trigger");
-        const optionsDiv = selDiv.querySelector(".ts-options");
-        
-        trigger.onclick = (e) => {
-            e.stopPropagation();
-            document.querySelectorAll(".ts-options").forEach(el => {
-                if (el !== optionsDiv) el.style.display = "none";
-            });
-            optionsDiv.style.display = optionsDiv.style.display === "none" ? "block" : "none";
-        };
-        
-        selDiv.querySelectorAll(".ts-option").forEach(opt => {
-            opt.onmouseenter = () => opt.style.background = "#f8fafc";
-            opt.onmouseleave = () => opt.style.background = "#fff";
-            
-            opt.onclick = (e) => {
-                e.stopPropagation();
-                const newId = opt.getAttribute("data-value");
-                const newMethod = myMethods.find(x => x._id === newId);
-                if (containerId === "ts-sender-card-container") {
-                    if (newMethod._id === receiverCard._id) receiverCard = senderCard;
-                    senderCard = newMethod;
-                } else {
-                    if (newMethod._id === senderCard._id) senderCard = receiverCard;
-                    receiverCard = newMethod;
+        const otherCardId = activeSelection === 'sender' ? (receiverCard ? receiverCard._id : null) : (senderCard ? senderCard._id : null);
+        let availableMethods = myMethods.filter(m => m._id !== otherCardId);
+
+        if (otherCardId) {
+            const otherCard = myMethods.find(m => m._id === otherCardId);
+            if (isVisa(otherCard)) {
+                availableMethods = availableMethods.filter(m => isVisa(m));
+                if (availableMethods.length === 0) {
+                    listEl.innerHTML = `
+                        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; padding:60px 20px; color:#cbd5e1; text-align:center;">
+                            <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="#ef4444" stroke-width="1.5" style="margin-bottom:16px;">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <div style="font-size:14px; font-weight:600; color:#0f172a; margin-bottom:4px;">Boshqa Visa karta topilmadi</div>
+                            <div style="font-size:13px; font-weight:500; color:#64748b;">Visa kartadan faqat boshqa Visa kartaga pul o'tkazish mumkin.</div>
+                        </div>
+                    `;
+                    return;
                 }
-                optionsDiv.style.display = "none";
-                updateCardSelects();
+            } else {
+                availableMethods = availableMethods.filter(m => !isVisa(m));
+                if (availableMethods.length === 0) {
+                    listEl.innerHTML = `
+                        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; padding:60px 20px; color:#cbd5e1; text-align:center;">
+                            <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="#ef4444" stroke-width="1.5" style="margin-bottom:16px;">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <div style="font-size:14px; font-weight:600; color:#0f172a; margin-bottom:4px;">${t("cards_not_found")}</div>
+                            <div style="font-size:13px; font-weight:500; color:#64748b;">Bu kartadan faqat mahalliy kartalarga (yoki hisobga) o'tkazma qilish mumkin.</div>
+                        </div>
+                    `;
+                    return;
+                }
+            }
+        }
+
+        listEl.innerHTML = availableMethods.map(m => {
+            const isBlocked = blockedCardIds.has(m._id) || m.isBlocked === true;
+            return `
+            <div class="ts-option-card ${isBlocked ? 'blocked-option-card' : ''}" data-id="${m._id}" style="padding:16px; border-radius:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; transition:0.2s; background:#fff; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.05)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)'">
+                <div style="display:flex; align-items:center; gap:12px; pointer-events:none;">
+                    <div style="width:40px; height:40px; border-radius:12px; background:#f1f5f9; display:flex; align-items:center; justify-content:center;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-credit-card-icon lucide-credit-card"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:2px;">
+                        <div style="font-weight:600; font-size:15px; color:#0f172a; letter-spacing:-0.2px;">${m.type === "card" ? (m.cardName || t("card")) : (m.bank === "Woorkroom Bank" || m.bank === "Bank Hisobi" ? "Bank Hisobi" : m.bank)} ${m.number ? "•••• " + m.number.slice(-4) : ""}</div>
+                        <div style="font-size:13px; color:#64748b; font-weight:500;">${m.balance.toLocaleString('en-US').replace(/,/g, ' ')} ${isVisa(m) ? "USD" : "UZS"}</div>
+                    </div>
+                </div>
+                ${isBlocked ? `
+                <div class="card-freeze-indicator">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-snowflake"><path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/></svg>
+                </div>
+                <div class="freeze-hover-overlay">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-snowflake"><path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/></svg>
+                  <span style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-top:2px;">${t("card_frozen_label")}</span>
+                </div>
+                ` : ''}
+            </div>
+        `}).join("");
+
+        listEl.querySelectorAll(".ts-option-card").forEach(el => {
+            el.onclick = () => {
+                const selId = el.getAttribute("data-id");
+                const isBlocked = blockedCardIds.has(selId) || (myMethods.find(x => x._id === selId)?.isBlocked === true);
+                if (isBlocked) {
+                    showToast(t("frozen_card_click_error"), "error");
+                    return;
+                }
+                const selMethod = myMethods.find(x => x._id === selId);
+                if (activeSelection === 'sender') {
+                    senderCard = selMethod;
+                    window.tsSenderCard = selMethod;
+                    if (!receiverCard) activeSelection = 'receiver';
+                    else activeSelection = null;
+                } else {
+                    receiverCard = selMethod;
+                    if (!senderCard) activeSelection = 'sender';
+                    else activeSelection = null;
+                }
+                updateUI();
             };
         });
     };
 
-    const updateCardSelects = () => {
-        renderCardSelect("ts-sender-card-container", senderCard);
-        renderCardSelect("ts-receiver-card-container", receiverCard);
+    const updateUI = () => {
+        const hasVisa = isVisa(senderCard) || isVisa(receiverCard);
+        const currency = hasVisa ? "USD" : "UZS";
+
+        if ($("ts-currency")) $("ts-currency").innerText = currency;
+        if ($("ts-commission")) $("ts-commission").innerText = `Komissiya: 0 ${currency}`;
+
+        renderBox("ts-sender-box", senderCard, activeSelection === 'sender');
+        renderBox("ts-receiver-box", receiverCard, activeSelection === 'receiver');
+        renderRightList();
     };
 
-    updateCardSelects();
+    $("ts-sender-box").onclick = () => {
+        activeSelection = 'sender';
+        updateUI();
+    };
+
+    $("ts-receiver-box").onclick = () => {
+        activeSelection = 'receiver';
+        updateUI();
+    };
+
+    updateUI();
     $("ts-amount").value = "";
     $("ts-error").style.display = "none";
     
@@ -2883,14 +3437,23 @@ const openSelfTransferModal = () => {
     $("ts-swap-btn").onclick = () => {
         const temp = senderCard;
         senderCard = receiverCard;
+        window.tsSenderCard = senderCard;
         receiverCard = temp;
-        updateCardSelects();
+        if (activeSelection === 'sender') activeSelection = 'receiver';
+        else if (activeSelection === 'receiver') activeSelection = 'sender';
+        updateUI();
     };
 
     $("ts-close").onclick = () => modal.style.display = "none";
     modal.onclick = (e) => { if(e.target === modal) modal.style.display = "none"; };
 
     $("ts-confirm").onclick = async () => {
+        if (!senderCard || !receiverCard) {
+            $("ts-error").textContent = "Iltimos, o'tkazish va qabul qilish kartalarini tanlang";
+            $("ts-error").style.display = "block";
+            return;
+        }
+
         const amount = parseFloat($("ts-amount").value.replace(/[\s,]/g, ""));
         if (!amount || amount <= 0) {
             $("ts-error").textContent = t("invalid_amount") || "Noto'g'ri summa kiritildi";
@@ -2903,7 +3466,7 @@ const openSelfTransferModal = () => {
             return;
         }
         if (blockedCardIds.has(senderCard._id)) {
-            $("ts-error").textContent = "Muzlatilgan kartadan to'lov qilish mumkin emas";
+            $("ts-error").textContent = t("frozen_card_tx_error");
             $("ts-error").style.display = "block";
             return;
         }
@@ -2961,80 +3524,156 @@ const openCurrencyExchangeModal = () => {
     const modal = $("ce-modal");
     if (!modal) return;
     
-    const visaCards = myMethods.filter(m => m.type === "card" && m.cardName === "Visa");
-    const nonVisaCards = myMethods.filter(m => m.type === "card" && m.cardName !== "Visa");
+    const isVisa = (c) => c && c.type === 'card' && (
+        (c.cardName && c.cardName.toLowerCase().includes('visa')) || 
+        (c.number && c.number.startsWith('4'))
+    );
+
+    const visaCards = myMethods.filter(m => isVisa(m));
+    const nonVisaCards = myMethods.filter(m => !isVisa(m));
     
     if (visaCards.length === 0 || nonVisaCards.length === 0) {
-        showToast("Valyuta almashtirish uchun sizda kamida bitta Visa va bitta boshqa karta bo'lishi kerak.", "error");
+        showToast("Valyuta almashtirish uchun sizda kamida bitta Visa va bitta boshqa karta (yoki hisob) bo'lishi kerak.", "error");
         return;
     }
     
-    let senderCard = nonVisaCards[0];
-    let receiverCard = visaCards[0];
+    let senderCard = null;
+    let receiverCard = null;
+    let activeSelection = 'sender';
 
-    const renderCardSelect = (containerId, selectedMethod, isSender) => {
+    const renderBox = (containerId, card, isActive) => {
         const container = $(containerId);
-        container.innerHTML = `
-            <div class="ce-custom-select" style="margin:0; position:relative; border-radius:12px;">
-                <div class="ce-select-trigger" style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px; font-weight:700; color:#1e293b; display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
-                    <div style="display:flex; flex-direction:column;">
-                        <span style="font-size:14px;">${selectedMethod.cardName || selectedMethod.bank || "Hisob"} ${selectedMethod.number ? " • " + selectedMethod.number.slice(-4) : ""}</span>
-                        <span style="font-size:12px; color:#64748b; font-weight:500; margin-top:2px;">${t("account_balance")}: ${fmt(selectedMethod.balance, selectedMethod.cardName === "Visa")}</span>
-                    </div>
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#8892a4" stroke-width="2"><path d="M19 9l-7 7-7-7"/></svg>
+        if (!card) {
+            container.innerHTML = `
+                <div style="height:64px; border:2px dashed ${isActive ? '#5b6ef5' : '#cbd5e1'}; border-radius:16px; display:flex; align-items:center; justify-content:center; gap:8px; background:${isActive ? '#eef2ff' : 'transparent'}; color:${isActive ? '#5b6ef5' : '#94a3b8'}; transition:0.2s;">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></svg>
+                    <span style="font-weight:600; font-size:14px;">${t("choose_card_title")}</span>
                 </div>
-                <div class="ce-options" style="display:none; position:absolute; width:100%; top:100%; left:0; margin-top:6px; background:#fff; border:1px solid #cbd5e1; border-radius:12px; z-index:50; box-shadow:0 10px 30px rgba(0,0,0,0.2); overflow:hidden;">
-                    ${(isSender ? (receiverCard.cardName === "Visa" ? nonVisaCards : visaCards) : (senderCard.cardName === "Visa" ? nonVisaCards : visaCards)).map(m => `
-                        <div class="ce-option" data-value="${m._id}" style="padding:12px; border-bottom:1px solid #f1f5f9; cursor:pointer; transition:background 0.2s;">
-                            <div style="font-weight:700; font-size:14px; color:#1e293b; pointer-events:none;">${m.cardName || m.bank || "Hisob"} ${m.number ? " • " + m.number.slice(-4) : ""}</div>
-                            <div style="font-size:12px; color:#64748b; font-weight:500; margin-top:2px; pointer-events:none;">${t("account_balance")}: ${fmt(m.balance, m.cardName === "Visa")}</div>
-                        </div>
-                    `).join("")}
+            `;
+            return;
+        }
+
+        const mIsVisa = isVisa(card);
+        
+        container.innerHTML = `
+            <div style="height:64px; border:2px solid ${isActive ? '#5b6ef5' : '#e2e8f0'}; border-radius:16px; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,0.04); display:flex; align-items:center; justify-content:space-between; padding:0 16px; transition:0.2s;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="width:36px; height:36px; border-radius:10px; background:${containerId === 'ce-sender-box' ? '#5b6ef5' : '#e2e8f0'}; display:flex; align-items:center; justify-content:center;">
+                        ${containerId === 'ce-sender-box' ? '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>' : '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#64748b" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>'}
+                    </div>
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size:14px; font-weight:700; color:#0f172a; letter-spacing:-0.2px;">${card.cardName || (card.bank === "Woorkroom Bank" ? "Bank Hisobi" : card.bank) || "Hisob"} ${card.number ? "•••• " + card.number.slice(-4) : ""}</span>
+                        <span style="font-size:12px; color:#64748b; font-weight:500; margin-top:2px;">${card.balance.toLocaleString('en-US').replace(/,/g, ' ')} ${isVisa ? "USD" : "UZS"}</span>
+                    </div>
                 </div>
             </div>
         `;
+    };
+
+    const renderRightList = () => {
+        const titleEl = $("ce-right-title");
+        const listEl = $("ce-right-list");
+
+        if (!activeSelection) {
+            titleEl.innerHTML = "Karta tanlash";
+            listEl.innerHTML = `
+                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; padding-top:60px; color:#cbd5e1;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-credit-card-icon lucide-credit-card"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                </div>
+            `;
+            return;
+        }
+
+        titleEl.innerHTML = activeSelection === 'sender' ? t("choose_sender_card") : t("choose_receiver_card");
         
-        const selDiv = container.querySelector(".ce-custom-select");
-        const trigger = selDiv.querySelector(".ce-select-trigger");
-        const optionsDiv = selDiv.querySelector(".ce-options");
+        let availableMethods = [];
+        const allCards = myMethods;
         
-        trigger.onclick = (e) => {
-            e.stopPropagation();
-            document.querySelectorAll(".ce-options").forEach(el => {
-                if (el !== optionsDiv) el.style.display = "none";
-            });
-            optionsDiv.style.display = optionsDiv.style.display === "none" ? "block" : "none";
-        };
-        
-        selDiv.querySelectorAll(".ce-option").forEach(opt => {
-            opt.onmouseenter = () => opt.style.background = "#f8fafc";
-            opt.onmouseleave = () => opt.style.background = "#fff";
-            
-            opt.onclick = (e) => {
-                e.stopPropagation();
-                const newId = opt.getAttribute("data-value");
-                const newMethod = myMethods.find(x => x._id === newId);
-                if (isSender) {
-                    senderCard = newMethod;
-                    if (senderCard.cardName === "Visa" && receiverCard.cardName === "Visa") receiverCard = nonVisaCards[0];
-                    if (senderCard.cardName !== "Visa" && receiverCard.cardName !== "Visa") receiverCard = visaCards[0];
-                } else {
-                    receiverCard = newMethod;
-                    if (receiverCard.cardName === "Visa" && senderCard.cardName === "Visa") senderCard = nonVisaCards[0];
-                    if (receiverCard.cardName !== "Visa" && senderCard.cardName !== "Visa") senderCard = visaCards[0];
+        if (activeSelection === 'sender') {
+            if (receiverCard && isVisa(receiverCard)) availableMethods = nonVisaCards;
+            else if (receiverCard && !isVisa(receiverCard)) availableMethods = visaCards;
+            else availableMethods = allCards;
+        } else {
+            if (senderCard && isVisa(senderCard)) availableMethods = nonVisaCards;
+            else if (senderCard && !isVisa(senderCard)) availableMethods = visaCards;
+            else availableMethods = allCards;
+        }
+
+        if (availableMethods.length === 0) {
+            listEl.innerHTML = `
+                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; padding-top:40px; color:#ef4444; text-align:center;">
+                    <div style="width:48px; height:48px; border-radius:50%; background:#fef2f2; display:flex; align-items:center; justify-content:center; margin-bottom:12px;">
+                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </div>
+                    <span style="font-size:14px; font-weight:600; line-height:1.4;">Boshqa mos karta topilmadi.<br/>Valyuta almashtirish faqat Visa va Local (Uzcard/Humo) kartalar o'rtasida bo'lishi kerak.</span>
+                </div>
+            `;
+            return;
+        }
+
+        listEl.innerHTML = availableMethods.map(m => {
+            const mIsVisa = isVisa(m);
+            const isBlocked = blockedCardIds.has(m._id) || m.isBlocked === true;
+            return `
+            <div class="ce-option-card ${isBlocked ? 'blocked-option-card' : ''}" data-id="${m._id}" style="padding:16px; border-radius:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; transition:0.2s; background:#fff; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.05)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)'">
+                <div style="display:flex; align-items:center; gap:12px; pointer-events:none;">
+                    <div style="width:40px; height:40px; border-radius:12px; background:#f1f5f9; display:flex; align-items:center; justify-content:center;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-credit-card-icon lucide-credit-card"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:2px;">
+                        <div style="font-weight:600; font-size:15px; color:#0f172a; letter-spacing:-0.2px;">${m.cardName || (m.bank === "Woorkroom Bank" ? "Bank Hisobi" : m.bank) || t("bank")} ${m.number ? "•••• " + m.number.slice(-4) : ""}</div>
+                        <div style="font-size:13px; color:#64748b; font-weight:500;">${m.balance.toLocaleString('en-US').replace(/,/g, ' ')} ${mIsVisa ? "USD" : "UZS"}</div>
+                    </div>
+                </div>
+                ${isBlocked ? `
+                <div class="card-freeze-indicator">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-snowflake"><path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/></svg>
+                </div>
+                <div class="freeze-hover-overlay">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-snowflake"><path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/></svg>
+                  <span style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-top:2px;">${t("card_frozen_label")}</span>
+                </div>
+                ` : ''}
+            </div>
+        `}).join("");
+
+        listEl.querySelectorAll(".ce-option-card").forEach(el => {
+            el.onclick = () => {
+                const selId = el.getAttribute("data-id");
+                const isBlocked = blockedCardIds.has(selId) || (myMethods.find(x => x._id === selId)?.isBlocked === true);
+                if (isBlocked) {
+                    showToast(t("frozen_card_click_error"), "error");
+                    return;
                 }
-                optionsDiv.style.display = "none";
-                updateCardSelects();
+                const selMethod = myMethods.find(x => x._id === selId);
+                if (activeSelection === 'sender') {
+                    senderCard = selMethod;
+                    if (isVisa(senderCard) && receiverCard && isVisa(receiverCard)) receiverCard = null;
+                    if (!isVisa(senderCard) && receiverCard && !isVisa(receiverCard)) receiverCard = null;
+                    activeSelection = receiverCard ? null : 'receiver';
+                } else {
+                    receiverCard = selMethod;
+                    if (isVisa(receiverCard) && senderCard && isVisa(senderCard)) senderCard = null;
+                    if (!isVisa(receiverCard) && senderCard && !isVisa(senderCard)) senderCard = null;
+                    activeSelection = senderCard ? null : 'sender';
+                }
+                updateUI();
                 updateCalculations();
             };
         });
     };
 
-    const updateCardSelects = () => {
-        renderCardSelect("ce-sender-card-container", senderCard, true);
-        renderCardSelect("ce-receiver-card-container", receiverCard, false);
-        $("ce-currency-send").textContent = senderCard.cardName === "Visa" ? "USD" : "UZS";
-        $("ce-currency-receive").textContent = receiverCard.cardName === "Visa" ? "USD" : "UZS";
+    const updateUI = () => {
+        renderBox("ce-sender-box", senderCard, activeSelection === 'sender');
+        renderBox("ce-receiver-box", receiverCard, activeSelection === 'receiver');
+        renderRightList();
+        
+        if (senderCard) {
+            $("ce-currency-send").textContent = isVisa(senderCard) ? "USD" : "UZS";
+        }
+        if (receiverCard) {
+            $("ce-currency-receive").textContent = isVisa(receiverCard) ? "USD" : "UZS";
+        }
     };
 
     const updateCalculations = () => {
@@ -3042,7 +3681,7 @@ const openCurrencyExchangeModal = () => {
         let result = 0;
         const rate = exchangeRates.USD || 12800; // default if not loaded
         
-        if (senderCard.cardName === "Visa") {
+        if (senderCard && isVisa(senderCard)) {
             // USD to UZS
             result = val * rate;
         } else {
@@ -3050,7 +3689,7 @@ const openCurrencyExchangeModal = () => {
             result = val / rate;
         }
         
-        if (receiverCard.cardName === "Visa") {
+        if (receiverCard && isVisa(receiverCard)) {
             $("ce-amount-receive").value = result > 0 ? result.toFixed(2) : "0";
         } else {
             $("ce-amount-receive").value = result > 0 ? Math.floor(result).toLocaleString('en-US').replace(/,/g, ' ') : "0";
@@ -3059,18 +3698,29 @@ const openCurrencyExchangeModal = () => {
         $("ce-rate-display").textContent = `1 USD = ${rate.toLocaleString('en-US').replace(/,/g, ' ')} UZS`;
     };
 
+    $("ce-sender-box").onclick = () => {
+        activeSelection = 'sender';
+        updateUI();
+    };
+
+    $("ce-receiver-box").onclick = () => {
+        activeSelection = 'receiver';
+        updateUI();
+    };
+
     $("ce-swap-btn").onclick = () => {
         const temp = senderCard;
         senderCard = receiverCard;
         receiverCard = temp;
-        updateCardSelects();
+        activeSelection = null;
+        updateUI();
         updateCalculations();
     };
 
     $("ce-amount-send").oninput = (e) => {
         let val = e.target.value.replace(/[^\d.]/g, "");
         if (val.split('.').length > 2) val = val.replace(/\.+$/, "");
-        if (senderCard.cardName !== "Visa") {
+        if (senderCard && !isVisa(senderCard)) {
             val = val.replace(/\./g, ""); // No decimals for UZS
         }
         e.target.value = val.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -3085,6 +3735,16 @@ const openCurrencyExchangeModal = () => {
 
     const confirmBtn = $("ce-confirm");
     confirmBtn.onclick = async () => {
+        if (!senderCard || !receiverCard) {
+            $("ce-error").textContent = "Iltimos, yuboruvchi va qabul qiluvchi kartalarni tanlang";
+            $("ce-error").style.display = "block";
+            return;
+        }
+        if (senderCard.isBlocked || receiverCard.isBlocked || blockedCardIds.has(senderCard._id) || blockedCardIds.has(receiverCard._id)) {
+            $("ce-error").textContent = t("frozen_card_click_error");
+            $("ce-error").style.display = "block";
+            return;
+        }
         const raw = $("ce-amount-send").value.replace(/[\s,]/g, "");
         const amount = parseFloat(raw);
         if (!amount || amount <= 0) {
@@ -3106,6 +3766,7 @@ const openCurrencyExchangeModal = () => {
 
         try {
             const currentUserId = getCurrent().userId || getCurrent()._id;
+            const rate = exchangeRates.USD || 12800;
             const res = await fetch(`${API_URL}/api/payments/send/new`, {
                 method: "POST",
                 headers: {
@@ -3118,7 +3779,8 @@ const openCurrencyExchangeModal = () => {
                     receiverMethodId: receiverCard._id,
                     amount: amount,
                     description: "Valyuta almashtirish",
-                    receiverId: currentUserId
+                    receiverId: currentUserId,
+                    exchangeRate: rate
                 })
             });
 
@@ -3143,10 +3805,9 @@ const openCurrencyExchangeModal = () => {
             confirmBtn.style.opacity = "1";
         }
     };
-
-    updateCardSelects();
+    updateUI();
     $("ce-amount-send").value = "";
-    $("ce-amount-receive").value = "";
+    $("ce-amount-receive").value = "0";
     $("ce-error").style.display = "none";
     updateCalculations();
     
@@ -3155,7 +3816,6 @@ const openCurrencyExchangeModal = () => {
 
 // ── BARCHA KARTALAR FUNCTIONS ──
 let selectedInspectorCardId = null;
-let blockedCardIds = new Set();
 
 const renderAllCards = () => {
   const grid = $("all-cards-grid-container");
@@ -3184,9 +3844,9 @@ const renderAllCards = () => {
   if (!filtered.length) {
     cardsHtml = `
       <div style="grid-column: 1 / -1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 60px 20px; color:#8892a4; text-align:center;">
-        <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="margin-bottom:8px;"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-        <p style="font-weight:600; margin:0 0 4px; font-size:14px; color:#1a1d2e;">Kartalar topilmadi</p>
-        <p style="font-size:12px; margin:0;">Kiritilgan filtrlar bo'yicha hech qanday karta topilmadi.</p>
+        <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="margin-bottom:8px;"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="2" y1="10" x2="23" y2="10"></line></svg>
+        <p style="font-weight:600; margin:0 0 4px; font-size:14px; color:#1a1d2e;">${t("cards_not_found")}</p>
+        <p style="font-size:12px; margin:0;">${t("no_cards_by_filters")}</p>
       </div>
     `;
     const isSelectedFiltered = filtered.some(m => m._id === selectedInspectorCardId);
@@ -3210,7 +3870,7 @@ const renderAllCards = () => {
 
       const isActive = selectedInspectorCardId === m._id ? " active-card" : "";
       const isBlocked = blockedCardIds.has(m._id);
-      const defaultBadge = m.isDefault ? `<span class="card-default-badge">Asosiy</span>` : "";
+      const defaultBadge = m.isDefault ? `<span class="card-default-badge">${t("default_label")}</span>` : "";
 
       return `
         <div class="all-cards-item${isActive}" data-id="${m._id}">
@@ -3326,7 +3986,7 @@ const showCardInspector = (card) => {
       ${isBlocked ? `
         <div style="position:absolute; inset:0; background:rgba(15, 23, 42, 0.7); backdrop-filter:blur(3px); display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; gap:8px; z-index:2;">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-snowflake-icon lucide-snowflake"><path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/></svg>
-          <span style="font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Karta muzlatilgan</span>
+          <span style="font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">${t("card_frozen_label")}</span>
         </div>
       ` : ""}
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -3343,7 +4003,7 @@ const showCardInspector = (card) => {
       </div>
       <div style="display:flex;justify-content:space-between;align-items:flex-end">
         <div style="text-align:left">
-          <p style="font-size:9px;opacity:.55;margin:0;text-transform:uppercase;letter-spacing:.5px">BALANCE</p>
+          <p style="font-size:9px;opacity:.55;margin:0;text-transform:uppercase;letter-spacing:.5px">${t("balance")}</p>
           <p style="font-size:18px;font-weight:700;margin:4px 0 0">${fmt(card.balance, card.cardName === "Visa")}</p>
         </div>
         <button class="biz-card-settings-btn" id="inspector-settings-btn" style="background:transparent;border:none;color:inherit;cursor:pointer;opacity:0.8;transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
@@ -3355,8 +4015,8 @@ const showCardInspector = (card) => {
     <!-- Switch lock card -->
     <div class="switch-container">
       <div class="switch-label-wrap">
-        <span class="switch-title">Kartani muzlatish</span>
-        <span class="switch-desc">${isBlocked ? "Karta muzlatilgan, tranzaksiyalar to'xtatildi" : "Kartani vaqtincha muzlatib qo'yish"}</span>
+        <span class="switch-title">${t("freeze_card")}</span>
+        <span class="switch-desc">${isBlocked ? t("frozen_card_desc") : t("freeze_card_desc")}</span>
       </div>
       <label class="switch-element">
         <input type="checkbox" id="inspector-lock-switch" ${isBlocked ? "checked" : ""}>
@@ -3367,20 +4027,20 @@ const showCardInspector = (card) => {
     <!-- Metadata Details -->
     <div style="background:#fff; padding:16px; border-radius:14px; border:1px solid #f0f2fa; display:flex; flex-direction:column;">
       <div class="inspector-detail-row">
-        <span class="inspector-detail-label">Karta nomi</span>
-        <span class="inspector-detail-value">${card.cardName || 'Bilinmagan'}</span>
+        <span class="inspector-detail-label">${t("card_name")}</span>
+        <span class="inspector-detail-value">${card.cardName || '—'}</span>
       </div>
       <div class="inspector-detail-row">
-        <span class="inspector-detail-label">Karta turi</span>
-        <span class="inspector-detail-value" style="text-transform:uppercase;">${card.type === 'card' ? 'Karta' : 'Bank hisobi'}</span>
+        <span class="inspector-detail-label">${t("col_type")}</span>
+        <span class="inspector-detail-value" style="text-transform:uppercase;">${card.type === 'card' ? t("card_type") : t("bank_type")}</span>
       </div>
       <div class="inspector-detail-row">
-        <span class="inspector-detail-label">Karta egasi</span>
+        <span class="inspector-detail-label">${t("holder")}</span>
         <span class="inspector-detail-value">${card.holder || '—'}</span>
       </div>
       ${card.expiry ? `
       <div class="inspector-detail-row">
-        <span class="inspector-detail-label">Amal qilish muddati</span>
+        <span class="inspector-detail-label">${t("expiry_date")}</span>
         <span class="inspector-detail-value">${card.expiry}</span>
       </div>` : ""}
       ${card.cardName === 'Visa' ? `
@@ -3391,14 +4051,14 @@ const showCardInspector = (card) => {
           <button id="inspector-toggle-cvv" style="background:transparent; border:none; color:inherit; opacity:0.7; cursor:pointer; display:flex; align-items:center; padding:0;">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
-          <button id="inspector-copy-cvv" style="background:#f1f3fa; border:none; border-radius:4px; padding:3px 6px; font-size:10px; font-weight:700; cursor:pointer; color:#5a6279;">Nusxalash</button>
+          <button id="inspector-copy-cvv" style="background:#f1f3fa; border:none; border-radius:4px; padding:3px 6px; font-size:10px; font-weight:700; cursor:pointer; color:#5a6279;">${t("copy")}</button>
         </span>
       </div>` : ""}
       <div class="inspector-detail-row" style="border-bottom:none; padding-bottom:0;">
-        <span class="inspector-detail-label">To'liq raqam</span>
+        <span class="inspector-detail-label">${t("full_number")}</span>
         <span class="inspector-detail-value" style="display:flex; align-items:center; gap:8px;">
           <span id="inspector-full-num" style="font-family:monospace; font-size:12px;">${fullNumSpaced}</span>
-          <button id="inspector-copy-num" style="background:#f1f3fa; border:none; border-radius:4px; padding:3px 6px; font-size:10px; font-weight:700; cursor:pointer; color:#5a6279;">Nusxalash</button>
+          <button id="inspector-copy-num" style="background:#f1f3fa; border:none; border-radius:4px; padding:3px 6px; font-size:10px; font-weight:700; cursor:pointer; color:#5a6279;">${t("copy")}</button>
         </span>
       </div>
     </div>
@@ -3408,37 +4068,60 @@ const showCardInspector = (card) => {
       ${!card.isDefault ? `
         <button class="inspector-action-btn inspector-action-secondary" id="inspector-set-default-btn">
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>
-          Asosiy hisob sifatida sozlash
+          ${t("set_as_default_btn")}
         </button>
       ` : `
         <div style="display:flex; align-items:center; justify-content:center; gap:6px; color:#10b981; font-weight:700; font-size:12px; background:#e6f9f0; padding:10px; border-radius:12px;">
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
-          Ushbu hisobingiz asosiy hisob qilingan
+          ${t("default_card_set_message")}
         </div>
       `}
       
       ${!card.isDefault ? `
         <button class="inspector-action-btn inspector-action-danger" id="inspector-delete-btn">
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-          Kartani o'chirish
+          ${t("delete_card")}
         </button>
       ` : ""}
     </div>
 
     <!-- Recent Transactions For This Card -->
     <div style="display:flex; flex-direction:column; gap:8px;">
-      <h4 style="font-size:13px; font-weight:700; color:#1a1d2e; margin:10px 0 2px;">So'nggi to'lovlar</h4>
+      <h4 style="font-size:13px; font-weight:700; color:#1a1d2e; margin:10px 0 2px;">${t("recent_transactions")}</h4>
       <div style="display:flex; flex-direction:column; gap:8px;">
         ${cardTx.length ? cardTx.map(tx => {
           const isPending = tx.status === "waiting";
           const me = getCurrent();
           const userId = me?.userId || me?._id;
-          const isSent = tx.senderId === userId;
+          let isSent = tx.senderId === userId;
           const isInternal = tx.senderId === userId && tx.receiverId === userId;
           
+          let displayAmount = tx.amount;
+          let isVisa = card.cardName === "Visa";
+          
+          if (isInternal) {
+             const sId = typeof tx.senderMethodId === 'object' && tx.senderMethodId ? tx.senderMethodId._id : tx.senderMethodId;
+             const rId = typeof tx.receiverMethodId === 'object' && tx.receiverMethodId ? tx.receiverMethodId._id : tx.receiverMethodId;
+             if (card._id === rId) {
+                isSent = false;
+                const isExchange = (tx.description === "Valyuta almashtirish" || tx.description === "Currency Exchange" || tx.description === "Обмен валюты");
+                if (isExchange) {
+                    const rate = exchangeRates.USD || 12800;
+                    const sMeth = getMethodInfo(tx.senderMethodId, sId, true);
+                    const sIsVisa = sMeth && sMeth.cardName === "Visa";
+                    if (sIsVisa && !isVisa) displayAmount = tx.amount * rate;
+                    else if (!sIsVisa && isVisa) displayAmount = tx.amount / rate;
+                }
+             }
+          }
+          
           let title = isSent ? `Yuborildi: ${tx.receiverName || "User"}` : `Qabul qilindi: ${tx.senderName || "User"}`;
-          if (isInternal) title = "O'z hisobiga o'tkazma";
-          if (tx.receiverId === "system_tour") title = tx.description || "Tur xaridi";
+          if (isInternal) {
+              title = (tx.description === "Valyuta almashtirish" || tx.description === "Currency Exchange" || tx.description === "Обмен валюты") 
+                  ? t("currency_exchange") 
+                  : t("internal_transfer");
+          }
+          if (tx.receiverId === "system_tour") title = tx.description || t("tour_purchase");
           
           const badgeClass = tx.status === "paid" ? "biz-status-success" : (isPending ? "biz-status-pending" : "biz-status-failed");
           const d = new Date(tx.createdAt);
@@ -3458,10 +4141,10 @@ const showCardInspector = (card) => {
                   <p style="margin:2px 0 0; font-size:10px; color:#8892a4;">${date} • <span class="biz-status-badge ${badgeClass}" style="padding:1px 4px; font-size:8px;">${tx.status}</span></p>
                 </div>
               </div>
-              <span style="font-size:12px; font-weight:700; color:${amtColor}; flex-shrink:0;">${amtSign} ${tx.amount.toLocaleString()} UZS</span>
+              <span style="font-size:12px; font-weight:700; color:${amtColor}; flex-shrink:0;">${amtSign} ${fmt(displayAmount, tx.currency === "USD" || isVisa)}</span>
             </div>
           `;
-        }).join("") : `<p style="font-size:11px; color:#8892a4; text-align:center; padding:12px; background:#fff; border-radius:12px; border:1px dashed #cbd5e1; margin:0;">Ushbu karta orqali hali to'lov qilinmagan.</p>`}
+        }).join("") : `<p style="font-size:11px; color:#8892a4; text-align:center; padding:12px; background:#fff; border-radius:12px; border:1px dashed #cbd5e1; margin:0;">${t("no_recent_transactions")}</p>`}
       </div>
     </div>
   `;
@@ -3519,16 +4202,39 @@ const showCardInspector = (card) => {
   };
 
   // Lock/unlock toggle
-  $("inspector-lock-switch").onchange = (e) => {
-    if (e.target.checked) {
-      blockedCardIds.add(card._id);
-      showToast("Karta bloklandi!", "warning");
-    } else {
-      blockedCardIds.delete(card._id);
-      showToast("Karta faollashtirildi!", "success");
+  $("inspector-lock-switch").onchange = async (e) => {
+    const isBlocked = e.target.checked;
+    try {
+      const res = await fetch(`${API_URL}/api/payments/methods/${card._id}/block`, {
+        method: "PATCH",
+        headers: {
+            ...getAuthHeaders(),
+            "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify({ isBlocked })
+      });
+      if (!res.ok) {
+        throw new Error("Server xatoligi");
+      }
+      const updatedCard = await res.json();
+      if (isBlocked) {
+        blockedCardIds.add(card._id);
+        showToast("Karta bloklandi!", "warning");
+      } else {
+        blockedCardIds.delete(card._id);
+        showToast("Karta faollashtirildi!", "success");
+      }
+      card.isBlocked = isBlocked;
+      const idx = myMethods.findIndex(m => m._id === card._id);
+      if (idx !== -1) myMethods[idx].isBlocked = isBlocked;
+    } catch (err) {
+      showToast("Karta holatini yangilashda xatolik: " + err.message, "error");
+      e.target.checked = !isBlocked;
     }
     // Re-render
     renderAllCards();
+    renderAccounts();
   };
 
   // Set default

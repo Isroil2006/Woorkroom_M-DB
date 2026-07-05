@@ -11,6 +11,21 @@ const pusher = new Pusher({
   useTLS: true,
 });
 
+const nodemailer = require("nodemailer");
+
+// OTPs store: userId -> { otp: "1234", expiresAt: Date }
+const otps = new Map();
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
+  port: process.env.SMTP_PORT || 587,
+  secure: process.env.SMTP_PORT == 465, // 465 porti uchun true bo'lishi kerak
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+
 // ─── PAYMENT METHODS ──────────────────────────────────────────
 
 // 1. Joriy foydalanuvchi ning barcha hisoblarini olish
@@ -143,12 +158,92 @@ exports.createTransaction = async (req, res) => {
   }
 };
 
+// 5.5. OTP (Email) yuborish
+exports.sendOtp = async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const user = await User.findOne({ $or: [{ userId }, { _id: userId }] });
+    if (!user || !user.email) {
+      return res.status(400).json({ message: "Foydalanuvchi yoki uning pochtasi topilmadi." });
+    }
+
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    otps.set(userId.toString(), {
+      otp,
+      expiresAt: Date.now() + 5 * 60 * 1000 // 5 daqiqa amal qiladi
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER || "noreply@woorkroom.com",
+      to: user.email,
+      subject: "To'lovni tasdiqlash kodi - Woorkroom",
+      html: `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; padding: 40px 20px; color: #1f2937;">
+          <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);">
+            <div style="background-color: #4F46E5; padding: 30px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700; letter-spacing: 1px;">WOORKROOM</h1>
+            </div>
+            <div style="padding: 40px 30px;">
+              <h2 style="margin-top: 0; color: #111827; font-size: 22px; text-align: center;">To'lovni tasdiqlash</h2>
+              <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">Hurmatli <strong>${user.username}</strong>,</p>
+              <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">Siz tizimimiz orqali to'lovni amalga oshirmoqdasiz. Jarayonni yakunlash uchun quyidagi maxfiy kodni kiriting:</p>
+              
+              <div style="text-align: center; margin: 35px 0;">
+                <span style="display: inline-block; font-size: 36px; font-weight: 800; color: #4F46E5; background-color: #EEF2FF; padding: 15px 40px; border-radius: 8px; letter-spacing: 8px; border: 1px solid #C7D2FE;">${otp}</span>
+              </div>
+            </div>
+            <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #9ca3af; font-size: 13px; margin: 0;">© 2026 Woorkroom. Barcha huquqlar himoyalangan.</p>
+              <p style="color: #9ca3af; font-size: 12px; margin: 5px 0 0 0;">Ushbu xat avtomatik tarzda yuborildi, unga javob qaytarmang.</p>
+            </div>
+          </div>
+        </div>
+      `
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      const atIndex = user.email.indexOf("@");
+      const namePart = user.email.substring(0, atIndex);
+      const maskedName = namePart.length > 3 ? namePart.substring(0, 4) + "***" : namePart + "***";
+      const maskedEmail = maskedName + user.email.substring(atIndex);
+      if (error) {
+         console.error("Nodemailer xatosi (Email ketmadi):", error);
+         console.log("TEST UCHUN OTP KODI:", otp); // Dev muhit uchun
+         return res.status(200).json({ message: "Pochta xatosi, ammo test uchun kod server terminaliga chiqdi.", email: maskedEmail });
+      }
+      res.status(200).json({ message: "Kod pochtangizga yuborildi.", email: maskedEmail });
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Kod yuborishda xatolik", error: error.message });
+  }
+};
+
 // 6. To'lovni amalga oshirish (SMS tasdiqlashdan keyin)
 exports.executeTransaction = async (req, res) => {
   try {
     const senderId = req.user.userId || req.user.id;
     const { transactionId } = req.params;
-    const { senderMethodId, receiverMethodId, amount, description, receiverId } = req.body;
+    const { senderMethodId, receiverMethodId, amount, description, receiverId, otp } = req.body;
+
+    // --- OTP VERIFICATION ---
+    const isSelfTransfer = receiverId && (receiverId.toString() === senderId.toString());
+    
+    if (!isSelfTransfer) {
+        const storedOtpObj = otps.get(senderId.toString());
+        if (!storedOtpObj) {
+          return res.status(400).json({ message: "Tasdiqlash kodi so'ralmagan yoki muddati o'tgan" });
+        }
+        if (Date.now() > storedOtpObj.expiresAt) {
+          otps.delete(senderId.toString());
+          return res.status(400).json({ message: "Kodning muddati o'tgan, qaytadan so'rang" });
+        }
+        if (storedOtpObj.otp !== otp) {
+          return res.status(400).json({ message: "Kiritilgan kod xato" });
+        }
+        // OTP to'g'ri bo'lsa uni o'chiramiz
+        otps.delete(senderId.toString());
+    }
+    // ------------------------
 
     let transaction;
     if (transactionId === "new") {
@@ -184,9 +279,11 @@ exports.executeTransaction = async (req, res) => {
     const senderMethod = await PaymentMethod.findById(senderMethodId);
     if (!senderMethod) return res.status(404).json({ message: "Jo'natuvchi hisob topilmadi" });
     if (senderMethod.userId !== senderId) return res.status(403).json({ message: "Bu sizning hisobingiz emas" });
+    if (senderMethod.isBlocked) return res.status(400).json({ message: "Muzlatilgan kartadan o'tkazma amalga oshirib bo'lmaydi" });
 
     const receiverMethod = await PaymentMethod.findById(receiverMethodId);
     if (!receiverMethod) return res.status(404).json({ message: "Qabul qiluvchi hisob topilmadi" });
+    if (receiverMethod.isBlocked) return res.status(400).json({ message: "Muzlatilgan kartaga o'tkazma amalga oshirib bo'lmaydi" });
 
     const txAmount = amount || transaction.amount;
     if (!txAmount || txAmount <= 0) {
@@ -196,15 +293,36 @@ exports.executeTransaction = async (req, res) => {
       return res.status(400).json({ message: "Balans yetarli emas" });
     }
 
-    // Balanslarni yangilash
+    // Balanslarni yangilash (Valyuta konvertatsiyasi bilan)
+    const isVisa = (c) => c && c.type === 'card' && (
+        (c.cardName && c.cardName.toLowerCase().includes('visa')) || 
+        (c.number && c.number.startsWith('4'))
+    );
+    
+    const senderIsVisa = isVisa(senderMethod);
+    const receiverIsVisa = isVisa(receiverMethod);
+    
+    let addedAmount = txAmount;
+    if (senderIsVisa !== receiverIsVisa) {
+      const rate = Number(req.body.exchangeRate) || 12800;
+      if (senderIsVisa) {
+        // USD to UZS
+        addedAmount = txAmount * rate;
+      } else {
+        // UZS to USD
+        addedAmount = txAmount / rate;
+      }
+    }
+
     senderMethod.balance -= txAmount;
-    receiverMethod.balance += txAmount;
+    receiverMethod.balance += addedAmount;
     await senderMethod.save();
     await receiverMethod.save();
 
     // Tranzaksiyani yangilash
     transaction.status = "paid";
     transaction.amount = txAmount;
+    transaction.currency = senderIsVisa ? "USD" : "UZS";
     transaction.description = description || transaction.description;
     transaction.senderMethodId = senderMethodId;
     transaction.receiverMethodId = receiverMethodId;
@@ -325,5 +443,30 @@ exports.getPaymentUsers = async (req, res) => {
     res.status(200).json(enriched);
   } catch (error) {
     res.status(500).json({ message: "Foydalanuvchilarni olishda xatolik", error: error.message });
+  }
+};
+
+exports.toggleBlockMethod = async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const { id } = req.params;
+    const { isBlocked } = req.body;
+
+    const method = await PaymentMethod.findById(id);
+    if (!method) return res.status(404).json({ message: "Hisob topilmadi" });
+    if (method.userId !== userId) return res.status(403).json({ message: "Ruxsat yo'q" });
+
+    method.isBlocked = isBlocked === true;
+    await method.save();
+
+    try {
+      await pusher.trigger(`user-${userId}`, "method-updated", { method });
+    } catch (err) {
+      console.error("Pusher error:", err);
+    }
+
+    res.status(200).json(method);
+  } catch (error) {
+    res.status(500).json({ message: "Hisob holatini o'zgartirishda xatolik", error: error.message });
   }
 };

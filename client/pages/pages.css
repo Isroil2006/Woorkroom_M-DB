@@ -8,9 +8,11 @@
 /* employees  */
 @import url(./Employees/employees.css);
 @import url(./Employees/permisson.css);
+@import url(./Employees/employees_responsive.css);
 
 /* business  */
 @import url(./Business/business.css);
+@import url(./Business/payment_responsive.css);
 @import url(./Business/analytics.css);
 
 /* todo  */

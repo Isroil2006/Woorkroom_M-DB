@@ -175,11 +175,17 @@ export async function userProfileRender() {
                         </div>
                         <div class="up-form-group">
                             <label>${t("gender")}</label>
-                            <select class="up-input up-select input" id="up-gender" disabled>
-                                <option value="" disabled ${!user.gender ? "selected" : ""}>${t("select_gender")}</option>
-                                <option value="Male"   ${user.gender === "Male" ? "selected" : ""}>${t("male")}</option>
-                                <option value="Female" ${user.gender === "Female" ? "selected" : ""}>${t("female")}</option>
-                            </select>
+                            <div class="custom-gender-select" id="up-gender-select">
+                                <div class="selected-gender disabled" id="selected-gender-val">
+                                    <span id="selected-gender-text">${user.gender ? (user.gender === "Male" ? t("male") : t("female")) : t("select_gender")}</span>
+                                    <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                </div>
+                                <div class="gender-options" id="up-gender-options">
+                                    <div class="gender-option ${user.gender === "Male" ? "active" : ""}" data-value="Male">${t("male")}</div>
+                                    <div class="gender-option ${user.gender === "Female" ? "active" : ""}" data-value="Female">${t("female")}</div>
+                                </div>
+                            </div>
+                            <input type="hidden" id="up-gender" class="up-input" value="${user.gender || ""}" />
                         </div>
                         <div class="up-form-group">
                             <label>${t("age")}</label>
@@ -219,6 +225,57 @@ export async function userProfileRender() {
 
   let originalValues = {};
 
+  // Initialize custom dropdown
+  initCustomGenderSelect();
+
+  function initCustomGenderSelect() {
+    const selectEl = document.getElementById("up-gender-select");
+    if (!selectEl) return;
+    const selected = selectEl.querySelector(".selected-gender");
+    const options = selectEl.querySelector(".gender-options");
+    const items = selectEl.querySelectorAll(".gender-option");
+    const hiddenInput = document.getElementById("up-gender");
+
+    selected.onclick = (e) => {
+      e.stopPropagation();
+      if (selected.classList.contains("disabled")) return;
+      const isOpen = options.classList.contains("active");
+      options.classList.toggle("active", !isOpen);
+      const chevron = selected.querySelector(".chevron");
+      if (chevron) chevron.style.transform = !isOpen ? "rotate(180deg)" : "rotate(0deg)";
+    };
+
+    items.forEach((item) => {
+      item.onclick = (e) => {
+        e.stopPropagation();
+        const val = item.dataset.value;
+        hiddenInput.value = val;
+        
+        // Update selected text
+        const textEl = document.getElementById("selected-gender-text");
+        if (textEl) textEl.textContent = item.textContent;
+
+        items.forEach((i) => i.classList.remove("active"));
+        item.classList.add("active");
+
+        options.classList.remove("active");
+        const chevron = selected.querySelector(".chevron");
+        if (chevron) chevron.style.transform = "rotate(0deg)";
+
+        hiddenInput.dispatchEvent(new Event("change"));
+      };
+    });
+
+    // Close dropdown on click outside
+    document.addEventListener("click", (e) => {
+      if (!selectEl.contains(e.target)) {
+        options.classList.remove("active");
+        const chevron = selected.querySelector(".chevron");
+        if (chevron) chevron.style.transform = "rotate(0deg)";
+      }
+    });
+  }
+
   // ── Edit ─────────────────────────────────────────────
   editBtn.onclick = () => {
     allInputs.forEach((inp) => {
@@ -228,6 +285,9 @@ export async function userProfileRender() {
     const pwdInput = document.getElementById("up-password");
     pwdInput.placeholder = t("new_password");
     document.getElementById("up-pwd-label").innerText = t("change_password");
+
+    const selGenderVal = document.getElementById("selected-gender-val");
+    if (selGenderVal) selGenderVal.classList.remove("disabled");
 
     saveBtn.classList.remove("hidden");
     cancelBtn.classList.remove("hidden");
@@ -244,6 +304,20 @@ export async function userProfileRender() {
     pwdInput.value = "";
     pwdInput.placeholder = "********";
     document.getElementById("up-pwd-label").innerText = t("password");
+
+    const selGenderVal = document.getElementById("selected-gender-val");
+    if (selGenderVal) {
+      selGenderVal.classList.add("disabled");
+      const genderVal = originalValues["up-gender"] || "";
+      const textEl = document.getElementById("selected-gender-text");
+      if (textEl) {
+        textEl.textContent = genderVal === "Male" ? t("male") : genderVal === "Female" ? t("female") : t("select_gender");
+      }
+      const items = document.querySelectorAll("#up-gender-select .gender-option");
+      items.forEach((item) => {
+        item.classList.toggle("active", item.dataset.value === genderVal);
+      });
+    }
 
     saveBtn.classList.add("hidden");
     cancelBtn.classList.add("hidden");
@@ -283,6 +357,8 @@ export async function userProfileRender() {
         saveBtn.textContent = t("saved");
         saveBtn.classList.add("up-saved");
         allInputs.forEach((inp) => (inp.disabled = true));
+        const selGenderVal = document.getElementById("selected-gender-val");
+        if (selGenderVal) selGenderVal.classList.add("disabled");
 
         setTimeout(() => {
           saveBtn.classList.remove("up-saved");

@@ -13,6 +13,7 @@ const paymentMethodSchema = new mongoose.Schema(
     cvv: { type: String, default: "" },
     balance: { type: Number, default: 0 },
     isDefault: { type: Boolean, default: false },
+    isBlocked: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

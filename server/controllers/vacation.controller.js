@@ -322,15 +322,36 @@ exports.bookVacation = async (req, res) => {
       return res.status(404).json({ success: false, message: "Vacation not found" });
     }
 
+    let paidAmount = null;
+    let paidCurrency = "UZS";
+
     if (paymentMethodId) {
       const pm = await PaymentMethod.findById(paymentMethodId);
       if (!pm) {
         return res.status(404).json({ success: false, message: "To'lov usuli topilmadi" });
       }
-      if (pm.balance < totalCost) {
+      if (pm.isBlocked) {
+        return res.status(400).json({ success: false, message: "Muzlatilgan kartadan to'lov qilib bo'lmaydi" });
+      }
+
+      // Check card type to determine if it is a Visa (USD) card or a local UZS card/account
+      const isVisa = pm.type === "card" && (
+        (pm.cardName || "").toLowerCase() === "visa" ||
+        (pm.cardName || "").toLowerCase() === "mastercard" ||
+        (pm.cardName || "").toLowerCase() === "unionpay" ||
+        (pm.number || "").toString().startsWith("4") ||
+        (pm.number || "").toString().startsWith("5")
+      );
+
+      const rate = Number(req.body.exchangeRate) || 12800;
+      const requiredAmount = isVisa ? totalCost : (totalCost * rate);
+      paidAmount = requiredAmount;
+      paidCurrency = isVisa ? "USD" : "UZS";
+
+      if (pm.balance < requiredAmount) {
         return res.status(400).json({ success: false, message: "Balans yetarli emas" });
       }
-      pm.balance -= totalCost;
+      pm.balance -= requiredAmount;
       await pm.save();
 
       const user = await User.findOne({ $or: [{ userId }, { _id: userId }] });
@@ -341,7 +362,8 @@ exports.bookVacation = async (req, res) => {
         receiverId: "system_tour",
         receiverName: "Workroom Agency",
         senderMethodId: paymentMethodId,
-        amount: totalCost,
+        amount: requiredAmount,
+        currency: paidCurrency,
         description: `Tur xaridi: ${vacation.name.uz || vacation.name} (${guests} kishi)`,
         status: "paid",
         paidAt: new Date()
@@ -354,6 +376,8 @@ exports.bookVacation = async (req, res) => {
       vacationId,
       guests,
       totalCost,
+      paidAmount,
+      paidCurrency,
       paymentMethod,
       paymentMethodId,
       selectedDate,
@@ -425,30 +449,35 @@ exports.rejectBooking = async (req, res) => {
     booking.status = "cancelled";
     await booking.save();
 
-    // Refund logic
+    // Refund logic — use paidAmount (actual deducted) not totalCost (USD reference price)
     if (booking.paymentMethodId) {
       const pm = await PaymentMethod.findById(booking.paymentMethodId);
       if (pm) {
-        pm.balance += booking.totalCost;
-        await pm.save();
-      }
-      
-      const userId = booking.userId;
-      const user = await User.findOne({ $or: [{ userId }, { _id: userId }] });
+        // Use saved paidAmount if available, otherwise fall back to totalCost
+        const refundAmount = (booking.paidAmount != null) ? booking.paidAmount : booking.totalCost;
+        const refundCurrency = booking.paidCurrency || "UZS";
 
-      // Create refund transaction
-      const tx = new Transaction({
-        senderId: "system_tour",
-        senderName: "Workroom Agency",
-        receiverId: user ? (user.userId || user._id) : userId,
-        receiverName: user ? user.username : "Unknown",
-        receiverMethodId: booking.paymentMethodId,
-        amount: booking.totalCost,
-        description: `Sayohat rad etildi, to'lov qaytarildi: ${booking.vacationId.name.uz || booking.vacationId.name || "Noma'lum tur"}`,
-        status: "paid",
-        paidAt: new Date()
-      });
-      await tx.save();
+        pm.balance += refundAmount;
+        await pm.save();
+        
+        const userId = booking.userId;
+        const user = await User.findOne({ $or: [{ userId }, { _id: userId }] });
+
+        // Create refund transaction with correct amount and currency
+        const tx = new Transaction({
+          senderId: "system_tour",
+          senderName: "Workroom Agency",
+          receiverId: user ? (user.userId || user._id) : userId,
+          receiverName: user ? user.username : "Unknown",
+          receiverMethodId: booking.paymentMethodId,
+          amount: refundAmount,
+          currency: refundCurrency,
+          description: `Sayohat rad etildi, to'lov qaytarildi: ${booking.vacationId.name.uz || booking.vacationId.name || "Noma'lum tur"}`,
+          status: "paid",
+          paidAt: new Date()
+        });
+        await tx.save();
+      }
     }
 
     res.json({ success: true, message: "Booking rejected and refunded successfully" });

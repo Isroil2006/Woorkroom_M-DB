@@ -11,6 +11,15 @@ const t = createTranslationHelper(vacTranslations);
 let toursData = [];
 const getTours = () => toursData;
 
+const isVisaCard = (c) => {
+    if (!c) return false;
+    const name = (c.cardName || "").toLowerCase();
+    const num = (c.number || "").toString().replace(/\s+/g, "");
+    if (num.startsWith("8600") || num.startsWith("9860")) return false;
+    if (name.includes("uzcard") || name.includes("humo")) return false;
+    return name === "visa" || name === "mastercard" || name === "unionpay" || num.startsWith("4") || num.startsWith("5");
+};
+
 let vacExchangeRates = { UZS: 1, USD: 12800, RUB: 130 };
 const vacFetchRates = async () => {
     try {
@@ -47,7 +56,14 @@ const ml = (field, lang) => {
 };
 
 // ─── PAGE EXPORT ──────────────────────────────
-export const VacationsPage = `<div class="vac-wrap" id="vac-root"></div>`;
+export const VacationsPage = `<div class="vac-wrap" id="vac-root">
+    <div id="vac-page-loader" style="display: flex; justify-content: center; align-items: center; height: calc(100vh - 120px); width: 100%;">
+        <svg class="vac-spinner" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#5b6ef5" stroke-width="3">
+            <circle cx="12" cy="12" r="10" stroke="rgba(91,110,245,0.2)"></circle>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke="#5b6ef5"></path>
+        </svg>
+    </div>
+</div>`;
 
 // ─── STATE ────────────────────────────────────
 let vacSearch = "";
@@ -488,7 +504,7 @@ const renderBookingDetail = () => {
                         <div class="vac-premium-hotel-right">
                             <div class="vac-premium-rooms-title">
                                 <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                Tanlangan xona
+                                ${tr.selected_room || 'Tanlangan xona'}
                             </div>
                             <div class="vac-premium-rooms-list" style="margin-top:12px;">
                                 <div class="vac-premium-room-card" style="border-color:#5b6ef5; background:#f5f7ff;">
@@ -514,20 +530,20 @@ const renderBookingDetail = () => {
             <div class="vac-detail-hotels-section">
                 <div class="vac-detail-section-title" style="font-size:18px; font-weight:700; color:#1e293b; margin-bottom:16px; display:flex; align-items:center; gap:10px;">
                     <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M3 21V7a2 2 0 012-2h6V3a2 2 0 012-2h0a2 2 0 012 2v2h6a2 2 0 012 2v14" stroke="#5b6ef5" stroke-width="2" stroke-linecap="round"/><path d="M3 21h18M9 21v-4a2 2 0 012-2h2a2 2 0 012 2v4" stroke="#5b6ef5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 9h2M7 13h2M15 9h2M15 13h2" stroke="#5b6ef5" stroke-width="2" stroke-linecap="round"/></svg>
-                    Tanlangan mehmonxona va xona
+                    ${tr.selected_hotel_and_room || 'Tanlangan mehmonxona va xona'}
                 </div>
                 <div class="vac-bd-hotel-room-cards">
                     <div class="vac-bd-hotel-card">
                         <div class="vac-bd-hotel-card-info">
-                            <div class="vac-bd-hotel-card-label">🏨 Mehmonxona</div>
+                            <div class="vac-bd-hotel-card-label">🏨 ${tr.bd_hotel || 'Mehmonxona'}</div>
                             <div class="vac-bd-hotel-card-name">${esc(b.hotelName)}</div>
                         </div>
                     </div>
                     ${b.roomName ? `
                     <div class="vac-bd-hotel-card">
                         <div class="vac-bd-hotel-card-info">
-                            <div class="vac-bd-hotel-card-label">🛏️ Xona</div>
-                            <div class="vac-bd-hotel-card-name">${esc(b.roomName)}${b.beds ? ` (${b.beds} yotoqli)` : ''}</div>
+                            <div class="vac-bd-hotel-card-label">🛏️ ${tr.bd_room || 'Xona'}</div>
+                            <div class="vac-bd-hotel-card-name">${esc(b.roomName)}${b.beds ? ` (${b.beds} ${tr.room_beds || 'yotoqli'})` : ''}</div>
                         </div>
                     </div>` : ''}
                 </div>
@@ -539,7 +555,7 @@ const renderBookingDetail = () => {
     <div class="vac-detail-page" id="vac-booking-detail-page">
         <button class="vac-back-btn" id="vac-booking-detail-back">
             <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-            Orqaga
+            ${tr.back || 'Orqaga'}
         </button>
 
         <div class="vac-gallery-wrap">
@@ -584,22 +600,22 @@ const renderBookingDetail = () => {
                         <div class="vac-bd-info-row">
                             <span class="vac-bd-info-label">
                                 <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                                Muddat
+                                ${tr.bd_duration || 'Muddat'}
                             </span>
                             <span class="vac-bd-info-val">${startDate} - ${endDate}</span>
                         </div>
                         <div class="vac-bd-info-row">
                             <span class="vac-bd-info-label">
                                 <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/></svg>
-                                Mehmonlar
+                                ${tr.bd_guests || 'Mehmonlar'}
                             </span>
-                            <span class="vac-bd-info-val">${b.guests} kishi</span>
+                            <span class="vac-bd-info-val">${b.guests} ${tr.person_count_lbl || 'kishi'}</span>
                         </div>
                         ${b.hotelName ? `
                         <div class="vac-bd-info-row">
                             <span class="vac-bd-info-label">
                                 <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M3 21V7a2 2 0 012-2h6V3a2 2 0 012-2h0a2 2 0 012 2v2h6a2 2 0 012 2v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                                Mehmonxona
+                                ${tr.bd_hotel || 'Mehmonxona'}
                             </span>
                             <span class="vac-bd-info-val">${esc(b.hotelName)}</span>
                         </div>` : ''}
@@ -607,20 +623,20 @@ const renderBookingDetail = () => {
                         <div class="vac-bd-info-row">
                             <span class="vac-bd-info-label">
                                 <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                Xona
+                                ${tr.bd_room || 'Xona'}
                             </span>
                             <span class="vac-bd-info-val">${esc(b.roomName)}</span>
                         </div>` : ''}
                         <div class="vac-bd-info-row">
                             <span class="vac-bd-info-label">
                                 <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                                Davomiylik
+                                ${tr.bd_period || 'Davomiylik'}
                             </span>
                             <span class="vac-bd-info-val">${tour.days} ${tr.days} / ${tour.nights} ${tr.nights}</span>
                         </div>
                     </div>
                     <div class="vac-bd-total-section">
-                        <span class="vac-bd-total-label">Jami narx</span>
+                        <span class="vac-bd-total-label">${tr.bd_total || 'Jami narx'}</span>
                         <span class="vac-bd-total-val">$${Number(b.totalCost).toLocaleString()}</span>
                     </div>
                 </div>
@@ -1588,7 +1604,7 @@ const getBookModalHTML = () => {
                     </div>
 
                     <div class="vac-book-actions" style="margin-top:auto; display:flex; justify-content:flex-end;">
-                        <button class="vac-btn-primary" id="vac-book-next-1" style="width: 100%; max-width: 280px; padding: 16px; font-size: 16px; border-radius: 12px;">${tr.next_step || 'Keyingi qadam'} &rarr;</button>
+                        <button class="vac-btn-primary" id="vac-book-next-1" style="width: auto; min-width: 160px; padding: 16px 32px; font-size: 16px; border-radius: 12px; transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap;">${tr.next_step || 'Keyingi qadam'}</button>
                     </div>
                 </div>
             </div>
@@ -1596,7 +1612,7 @@ const getBookModalHTML = () => {
     }
     else if (bookStep === 2) {
         baseHtml += `
-            <div class="vac-book-section">
+            <div class="vac-book-section" style="flex: 1; display: flex; flex-direction: column;">
                 <label class="vac-book-label" style="font-size:16px; margin-bottom:16px; display:flex; align-items:center; gap:8px;">
                     <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M3 21V7a2 2 0 012-2h6V3a2 2 0 012-2h0a2 2 0 012 2v2h6a2 2 0 012 2v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3 21h18M9 21v-4a2 2 0 012-2h2a2 2 0 012 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     ${tr.select_hotel || 'Mehmonxona va Xonani tanlang'}
@@ -1675,9 +1691,9 @@ const getBookModalHTML = () => {
                 </div>
             </div>
 
-            <div class="vac-book-actions" style="margin-top:32px; display:flex; justify-content:flex-end; gap: 16px;">
-                <button class="vac-btn-secondary" id="vac-book-prev-2" style="padding: 12px 24px;">${tr.prev_step || 'Orqaga'}</button>
-                <button class="vac-btn-primary" id="vac-book-next-2" ${!bookSelectedRoomId ? 'disabled' : ''} style="padding: 12px 24px;">${tr.next_step || 'Keyingi qadam'}</button>
+            <div class="vac-book-actions" style="margin-top:auto; display:flex; justify-content:flex-end; gap: 16px;">
+                <button class="vac-btn-secondary" id="vac-book-prev-2" style="padding: 16px 32px; border-radius: 12px; font-size: 16px;">${tr.prev_step || 'Orqaga'}</button>
+                <button class="vac-btn-primary" id="vac-book-next-2" style="width: auto; min-width: 160px; padding: 16px 32px; font-size: 16px; border-radius: 12px; transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap;">${tr.next_step || 'Keyingi qadam'}</button>
             </div>
         `;
     }
@@ -1718,7 +1734,12 @@ const getBookModalHTML = () => {
                     <label class="vac-book-label" style="font-size: 17px;">${tr.book_select_payment}</label>
                     <div class="vac-book-methods">
                         ${methods.length ? methods.map((m, i) => {
-                            const isEnough = Number(m.balance) >= totalCostUzs;
+                            const isVisa = isVisaCard(m);
+                            const requiredAmount = isVisa ? totalCost : totalCostUzs;
+                            const isEnough = Number(m.balance || 0) >= requiredAmount;
+                            const balanceString = isVisa ? 
+                                `$${Number(m.balance || 0).toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2})}` : 
+                                `${Number(m.balance || 0).toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2})} UZS`;
                             return `
                             <label class="vac-book-method-item ${bookSelectedMethodIdx === i ? 'active' : ''} ${!isEnough ? 'disabled' : ''}" style="transition: all 0.3s ease;">
                                 <input type="radio" name="b-method" value="${i}" ${bookSelectedMethodIdx === i ? 'checked' : ''} ${!isEnough ? 'disabled' : ''} class="vac-book-method-radio"/>
@@ -1726,7 +1747,7 @@ const getBookModalHTML = () => {
                                     <div class="vac-book-method-top">
                                         <span class="vac-book-method-name" style="font-size:16px; font-weight:600;">${m.cardName || m.type} <span style="color:#64748b; font-weight:500;">${m.displayNumber || m.number}</span></span>
                                         <div style="text-align: right;">
-                                            <div class="vac-book-method-bal ${!isEnough ? 'error' : ''}" style="font-size: 16px; font-weight: 700;">${fmtUzs(m.balance)}</div>
+                                            <div class="vac-book-method-bal ${!isEnough ? 'error' : ''}" style="font-size: 16px; font-weight: 700;">${balanceString}</div>
                                             ${!isEnough ? `<div style="font-size:11px; color:#ef4444; margin-top:2px; font-weight:600;">Mablag' yetarli emas</div>` : ''}
                                         </div>
                                     </div>
@@ -3185,9 +3206,19 @@ const attachBookModalEvents = () => {
             });
         });
 
-        $v("vac-book-next-1")?.addEventListener("click", () => {
+        $v("vac-book-next-1")?.addEventListener("click", (e) => {
             if ((t.dates && t.dates.length > 0) && bookSelectedDateIdx === null) {
-                alert("Iltimos, borish sanasini tanlang");
+                const btn = e.target;
+                const origHtml = btn.innerHTML;
+                const origBg = btn.style.background;
+                const vacLang = typeof getCurrentLang === 'function' ? getCurrentLang() : 'uz';
+                const tr = vacTranslations[vacLang] || vacTranslations.uz;
+                btn.innerHTML = tr.select_date_error || "Sana tanlanmadi";
+                btn.style.background = "#ef4444";
+                setTimeout(() => {
+                    btn.innerHTML = origHtml;
+                    btn.style.background = origBg;
+                }, 2000);
                 return;
             }
             if (t.hotels && t.hotels.length > 0) {
@@ -3231,9 +3262,33 @@ const attachBookModalEvents = () => {
             bookStep = 1;
             updateBookModalUI();
         });
-        $v("vac-book-next-2")?.addEventListener("click", () => {
+        $v("vac-book-next-2")?.addEventListener("click", (e) => {
+            if (!bookSelectedHotelId) {
+                const btn = e.target;
+                const origHtml = btn.innerHTML;
+                const origBg = btn.style.background;
+                const vacLang = typeof getCurrentLang === 'function' ? getCurrentLang() : 'uz';
+                const tr = vacTranslations[vacLang] || vacTranslations.uz;
+                btn.innerHTML = tr.select_hotel_error || "Mehmonxona tanlanmadi";
+                btn.style.background = "#ef4444";
+                setTimeout(() => {
+                    btn.innerHTML = origHtml;
+                    btn.style.background = origBg;
+                }, 2000);
+                return;
+            }
             if (!bookSelectedRoomId) {
-                alert(tr.select_room_msg || "Iltimos, xona tanlang");
+                const btn = e.target;
+                const origHtml = btn.innerHTML;
+                const origBg = btn.style.background;
+                const vacLang = typeof getCurrentLang === 'function' ? getCurrentLang() : 'uz';
+                const tr = vacTranslations[vacLang] || vacTranslations.uz;
+                btn.innerHTML = tr.select_room_error || "Xona tanlanmadi";
+                btn.style.background = "#ef4444";
+                setTimeout(() => {
+                    btn.innerHTML = origHtml;
+                    btn.style.background = origBg;
+                }, 2000);
                 return;
             }
             bookStep = 3;
@@ -3272,13 +3327,33 @@ const processTourPayment = async () => {
     if (bookSelectedRoomPrice) {
         totalCost += Number(bookSelectedRoomPrice);
     }
+    const totalCostUzs = totalCost * vacExchangeRates.USD;
+
+    const btn = document.getElementById("vac-book-confirm");
+    if (btn && btn.classList.contains("loading")) return;
 
     try {
         const method = myCards[bookSelectedMethodIdx];
         if (!method) return;
 
-        if (Number(method.balance) < totalCost) {
-            const btn = document.getElementById("vac-book-confirm");
+        if (method.isBlocked === true) {
+            if (btn) {
+                const oldHtml = btn.innerHTML;
+                const oldBg = btn.style.backgroundColor;
+                btn.style.backgroundColor = "#ef4444";
+                btn.textContent = "Muzlatilgan kartadan to'lov qilib bo'lmaydi";
+                setTimeout(() => {
+                    btn.style.backgroundColor = oldBg;
+                    btn.innerHTML = oldHtml;
+                }, 2000);
+            }
+            return;
+        }
+
+        const isVisa = isVisaCard(method);
+        const requiredAmount = isVisa ? totalCost : totalCostUzs;
+
+        if (Number(method.balance || 0) < requiredAmount) {
             if (btn) {
                 const oldHtml = btn.innerHTML;
                 const oldBg = btn.style.backgroundColor;
@@ -3292,12 +3367,17 @@ const processTourPayment = async () => {
             return;
         }
 
+        if (btn) {
+            btn.classList.add("loading");
+            btn.disabled = true;
+            btn.innerHTML = `<svg class="vac-spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="margin-right: 8px;"><circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.2)"></circle><path d="M12 2a10 10 0 0 1 10 10" stroke="#fff"></path></svg> ${tr.processing || "To'lanmoqda..."}`;
+        }
+
         let selectedDateObj = null;
         if (t.dates && t.dates[bookSelectedDateIdx]) {
             selectedDateObj = t.dates[bookSelectedDateIdx];
         }
 
-        // Prepare hotel data
         let hotelName = '';
         let roomName = '';
         if (bookSelectedHotelId && t.hotels) {
@@ -3311,7 +3391,6 @@ const processTourPayment = async () => {
             }
         }
 
-        // Save booking to backend API
         try {
             const res = await fetch(`${API_URL}/api/vacations/${t.id}/book`, {
                 method: "POST",
@@ -3320,6 +3399,7 @@ const processTourPayment = async () => {
                 body: JSON.stringify({
                     guests: bookGuests,
                     totalCost,
+                    exchangeRate: vacExchangeRates.USD,
                     paymentMethod: { type: method.type, number: method.number || method.displayNumber },
                     paymentMethodId: method._id,
                     selectedDate: selectedDateObj,
@@ -3339,9 +3419,15 @@ const processTourPayment = async () => {
         } catch (e) {
             console.error("Booking API error:", e);
             return;
+        } finally {
+            if (btn) {
+                btn.classList.remove("loading");
+                btn.disabled = false;
+                btn.innerHTML = tr.book_pay;
+            }
         }
 
-        bookStep = 4; // Success step
+        bookStep = 4;
         updateBookModalUI();
         fetchMyBookings();
         fetchAdminBookings();
@@ -3944,9 +4030,15 @@ const autosave = () => saveUiState();
 
 // ─── INIT ─────────────────────────────────────
 export const initVacationsLogic = async () => {
-    await fetchToursAPI();
-    await fetchMyBookings();
-    await fetchAdminBookings();
+    try {
+        await Promise.all([
+            fetchToursAPI(),
+            fetchMyBookings(),
+            fetchAdminBookings()
+        ]);
+    } catch (e) {
+        console.error("Failed to load vacations data", e);
+    }
     const cu = getCurrentUser();
     const vacLang = getCurrentLang();
     // Restore UI state from before refresh

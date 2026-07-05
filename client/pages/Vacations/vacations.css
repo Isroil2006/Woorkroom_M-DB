@@ -1757,6 +1757,14 @@
     cursor: not-allowed;
 }
 
+.vac-book-confirm-btn.loading {
+    opacity: 0.8 !important;
+    pointer-events: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
 .vac-book-login-btn {
     margin-top: 20px;
 }
@@ -2869,6 +2877,37 @@
 }
 .vac-book-method-item.disabled { opacity: 0.5; pointer-events: none; cursor: not-allowed; filter: grayscale(1); }
 
+/* --- DISABLED DATE CARD --- */
+.vac-book-date-card.disabled {
+    border-color: #ef4444;
+    cursor: default;
+    background: #fff;
+}
+.vac-book-date-card.disabled .vac-book-date-range {
+    color: #ef4444;
+    font-weight: 600;
+}
+.vac-book-date-card.disabled .vac-book-date-ended {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #ef4444;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 10;
+}
+.vac-book-date-card.disabled:hover .vac-book-date-ended {
+    opacity: 1;
+}
+
 /* ─── MAIN TABS STYLE ─── */
 .vac-main-tabs {
     display: inline-flex;
@@ -3504,6 +3543,13 @@
 .vac-pagination-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+@keyframes vac-spin {
+    100% { transform: rotate(360deg); }
+}
+.vac-spinner {
+    animation: vac-spin 1s linear infinite;
 }
 .vac-pagination-pages {
     display: flex;

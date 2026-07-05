@@ -6,32 +6,44 @@ import { translations } from "../Employees/translations.js";
 import { getCurrentLang, createTranslationHelper } from "../../assets/js/i18n.js";
 
 const t = createTranslationHelper(translations);
+import { initEmployeesResponsive } from "./employees_responsive.js";
 
 export const EmployeesPage = () => `
     <div class="employees-page">
         <div class="employees-header">
-            <h2 id="employee-count-title">${t("employees")} (0)</h2>
+            <h2 id="employee-count-title">${t("employees")}</h2>
             <div class="employees-header-right">
-                <div class="rows-per-page-container" id="rows-per-page-container">
-                    <button class="rows-selector-btn" id="rows-selector-btn">
-                        <span>${t("show")}: <span id="current-rows-val">10</span></span>
-                        <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                    </button>
-                    <div class="rows-dropdown" id="rows-dropdown">
-                        <div class="rows-option active" data-val="10">10</div>
-                        <div class="rows-option" data-val="15">15</div>
-                        <div class="rows-option" data-val="20">20</div>
-                        <div class="rows-option" data-val="25">25</div>
-                        <div class="rows-option" data-val="30">30</div>
-                    </div>
+                <div class="emp-count-badge" id="emp-count-badge" title="Total Employees">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span id="emp-badge-count">0</span>
                 </div>
                 <button class="btn add-employee-btn">${t("add_employees")}</button>
             </div>
         </div>
         <div id="employees-list"></div>
-        <div class="pagination" id="pagination"></div>
+        <div class="employees-footer">
+            <div class="rows-per-page-container" id="rows-per-page-container">
+                <button class="rows-selector-btn" id="rows-selector-btn">
+                    <span>${t("show")}: <span id="current-rows-val">10</span></span>
+                    <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </button>
+                <div class="emp-rows-dropdown" id="emp-rows-dropdown">
+                    <div class="emp-rows-option active" data-val="10">10</div>
+                    <div class="emp-rows-option" data-val="15">15</div>
+                    <div class="emp-rows-option" data-val="20">20</div>
+                    <div class="emp-rows-option" data-val="25">25</div>
+                    <div class="emp-rows-option" data-val="30">30</div>
+                </div>
+            </div>
+            <div class="pagination" id="pagination"></div>
+        </div>
     </div>
 
     <div class="modal" id="employeeModal" style="display:none;">
@@ -74,11 +86,19 @@ export const EmployeesPage = () => `
                         </div>
                         <div class="form-group">
                             <label>${t("gender")}</label>
-                            <select id="emp-gender">
-                                <option value="" disabled selected>${t("select_gander")}</option>
-                                <option value="Male">${t("male")}</option>
-                                <option value="Female">${t("famale")}</option>
-                            </select>
+                            <div class="custom-gender-select" id="emp-gender-select">
+                                <div class="selected-gender" id="selected-gender-val">
+                                    <span id="selected-gender-text">${t("select_gander")}</span>
+                                    <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="gender-options" id="gender-options">
+                                    <div class="gender-option" data-value="Male">${t("male")}</div>
+                                    <div class="gender-option" data-value="Female">${t("famale")}</div>
+                                </div>
+                            </div>
+                            <input type="hidden" id="emp-gender" value="" />
                         </div>
                         <div class="form-group">
                             <label>${t("age")}</label>
@@ -195,7 +215,9 @@ export function initEmployeesPage() {
     const myPerms = cu ? await getPermissions(cu.userId || cu._id) : null;
 
     list.innerHTML = "";
-    employeeCountTitle.innerText = `${t("employees")} (${users.length})`;
+    employeeCountTitle.innerText = t("employees");
+    const empBadgeCount = document.getElementById("emp-badge-count");
+    if (empBadgeCount) empBadgeCount.innerText = users.length;
 
     const start = (currentPageNum - 1) * ITEMS_PER_PAGE;
     const pageUsers = users.slice(start, start + ITEMS_PER_PAGE);
@@ -236,6 +258,12 @@ export function initEmployeesPage() {
                     <div class="name-email-box">
                         <span class="username">${u.username || "—"}</span>
                         <span class="useremail">${u.email || "—"}</span>
+                    </div>
+
+                    <div class="emp-chevron-wrap">
+                        <svg class="emp-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
                     </div>
                 </div>
                 <div class="user-main-info">
@@ -289,7 +317,6 @@ export function initEmployeesPage() {
   function renderPagination(total) {
     pagination.innerHTML = "";
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE) || 1;
-    if (totalPages <= 1) return;
 
     // Previous button
     const prevBtn = document.createElement("button");
@@ -352,6 +379,23 @@ export function initEmployeesPage() {
   }
 
   function attachEvents() {
+    // Accordion toggle on mobile
+    document.querySelectorAll(".employee-card").forEach((card) => {
+      const box = card.querySelector(".employee-box");
+      if (box) {
+        box.onclick = () => {
+          if (window.innerWidth <= 992) {
+            const isExpanded = card.classList.contains("expanded");
+            // Close other cards for accordion behavior
+            document.querySelectorAll(".employee-card").forEach((c) => {
+              if (c !== card) c.classList.remove("expanded");
+            });
+            card.classList.toggle("expanded", !isExpanded);
+          }
+        };
+      }
+    });
+
     document.querySelectorAll(".emp-action-btn--edit").forEach((btn) => {
       btn.onclick = () => openEdit(parseInt(btn.dataset.idx));
     });
@@ -423,7 +467,10 @@ export function initEmployeesPage() {
       passwordInput.placeholder = t("new_password");
       document.getElementById("pwd-label").innerText = t("password_hint");
       telInput.value = u.tel || "";
-      genderInput.value = u.gender || "";
+      
+      initCustomGenderSelect();
+      setCustomGenderValue(u.gender || "");
+      bindGenderChangeHandler(genderInput);
       ageInput.value = u.age || "";
       positionInput.value = u.position || "";
       levelInput.value = u.level || "";
@@ -595,7 +642,9 @@ export function initEmployeesPage() {
     const levelInput = document.getElementById("emp-level");
 
     [usernameInput, emailInput, passwordInput, telInput, ageInput, positionInput, levelInput].forEach((i) => (i.value = ""));
-    genderInput.value = "";
+    initCustomGenderSelect();
+    setCustomGenderValue("");
+    bindGenderChangeHandler(genderInput);
 
     currentImage = "./assets/images/User-avatar.png";
     modalAvatarImg.src = currentImage;
@@ -677,16 +726,16 @@ export function initEmployeesPage() {
 
   // ── Rows Per Page Dropdown Logic ──
   const rowsSelectorBtn = document.getElementById("rows-selector-btn");
-  const rowsDropdown = document.getElementById("rows-dropdown");
+  const rowsDropdown = document.getElementById("emp-rows-dropdown");
   const currentRowsVal = document.getElementById("current-rows-val");
-  const rowsOptions = document.querySelectorAll(".rows-option");
+  const rowsOptions = document.querySelectorAll(".emp-rows-option");
 
   rowsSelectorBtn.onclick = (e) => {
     e.stopPropagation();
-    const isOpen = rowsDropdown.style.display === "flex";
-    rowsDropdown.style.display = isOpen ? "none" : "flex";
+    rowsDropdown.classList.toggle("active");
+    const isOpen = rowsDropdown.classList.contains("active");
     const chevron = rowsSelectorBtn.querySelector(".chevron");
-    if (chevron) chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
+    if (chevron) chevron.style.transform = isOpen ? "rotate(180deg)" : "rotate(0deg)";
   };
 
   rowsOptions.forEach((opt) => {
@@ -698,7 +747,7 @@ export function initEmployeesPage() {
       rowsOptions.forEach((o) => o.classList.remove("active"));
       opt.classList.add("active");
 
-      rowsDropdown.style.display = "none";
+      rowsDropdown.classList.remove("active");
       const chevron = rowsSelectorBtn.querySelector(".chevron");
       if (chevron) chevron.style.transform = "rotate(0deg)";
 
@@ -707,17 +756,103 @@ export function initEmployeesPage() {
     };
   });
 
+  function bindGenderChangeHandler(input) {
+    if (!input) return;
+    input.onchange = () => {
+      const g = input.value;
+      if (!currentImage.startsWith("data:image")) {
+        currentImage = g === "Male" ? "/assets/images/user-avatar-male.png" : g === "Female" ? "/assets/images/user-avatar-female.png" : "/assets/images/User-avatar.png";
+        modalAvatarImg.src = currentImage;
+      }
+    };
+  }
+
+  function initCustomGenderSelect() {
+    const selectEl = document.getElementById("emp-gender-select");
+    if (!selectEl) return;
+    const selected = selectEl.querySelector(".selected-gender");
+    const options = selectEl.querySelector(".gender-options");
+    const items = selectEl.querySelectorAll(".gender-option");
+    const hiddenInput = document.getElementById("emp-gender");
+
+    selected.onclick = (e) => {
+      e.stopPropagation();
+      const isOpen = options.classList.contains("active");
+      options.classList.toggle("active", !isOpen);
+      const chevron = selected.querySelector(".chevron");
+      if (chevron) chevron.style.transform = !isOpen ? "rotate(180deg)" : "rotate(0deg)";
+    };
+
+    items.forEach((item) => {
+      item.onclick = (e) => {
+        e.stopPropagation();
+        const val = item.dataset.value;
+        hiddenInput.value = val;
+        
+        // Update selected text
+        const textEl = document.getElementById("selected-gender-text");
+        if (textEl) textEl.textContent = item.textContent;
+
+        items.forEach((i) => i.classList.remove("active"));
+        item.classList.add("active");
+
+        options.classList.remove("active");
+        const chevron = selected.querySelector(".chevron");
+        if (chevron) chevron.style.transform = "rotate(0deg)";
+
+        hiddenInput.dispatchEvent(new Event("change"));
+      };
+    });
+  }
+
+  function setCustomGenderValue(val) {
+    const hiddenInput = document.getElementById("emp-gender");
+    if (hiddenInput) hiddenInput.value = val;
+
+    const selectEl = document.getElementById("emp-gender-select");
+    if (!selectEl) return;
+
+    const items = selectEl.querySelectorAll(".gender-option");
+    const textEl = document.getElementById("selected-gender-text");
+
+    let text = t("select_gander");
+    items.forEach((item) => {
+      if (item.dataset.value === val) {
+        item.classList.add("active");
+        text = item.textContent;
+      } else {
+        item.classList.remove("active");
+      }
+    });
+
+    if (textEl) textEl.textContent = text;
+  }
+
   window.onclick = (e) => {
     if (e.target === modal) modal.style.display = "none";
     if (e.target === deleteModal) deleteModal.style.display = "none";
 
     // Close rows dropdown if clicked outside
-    if (!rowsSelectorBtn.contains(e.target) && !rowsDropdown.contains(e.target)) {
-      rowsDropdown.style.display = "none";
+    if (rowsSelectorBtn && rowsDropdown && !rowsSelectorBtn.contains(e.target) && !rowsDropdown.contains(e.target)) {
+      rowsDropdown.classList.remove("active");
       const chevron = rowsSelectorBtn.querySelector(".chevron");
+      if (chevron) chevron.style.transform = "rotate(0deg)";
+    }
+
+    // Close custom gender dropdown if clicked outside
+    const genderSelect = document.getElementById("emp-gender-select");
+    const genderOptions = document.getElementById("gender-options");
+    if (genderSelect && genderOptions && !genderSelect.contains(e.target) && !genderOptions.contains(e.target)) {
+      genderOptions.classList.remove("active");
+      const chevron = genderSelect.querySelector(".chevron");
       if (chevron) chevron.style.transform = "rotate(0deg)";
     }
   };
 
+  // Initial bindings
+  initCustomGenderSelect();
+  bindGenderChangeHandler(genderInput);
+
   renderEmployees();
+  initEmployeesResponsive();
 }

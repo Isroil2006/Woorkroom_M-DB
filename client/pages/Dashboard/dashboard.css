@@ -164,7 +164,6 @@
     border: 1px solid #e2e8f0;
     border-radius: 12px;
     padding: 20px;
-    margin-bottom: 25px;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
@@ -584,10 +583,11 @@
 }
 
 .s-card {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: #f1f5f9;
+    border: 1px solid #d2d5da !important;
     border-radius: 12px;
     padding: 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
 .s-card h3 {
@@ -601,6 +601,27 @@
     font-weight: 600;
     font-size: 14px;
     color: #475569;
+}
+
+.s-card label.s-toggle-box {
+    margin-bottom: 0;
+    font-weight: normal;
+    font-size: unset;
+    color: unset;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+    gap: 12px;
+}
+
+.s-card label.s-toggle-box:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
 }
 
 .s-input {

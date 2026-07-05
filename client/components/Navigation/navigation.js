@@ -61,10 +61,9 @@ const attachHoverEvents = () => {
   navigationWrapper.addEventListener("mouseleave", () => {
     clearTimeout(hoverTimer);
     isCollapsed = true;
-    isLocked = false; // Reset lock when leaving
+    isLocked = false;
     updateSidebarUI();
 
-    // Auto-close profile dropdown when leaving navigation
     const dropdown = document.querySelector(".profile-dropdown");
     const chevron = document.querySelector(".sidebar-profile .chevron-icon");
     if (dropdown) dropdown.style.display = "none";
@@ -72,8 +71,23 @@ const attachHoverEvents = () => {
   });
 };
 
+const attachMobileEvents = () => {
+  const burger = document.getElementById("mobile-burger");
+  const overlay = document.getElementById("mobile-nav-overlay");
+  if (!burger || !overlay) return;
+
+  burger.addEventListener("click", () => {
+    navigationWrapper.classList.add("mobile-open");
+    overlay.classList.add("active");
+  });
+
+  overlay.addEventListener("click", () => {
+    navigationWrapper.classList.remove("mobile-open");
+    overlay.classList.remove("active");
+  });
+};
+
 let userAvatar = "/assets/images/User-avatar.png";
-let userName = getCurrentLang() === "uz" ? "Foydalanuvchi" : "User";
 
 export const translations = {
   uz: {
@@ -166,7 +180,7 @@ const renderNavigation = () => {
   const cu = getCurrentUser();
 
   const displayAvatar = cu?.avatar || (cu?.gender === "Male" ? "/assets/images/user-avatar-male.png" : cu?.gender === "Female" ? "/assets/images/user-avatar-female.png" : userAvatar);
-  const displayName = cu?.username || (lang === "uz" ? "Foydalanuvchi" : "User");
+  const displayName = cu?.username ? cu.username.split(" ")[0] : (lang === "uz" ? "Foydalanuvchi" : "User");
 
   navigationWrapper.innerHTML = `
     <div class="nav-header">
@@ -286,13 +300,11 @@ const renderNavigation = () => {
     </div>
     `;
 
-  // Re-attach all events
   initNavLanguage();
   attachNavClickEvents();
   attachProfileEvents();
   attachLogoEvent();
 
-  // Apply permissions to new elements
   if (cu) {
     applyPermissions(cu.userId || cu._id);
   }
@@ -347,6 +359,11 @@ const attachNavClickEvents = () => {
       isCollapsed = true;
       isLocked = true;
       updateSidebarUI();
+      
+      // Close mobile sidebar if open
+      navigationWrapper.classList.remove("mobile-open");
+      const overlay = document.getElementById("mobile-nav-overlay");
+      if (overlay) overlay.classList.remove("active");
 
       const cu = getCurrentUser();
       if (cu) {
@@ -418,9 +435,27 @@ const attachLogoEvent = () => {
 
 let currentPageName = "";
 
+const PAGE_TITLE_MAP = {
+  Tests: "nav_tests",
+  Payments: "nav_payments",
+  Tasks: "nav_calendar",
+  Vacations: "nav_vacations",
+  Employees: "nav_employees",
+  Messenger: "nav_messenger",
+  Infoportal: "nav_infoportal",
+  SuperSettings: "nav_settings",
+  "user-profile": "nav_profile"
+};
+
 const renderPage = (pageName, force = false) => {
   const isSamePage = (currentPageName === pageName);
   currentPageName = pageName;
+
+  const titleKey = PAGE_TITLE_MAP[pageName];
+  const mobileTitleEl = document.getElementById("mobile-page-title");
+  if (mobileTitleEl) {
+    mobileTitleEl.textContent = titleKey ? t(titleKey) : pageName;
+  }
 
   // 1. Ishlab chiqilmoqda (Maintenance) tekshiruvi
   if (UNDER_CONSTRUCTION[pageName]) {
@@ -532,6 +567,7 @@ const initNavigation = async () => {
   // 0. Initialize sidebar state and events
   updateSidebarUI();
   attachHoverEvents();
+  attachMobileEvents();
 
   // 1. Foydalanuvchini yuklash
   const cu = await fetchCurrentUser();
@@ -582,7 +618,7 @@ const handleLanguageChange = () => {
   renderNavigation();
   const currentPath = window.location.pathname;
   const pageName = ROUTES[currentPath] || "NotFound";
-  renderPage(pageName, false);
+  renderPage(pageName, true);
 };
 
 document.addEventListener(LANGUAGE_CHANGED_EVENT, handleLanguageChange);

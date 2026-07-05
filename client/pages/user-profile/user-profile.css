@@ -15,7 +15,9 @@
     flex-direction: column;
     gap: 24px;
     background-color: #F0F2F8;
-    padding: 28px 32px;border-radius: 12px;
+    padding: 28px 32px 40px;
+    border-radius: 12px;
+    overflow-y: auto;
 }
 
 /* ── Header ──────────────────────────────────────────────── */
@@ -50,7 +52,7 @@
 .up-body {
     display: flex;
     gap: 24px;
-    height: 100%;
+    height: auto;
 }
 
 /* ── Generic card ────────────────────────────────────────── */
@@ -275,7 +277,7 @@
     cursor: not-allowed;
     border-color: #eef0f5;
 }
-.up-select { appearance: none; cursor: pointer; }
+.up-select { cursor: pointer; }
 .up-select:not(:disabled) { cursor: pointer; }
 
 /* Form footer */
@@ -352,7 +354,7 @@
 .up-settings-body {
     display: flex;
     gap: 24px;
-    height: 100%;
+    height: auto;
 }
 
 .up-snav {
@@ -464,3 +466,153 @@
 .up-skeleton-text { height: 16px; width: 140px; }
 .up-skeleton-title { height: 24px; width: 180px; }
 .up-skeleton-input { height: 42px; width: 100%; border-radius: 12px; }
+
+/* ── Custom Gender Select ── */
+.custom-gender-select {
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.selected-gender {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1.5px solid #e6edf5;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-main);
+    background: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+    user-select: none;
+    box-sizing: border-box;
+}
+
+.selected-gender:hover {
+    background: #fff;
+    border-color: #cbd5e1;
+}
+
+/* Focused style via active container class or js */
+.custom-gender-select:has(.gender-options.active) .selected-gender {
+    border-color: var(--primary-blue);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(91, 110, 245, 0.1);
+}
+
+.selected-gender.disabled {
+    background: #f7f9fc;
+    color: #9aa0b4;
+    cursor: not-allowed;
+    border-color: #eef0f5;
+    pointer-events: none;
+}
+
+.selected-gender .chevron {
+    color: #8892a4;
+    transition: transform 0.2s;
+}
+
+.gender-options {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 100%;
+    background: white;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 1002;
+}
+
+.gender-options.active {
+    display: flex;
+}
+
+.gender-option {
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a1d2e;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.gender-option:hover {
+    background: #f8fafc;
+    color: var(--primary-blue);
+}
+
+.gender-option.active {
+    background: #ebf3ff;
+    color: var(--primary-blue);
+}
+
+/* ── Responsive Media Queries ── */
+@media (max-width: 992px) {
+    .up-root {
+        padding: 20px 20px 40px;
+        gap: 20px;
+    }
+    .up-body {
+        flex-direction: column;
+        gap: 20px;
+    }
+    .up-aside {
+        width: 100%;
+    }
+    .up-form-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    .up-settings-body {
+        flex-direction: column;
+        gap: 20px;
+    }
+    .up-snav {
+        width: 100%;
+    }
+}
+
+@media (max-width: 576px) {
+    .up-root {
+        padding: 16px 12px 40px;
+        gap: 16px;
+    }
+    .up-header h2 {
+        font-size: 24px;
+    }
+    .up-card {
+        padding: 20px;
+    }
+    .up-info-chip {
+        padding: 12px 16px;
+    }
+    .up-form-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        height: auto;
+    }
+    .up-edit-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    .up-form-footer {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .up-save-btn,
+    .up-cancel-btn {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+}

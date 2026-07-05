@@ -40,7 +40,7 @@ const run = async () => {
         number: accountNumber,
         displayNumber: displayAccNum,
         holder: user.username,
-        bank: "Woorkroom Bank",
+        bank: "Bank Hisobi",
         balance: 10000,
         isDefault: true,
       });

@@ -64,7 +64,7 @@ exports.register = async (req, res) => {
       number: accountNumber,
       displayNumber: displayAccNum,
       holder: newUser.username,
-      bank: "Woorkroom Bank",
+      bank: "Bank Hisobi",
       balance: 10000,
       isDefault: true,
     });

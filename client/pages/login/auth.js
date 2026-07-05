@@ -1,6 +1,6 @@
 export const signInForm = `
     <form class="form-content" id="login-form">
-        <h2>Sign In to Woorkroom</h2>
+        <h2>Sign In</h2>
         <div class="input-group">
             <label for="email">Email Address</label>
             <input class="input" type="email" id="email"   placeholder="youremail@gmail.com" required>
@@ -21,32 +21,49 @@ export const signInForm = `
 `;
 
 export const signUpForm = `
-    <form class="form-content" id="register-form">
-        <h2>Create Account</h2>
+    <form class="form-content" id="register-form" style="display:flex; flex-direction:column; max-width:800px; width:100%; margin-top:-20px;" autocomplete="off">
+        <h2 style="text-align:center; margin-top:0; margin-bottom:32px;">Sign up</h2>
 
-        <div class="input-group">
-            <label for="reg-username">User name</label>
-            <input class="input" type="text" id="reg-username" placeholder="username" required>
-            <p class="error-message" id="error-reg-username"></p>
+        <div style="display:flex; gap:32px; width:100%; flex-wrap:wrap; margin-bottom:24px;">
+            <!-- Left Column -->
+            <div style="flex:1; display:flex; flex-direction:column; gap:20px; min-width:300px;">
+                <div class="input-group">
+                    <label for="reg-firstname">Ism</label>
+                    <input class="input" type="text" id="reg-firstname" autocomplete="off" placeholder="John" required>
+                    <p class="error-message" id="error-reg-firstname"></p>
+                </div>
+                <div class="input-group">
+                    <label for="reg-lastname">Familiya</label>
+                    <input class="input" type="text" id="reg-lastname" autocomplete="off" placeholder="Doe" required>
+                    <p class="error-message" id="error-reg-lastname"></p>
+                </div>
+                <div class="input-group">
+                    <label for="reg-tel">Mobile Number</label>
+                    <input class="input" type="tel" id="reg-tel" maxlength="17" autocomplete="off" placeholder="+998 90 000 00 00" required>
+                    <p class="error-message" id="error-reg-tel"></p>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div style="flex:1; display:flex; flex-direction:column; gap:20px; min-width:300px;">
+                <div class="input-group">
+                    <label for="reg-email">Email Address</label>
+                    <input class="input" type="email" id="reg-email" autocomplete="off" placeholder="email@gmail.com" required>
+                    <p class="error-message" id="error-reg-email"></p>
+                </div>
+                <div class="input-group">
+                    <label for="reg-password">Create Password</label>
+                    <input class="input" type="password" id="reg-password" autocomplete="new-password" placeholder="********" required>
+                    <p class="error-message" id="error-reg-password"></p>
+                </div>
+            </div>
         </div>
 
-        <div class="input-group">
-            <label for="reg-tel">Mobile Number</label>
-            <input class="input" type="tel" id="reg-tel" maxlength="17" placeholder="+998 99 999 99 99" required>
-            <p class="error-message" id="error-reg-tel"></p>
+        <!-- Buttons Container (Bottom Center) -->
+        <div style="display:flex; flex-direction:column; align-items:center; width:100%; margin-top:24px;">
+            <button type="button" class="signup-btn btn" style="width:240px; margin:0 auto;">Register</button>
+            <a type="button" id="switch-to-signin" class="link-btn" style="text-align:center; padding-top: 20px;">Already have an account?</a>
         </div>
-        <div class="input-group">
-            <label for="reg-email">Email Address</label>
-            <input class="input" type="email" id="reg-email" placeholder="youremail@gmail.com" required>
-            <p class="error-message" id="error-reg-email"></p>
-        </div>
-        <div class="input-group">
-            <label for="reg-password">Create Password</label>
-            <input class="input" type="password" id="reg-password" placeholder="********" required>
-            <p class="error-message" id="error-reg-password"></p>
-        </div>
-        <button type="button" class="signup-btn btn">Register</button>
-        <a type="button" id="switch-to-signin" class="link-btn">Already have an account?</a>
     </form>
 `;
 

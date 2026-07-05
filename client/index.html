@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <title>Woorkroom</title>
     <link rel="stylesheet" href="./assets/css/index.css" />
     <link rel="stylesheet" href="./assets/css/404.css" />
@@ -68,48 +68,41 @@
     </style>
     <script>
       (function() {
-        const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         const urlParams = new URLSearchParams(window.location.search);
         const receiptData = urlParams.get('receiptData');
 
-        if (isMobile || receiptData) {
+        if (receiptData) {
           document.addEventListener("DOMContentLoaded", () => {
             const overlay = document.createElement("div");
             overlay.id = "mobile-interceptor";
             overlay.className = "active";
             
-            if (receiptData) {
-              const decoded = decodeURIComponent(receiptData);
-              const lines = decoded.split('\n');
-              let html = '<div class="mobile-receipt-card">';
-              
-              let title = "Tranzaksiya Cheki";
-              if(lines.length > 0 && !lines[0].includes(':')) {
-                 title = lines[0].replace(/-/g, '').trim() || title;
-              }
-              html += '<h2>' + title + '</h2>';
-
-              lines.forEach(line => {
-                 if (line.includes(':')) {
-                    const firstColon = line.indexOf(':');
-                    const label = line.substring(0, firstColon).trim();
-                    const val = line.substring(firstColon + 1).trim();
-                    html += '<div class="mobile-receipt-row"><span class="mobile-receipt-label">' + label + '</span><span class="mobile-receipt-val">' + val + '</span></div>';
-                 }
-              });
-              html += '</div>';
-              overlay.innerHTML = html;
-            } else if (isMobile) {
-              overlay.innerHTML = '<div class="mobile-error-msg">Uzur, bu loyiha telefon uchun moslashmagan.</div><div class="mobile-error-sub">Iltimos, kompyuterdan kiring.</div>';
+            const decoded = decodeURIComponent(receiptData);
+            const lines = decoded.split('\n');
+            let html = '<div class="mobile-receipt-card">';
+            
+            let title = "Tranzaksiya Cheki";
+            if(lines.length > 0 && !lines[0].includes(':')) {
+               title = lines[0].replace(/-/g, '').trim() || title;
             }
+            html += '<h2>' + title + '</h2>';
 
-            if ((isMobile && !receiptData) || receiptData) {
-                document.body.appendChild(overlay);
-                const container = document.querySelector(".container");
-                if (container) container.style.display = "none";
-                const globalLoader = document.getElementById("global-loader");
-                if (globalLoader) globalLoader.style.display = "none";
-            }
+            lines.forEach(line => {
+               if (line.includes(':')) {
+                  const firstColon = line.indexOf(':');
+                  const label = line.substring(0, firstColon).trim();
+                  const val = line.substring(firstColon + 1).trim();
+                  html += '<div class="mobile-receipt-row"><span class="mobile-receipt-label">' + label + '</span><span class="mobile-receipt-val">' + val + '</span></div>';
+               }
+            });
+            html += '</div>';
+            overlay.innerHTML = html;
+
+            document.body.appendChild(overlay);
+            const container = document.querySelector(".container");
+            if (container) container.style.display = "none";
+            const globalLoader = document.getElementById("global-loader");
+            if (globalLoader) globalLoader.style.display = "none";
           });
         }
       })();
@@ -122,6 +115,21 @@
     </div>
 
     <div class="container">
+      <!-- MOBILE HEADER -->
+      <div class="mobile-header" id="mobile-header">
+        <div class="mobile-logo-container">
+          <span id="mobile-page-title" class="mobile-page-title"></span>
+        </div>
+        <div class="mobile-burger" id="mobile-burger">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 12H21M3 6H21M3 18H21" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+      
+      <!-- MOBILE NAV OVERLAY -->
+      <div class="mobile-nav-overlay" id="mobile-nav-overlay"></div>
+
       <div class="navigation-wrapper"></div>
       <div class="main-area">
         <!-- <div class="navbar"></div> -->

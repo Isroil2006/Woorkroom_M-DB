@@ -1,0 +1,671 @@
+/* ── MOBILE RESPONSIVE STYLES FOR PAYMENT PAGE ── */
+
+@media (max-width: 1024px) {
+    /* 1. LAYOUT & CONTAINERS */
+
+    /* The .content wrapper (from global.css) constrains height via flex:1 + min-height:0.
+       On mobile we need it to scroll so the payment page content is accessible. */
+    .content {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    .biz-welcome {
+        display: none !important;
+    }
+
+    .biz-container {
+        flex-direction: column !important;
+        height: auto !important;
+        min-height: 100% !important;
+        overflow-y: visible !important;
+        background: #f8fafc !important;
+        gap: 0 !important;
+    }
+
+    .biz-root {
+        width: 100% !important;
+        height: auto !important; /* Allow natural expansion */
+        order: 2 !important; /* Move transactions history below the card */
+        padding: 0 !important;
+        overflow: visible !important;
+        background: transparent !important;
+    }
+
+    #view-dashboard,
+    #docs-mini,
+    .biz-root .biz-card {
+        height: auto !important;
+        overflow: visible !important;
+        min-height: 0 !important;
+        flex: none !important;
+    }
+
+    .biz-dash-right {
+        width: 100% !important;
+        order: 1 !important; /* Move accounts/carousel to the very top */
+        padding: 0 !important;
+        background: transparent !important;
+    }
+
+    /* 2. HIDE UNNECESSARY HEADERS & BUTTONS */
+    .biz-dash-right .biz-card-head {
+        display: none !important; /* Hide "Mening hisoblarim" & "Qo'shish" button */
+    }
+
+    .biz-dash-right .biz-card {
+        background: transparent !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+    }
+
+    .biz-full-table-header.docs-cols {
+        display: none !important; /* Hide table headers */
+    }
+
+    .biz-root .biz-card {
+        background: transparent !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+    }
+
+    /* Show "Barchasi >" on mobile */
+    .mobile-barchasi-link {
+        display: block !important;
+        font-size: 13px !important;
+        color: #4f46e5 !important;
+        text-decoration: none !important;
+    }
+
+    /* Hide desktop barchasi buttons and filters */
+    #btn-view-all-cards,
+    #mini-create-doc-btn,
+    #mini-filters-container {
+        display: none !important;
+    }
+
+    .biz-card-head h3 {
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+    }
+
+    /* Header styling */
+    .biz-card-head {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-bottom: 12px !important;
+        padding: 0 4px !important;
+    }
+
+    /* 3. CARD CAROUSEL & BUTTONS */
+    .biz-carousel-viewport {
+        border-radius: 20px !important;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08) !important;
+    }
+
+    .biz-acc-card {
+        min-height: 180px !important;
+        padding: 24px !important;
+    }
+
+    .biz-carousel-arrow {
+        display: none !important; /* Hide carousel arrows on mobile */
+    }
+
+    #c-dots {
+        max-width: 100% !important;
+        justify-content: center !important;
+        margin: 0 auto !important;
+    }
+
+    /* Center the carousel controls wrapper */
+    #accounts-list > div:nth-child(2) {
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        margin: 16px 0 0 0 !important;
+    }
+
+    /* Buttons layout */
+    #transfer-to-self-btn {
+        background: #fff !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.03) !important;
+        color: #475569 !important;
+        padding: 14px 20px !important;
+        border-radius: 16px !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 12px !important;
+        width: 100% !important;
+        margin-top: 16px !important;
+        height: auto !important;
+        border-color: #e2e8f0 !important;
+        transition: transform 0.2s !important;
+    }
+
+    #currency-exchange-btn {
+        background: #4f46e5 !important;
+        color: #fff !important;
+        padding: 14px 20px !important;
+        border-radius: 16px !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 12px !important;
+        width: 100% !important;
+        margin-top: 10px !important;
+        border: none !important;
+        box-shadow: 0 6px 16px rgba(79, 70, 229, 0.25) !important;
+        height: auto !important;
+        transition: transform 0.2s !important;
+    }
+
+    /* 4. METRICS / STATS */
+    .biz-stats-col {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 12px !important;
+        padding: 0 !important;
+        background: transparent !important;
+        width: 100% !important;
+        margin-top: 20px !important;
+    }
+
+    .biz-stat-card {
+        background: #fff !important;
+        border-radius: 16px !important;
+        padding: 12px 14px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 6px !important;
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.02) !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        border: 1px solid #f1f5f9 !important;
+    }
+
+    .biz-stat-card .biz-stat-icon {
+        width: 32px !important;
+        height: 32px !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin-bottom: 4px !important;
+    }
+
+    .biz-stat-card .biz-stat-icon svg {
+        width: 16px !important;
+        height: 16px !important;
+    }
+
+    .biz-stat-card .biz-stat-label {
+        font-size: 10px !important;
+        color: #8892a4 !important;
+        margin: 0 !important;
+        text-transform: uppercase !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.5px !important;
+    }
+
+    .biz-stat-card .biz-stat-value {
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        color: #0f172a !important;
+        margin: 0 !important;
+    }
+
+    /* 5. TRANSACTIONS LIST CARDS */
+    #docs-mini {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+        margin-top: 8px !important;
+    }
+
+    .mini-table-row {
+        background: #fff !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.02) !important;
+        border: 1px solid #f1f5f9 !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+    }
+
+    .mini-table-row .biz-row.docs-cols {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+        height: 64px !important;
+        padding: 0 16px !important;
+        border-bottom: none !important;
+        background: transparent !important;
+        box-sizing: border-box !important;
+        cursor: pointer !important;
+    }
+
+    .mini-table-row:active {
+        transform: scale(0.98) !important;
+        transition: transform 0.1s ease !important;
+    }
+
+    /* Type container */
+    .mini-table-row .tx-type-col {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+    }
+
+    /* Icon Container */
+    .mini-table-row .tx-type-icon-wrapper {
+        width: 36px !important;
+        height: 36px !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+    }
+
+    .mini-table-row .tx-type-icon-wrapper svg {
+        width: 14px !important;
+        height: 14px !important;
+    }
+
+    /* Type Text (e.g. Qabul qilingan) */
+    .mini-table-row .tx-type-text {
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+    }
+
+    /* Hide unused columns entirely on mobile */
+    .mini-table-row .tx-sender-cell,
+    .mini-table-row .tx-receiver-cell,
+    .mini-table-row .tx-date-cell,
+    .mini-table-row .tx-actions-cell {
+        display: none !important;
+    }
+
+    /* Amount */
+    .mini-table-row .tx-amount-cell {
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        text-align: right !important;
+        padding: 0 !important;
+    }
+
+    /* Pagination */
+    .biz-pagination {
+        margin-top: 12px !important;
+        justify-content: center !important;
+    }
+
+    /* 6. MODALS STYLING FOR MOBILE */
+    .biz-overlay {
+        padding: 10px !important;
+    }
+
+    .biz-modal {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-radius: 20px !important;
+        flex-direction: column !important;
+        max-height: 90vh !important;
+        overflow-y: auto !important;
+    }
+
+    /* TS Modal & CE Modal specific stacking */
+    #ts-modal .biz-modal,
+    #ce-modal .biz-modal {
+        flex-direction: column !important;
+    }
+
+    /* TS & CE Modals left column */
+    #ts-modal .biz-modal > div:first-of-type,
+    #ce-modal .biz-modal > div:first-of-type {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 24px 20px !important;
+        border-right: none !important;
+    }
+
+    /* TS & CE Modals right panel */
+    #ts-right-panel,
+    #ce-right-panel {
+        width: 100% !important;
+        border-left: none !important;
+        border-top: 1px solid #e2e8f0 !important;
+        padding: 20px !important;
+        max-height: 320px !important;
+    }
+
+    /* PMT Modal overlay specific stacking */
+    .pmt-modal {
+        flex-direction: column !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    #pmt-step-2-3 {
+        flex-direction: column !important;
+    }
+
+    #pmt-step-2-3 > div:first-child {
+        width: 100% !important;
+        border-right: none !important;
+        padding: 16px !important;
+        min-height: auto !important;
+    }
+
+    #pmt-right-panel {
+        width: 100% !important;
+        border-left: none !important;
+        border-top: 1px solid #e2e8f0 !important;
+        padding: 16px !important;
+        min-height: auto !important;
+        max-height: 300px !important;
+    }
+
+    .pmt-modal-header {
+        padding: 12px 16px !important;
+    }
+
+    /* Full view tables responsive support */
+    .clients-cols,
+    .docs-cols {
+        display: none !important;
+    }
+
+    #docs-full-list {
+        height: 15px;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+        padding: 10px 0 40px 0 !important;
+        overflow-y: auto !important;
+    }
+
+    #clients-full-list {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+        padding: 10px 0 !important;
+    }
+
+    /* Show docs-full-list row items styled just like docs-mini but smaller */
+    #docs-full-list .biz-doc-row-wrap {
+        background: #fff !important;
+        border-radius: 12px !important;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.01) !important;
+        border: 1px solid #f1f5f9 !important;
+        margin-bottom: 0 !important;
+        cursor: pointer !important;
+        overflow: hidden !important;
+        display: block !important;
+    }
+    #docs-full-list .biz-doc-row-wrap:active {
+        transform: scale(0.98) !important;
+        transition: transform 0.1s ease !important;
+    }
+    #docs-full-list .biz-doc-row-wrap .biz-row.docs-cols {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+        height: 52px !important;
+        padding: 0 12px !important;
+        border-bottom: none !important;
+        background: transparent !important;
+        box-sizing: border-box !important;
+    }
+    /* Hide unused columns entirely on mobile */
+    #docs-full-list .biz-row.docs-cols .tx-sender-cell,
+    #docs-full-list .biz-row.docs-cols .tx-receiver-cell,
+    #docs-full-list .biz-row.docs-cols .tx-date-cell,
+    #docs-full-list .biz-row.docs-cols .tx-actions-cell {
+        display: none !important;
+    }
+    #docs-full-list .biz-row.docs-cols .tx-type-col {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+    #docs-full-list .biz-row.docs-cols .tx-type-icon-wrapper {
+        width: 28px !important;
+        height: 28px !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+    }
+    #docs-full-list .biz-row.docs-cols .tx-type-icon-wrapper svg {
+        width: 12px !important;
+        height: 12px !important;
+    }
+    #docs-full-list .biz-row.docs-cols .tx-type-text {
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+    }
+    #docs-full-list .biz-row.docs-cols .tx-amount-cell {
+        font-size: 13px !important;
+        font-weight: 800 !important;
+        text-align: right !important;
+        padding: 0 !important;
+    }
+
+    /* Hide scrollbar but keep scrollable */
+    .content::-webkit-scrollbar,
+    .biz-container::-webkit-scrollbar,
+    #docs-mini::-webkit-scrollbar,
+    #docs-full-list::-webkit-scrollbar {
+        display: none !important;
+    }
+    .content,
+    .biz-container,
+    #docs-mini,
+    #docs-full-list {
+        -ms-overflow-style: none !important;
+        scrollbar-width: none !important;
+    }
+
+    /* Barchasi view back button: make it circular and smaller, only icon visible */
+    #back-docs {
+        width: 36px !important;
+        height: 36px !important;
+        border-radius: 50% !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #f1f5f9 !important;
+        border: 1px solid #e2e8f0 !important;
+        min-width: 36px !important;
+    }
+    #back-docs span {
+        display: none !important;
+    }
+    #back-docs svg {
+        width: 20px !important;
+        height: 20px !important;
+        margin: 0 !important;
+    }
+
+    /* Make Title smaller in Barchasi view */
+    #view-docs .biz-card-head h3 {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+    }
+
+    /* Hide Search bar inside Barchasi view */
+    #view-docs .biz-doc-filters .biz-search {
+        display: none !important;
+    }
+
+    #view-docs .biz-doc-filters {
+        display: flex !important;
+        gap: 8px !important;
+        margin-bottom: 12px !important;
+        width: 100% !important;
+        border-top: none !important;
+        border-bottom: none !important;
+        padding: 0 !important;
+    }
+    #view-docs .biz-doc-filters .biz-custom-select {
+        width: max-content !important;
+        flex: none !important;
+    }
+    #view-docs .biz-doc-filters .biz-select-trigger {
+        height: 32px !important;
+        padding: 0 8px !important;
+        border-radius: 10px !important;
+        background: #f1f5f9 !important;
+        border: 1px solid #e2e8f0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        font-weight: 600 !important;
+        color: #1a1d2e !important;
+        font-size: 11px !important;
+        gap: 6px !important;
+    }
+    #view-docs .biz-doc-filters .biz-select-options {
+        width: max-content !important;
+        min-width: 130px !important;
+        box-sizing: border-box !important;
+        border-radius: 10px !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
+        border: 1px solid #e2e8f0 !important;
+        background: #fff !important;
+    }
+
+    #view-docs .biz-card {
+        padding: 12px !important;
+    }
+
+    /* Fixed/Sticky Pagination at the bottom on mobile */
+    #view-docs #docs-pagination-container {
+        position: sticky !important;
+        bottom: 0 !important;
+        background: #fff !important;
+        padding: 12px 4px !important;
+        border-top: 1px solid #f1f5f9 !important;
+        z-index: 100 !important;
+        margin-top: auto !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Vacation style rows-per-page pagination limit select on mobile */
+    #docs-rows-btn {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        padding: 0 8px !important;
+        height: 28px !important;
+        background: #ffffff !important;
+        border: 1.5px solid #e2e8f0 !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        font-weight: 700 !important;
+        font-size: 11px !important;
+        color: #1a1d2e !important;
+        min-width: 85px !important;
+        justify-content: space-between !important;
+        transition: all 0.2s !important;
+        box-sizing: border-box !important;
+    }
+    #docs-rows-btn:hover {
+        background: #f8fafc !important;
+        border-color: #cbd5e1 !important;
+    }
+    #docs-rows-dropdown {
+        position: absolute !important;
+        bottom: calc(100% + 6px) !important;
+        left: 0 !important;
+        width: 85px !important;
+        background: white !important;
+        border: 1.5px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        transform: translateY(10px) !important;
+        transition: all 0.2s !important;
+        z-index: 1000 !important;
+        padding: 4px !important;
+        box-sizing: border-box !important;
+    }
+    #docs-rows-dropdown.open {
+        opacity: 1 !important;
+        visibility: visible !important;
+        transform: translateY(0) !important;
+    }
+    #docs-rows-dropdown .vac-rows-option {
+        padding: 6px 10px !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        color: #475569 !important;
+        cursor: pointer !important;
+        border-radius: 4px !important;
+        transition: background 0.15s !important;
+        text-align: left !important;
+    }
+    #docs-rows-dropdown .vac-rows-option:hover {
+        background: #f1f5f9 !important;
+        color: #1a1d2e !important;
+    }
+    #docs-rows-dropdown .vac-rows-option.active {
+        background: #eef2ff !important;
+        color: #5b6ef5 !important;
+    }
+
+    /* Hide all cards view completely on mobile */
+    #view-all-cards {
+        display: none !important;
+    }
+
+    /* Hide original create button in view-docs */
+    #create-doc-btn {
+        display: none !important;
+    }
+
+    /* Render mobile create button correctly */
+    #mobile-create-doc-btn {
+        display: flex !important;
+    }
+    #transfer-to-self-btn {
+        flex: 1 !important;
+        width: auto !important;
+        margin-top: 0 !important;
+    }
+    .mobile-action-buttons-row {
+        display: flex !important;
+        gap: 10px !important;
+        width: 100% !important;
+        margin-top: 16px !important;
+    }
+
+    #transfer-to-self-btn,
+    #mobile-create-doc-btn {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+}

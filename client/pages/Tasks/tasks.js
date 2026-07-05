@@ -4,6 +4,7 @@ import { translations } from "./trasnslations.js";
 import { applyPermissions, checkPermission, getPermissions } from "../Employees/permission.js";
 import { getCurrentLang, createTranslationHelper, LANGUAGE_CHANGED_EVENT } from "../../assets/js/i18n.js";
 import { showNotification } from "../../components/Notification/notification.js";
+import { initTasksResponsive } from "./tasks_responsive.js";
 
 const t = createTranslationHelper(translations);
 
@@ -18,6 +19,7 @@ let currentUserPermissions = null;
 
 // ─── STATE ────────────────────────────────────────────────────
 let currentProjectId = null;
+let mobileProjectActive = false;
 let viewMode = "tasks"; // "tasks" or "overview"
 let searchTab = "username"; // "username" or "email"
 let editingProjectId = null;
@@ -1036,6 +1038,11 @@ const openProjectModal = (pid = null) => {
   if (nerr) nerr.classList.remove("visible");
 
   const msi = $("member-search-input");
+  if (nameInput) {
+    nameInput.value = "";
+    const pmc = $("pm-name-counter");
+    if (pmc) pmc.innerText = "0/20";
+  }
   if (msi) msi.value = "";
   const msr = $("member-search-results");
   if (msr) msr.style.display = "none";
@@ -1043,7 +1050,11 @@ const openProjectModal = (pid = null) => {
   if (pid) {
     const proj = projectsCache.find((p) => p._id === pid);
     if (title) title.textContent = t("project_settings") || "Project Settings";
-    if (nameInput) nameInput.value = proj ? proj.name : "";
+    if (nameInput) {
+      nameInput.value = proj ? proj.name : "";
+      const pmc = $("pm-name-counter");
+      if (pmc) pmc.innerText = (nameInput.value.length || 0) + "/20";
+    }
     selectedProjectMembers = proj && proj.members ? [...proj.members] : [];
     if (delBtn) delBtn.style.display = "block";
     if (saveBtn) saveBtn.textContent = t("save_changes") || "Save Changes";
@@ -1125,6 +1136,7 @@ const saveProject = async () => {
         projectsCache.push(savedProj);
         currentProjectId = savedProj._id;
         viewMode = "settings";
+        mobileProjectActive = true;
       }
       showNotification(isEdit ? t("project_updated") : t("project_created"), "success");
       await renderView(true);
@@ -1163,6 +1175,9 @@ export const TodoPage = () => `
   <main class="tasks-main">
     <header class="tasks-header">
       <div class="header-project-info">
+        <button id="todo-mobile-back-btn" class="todo-mobile-back-btn" title="Back">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
         <h1 id="todo-project-title">Select a Project</h1>
         <button id="project-overview-btn" class="project-settings-btn" style="width: max-content; padding: 0 12px; gap: 6px; display: none;" title="${t('project_overview')}">
           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings-icon lucide-settings"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1262,10 +1277,11 @@ export const TodoPage = () => `
               <div class="filter-section">
                 <h4>${t("filter_date_range")}</h4>
                 <div class="filter-date-inputs">
-                  <input type="date" id="filter-date-start" class="filter-date-input" value="${taskFilters.dateStart || ''}">
                   <span>${t("filter_date_from")}</span>
-                  <input type="date" id="filter-date-end" class="filter-date-input" value="${taskFilters.dateEnd || ''}">
+                  <input type="date" id="filter-date-start" class="filter-date-input" value="${taskFilters.dateStart || ''}" onchange="const end=document.getElementById('filter-date-end'); if(end) { end.min=this.value; if(end.value && end.value < this.value) { end.value=''; const e = new Event('change'); end.dispatchEvent(e); } }">
                   <span>${t("filter_date_to")}</span>
+                  <input type="date" id="filter-date-end" class="filter-date-input" value="${taskFilters.dateEnd || ''}">
+                  <span></span>
             </div>
           </div>
         </div>
@@ -1313,8 +1329,11 @@ export const TodoPage = () => `
     </div>
     <div class="todo-modal-body">
       <div class="todo-form-group">
-        <label class="todo-form-label" id="lbl-task-name">Task Name</label>
-        <input class="todo-form-input" id="tm-title" placeholder="Enter task title..." />
+        <label class="todo-form-label" id="lbl-task-name" style="display: flex; justify-content: space-between;">
+            <span id="lbl-task-name-text">Task Name</span>
+            <span id="tm-title-counter" style="color: #64748b; font-size: 12px; font-weight: normal;">0/20</span>
+        </label>
+        <input class="todo-form-input" id="tm-title" maxlength="20" placeholder="Enter task title..." oninput="const c=document.getElementById('tm-title-counter'); if(c) c.innerText=this.value.length+'/20';" />
         <span class="todo-form-error" id="tm-title-error"></span>
       </div>
       <div class="todo-form-group">
@@ -1331,8 +1350,11 @@ export const TodoPage = () => `
         <span class="todo-form-error" id="tm-file-error"></span>
       </div>
       <div class="todo-form-group">
-        <label class="todo-form-label" id="lbl-task-desc">Description</label>
-        <textarea class="todo-form-input" id="tm-desc" rows="3" placeholder="Description..."></textarea>
+        <label class="todo-form-label" id="lbl-task-desc" style="display: flex; justify-content: space-between;">
+            <span id="lbl-task-desc-text">Description</span>
+            <span id="tm-desc-counter" style="color: #64748b; font-size: 12px; font-weight: normal;">0/350</span>
+        </label>
+        <textarea class="todo-form-input" id="tm-desc" rows="3" maxlength="350" placeholder="Description..." oninput="const c=document.getElementById('tm-desc-counter'); if(c) c.innerText=this.value.length+'/350';"></textarea>
       </div>
       <div class="todo-form-row">
         <div class="todo-form-group">
@@ -1351,7 +1373,7 @@ export const TodoPage = () => `
       <div class="todo-form-row">
         <div class="todo-form-group">
           <label class="todo-form-label" id="lbl-task-startdate">${t("start_date_label")}</label>
-          <input class="todo-form-input" type="date" id="tm-startdate" />
+          <input class="todo-form-input" type="date" id="tm-startdate" onchange="const d=document.getElementById('tm-duedate'); if(d) { d.min=this.value; if(d.value && d.value < this.value) d.value=''; }" />
         </div>
         <div class="todo-form-group">
           <label class="todo-form-label" id="lbl-task-duedate">${t("duedate_label")}</label>
@@ -1360,7 +1382,7 @@ export const TodoPage = () => `
       </div>
       <div class="todo-form-group">
         <label class="todo-form-label" id="lbl-task-estimated">${t("estimated_time_label")}</label>
-        <input class="todo-form-input" type="number" id="tm-estimated" min="0" placeholder="0" />
+        <input class="todo-form-input" type="number" id="tm-estimated" min="0" step="1" placeholder="0" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
       </div>
     </div>
     <div class="todo-modal-footer">
@@ -1532,8 +1554,11 @@ export const TodoPage = () => `
     </div>
     <div class="todo-modal-body">
       <div class="todo-form-group">
-        <label class="todo-form-label" id="lbl-project-name">Project Name</label>
-        <input class="todo-form-input" id="pm-name" placeholder="Enter project name..." />
+        <label class="todo-form-label" id="lbl-project-name" style="display: flex; justify-content: space-between;">
+            <span id="lbl-project-name-text">Project Name</span>
+            <span id="pm-name-counter" style="color: #64748b; font-size: 12px; font-weight: normal;">0/20</span>
+        </label>
+        <input class="todo-form-input" id="pm-name" maxlength="20" placeholder="Enter project name..." oninput="const c=document.getElementById('pm-name-counter'); if(c) c.innerText=this.value.length+'/20';" />
         <span class="todo-form-error" id="pm-name-error"></span>
       </div>
       <div id="project-members-section" style="margin-top: 24px; display: none;">
@@ -1611,6 +1636,7 @@ const renderProjectSidebar = async () => {
       currentProjectId = item.dataset.pid;
       viewMode = "tasks";
       taskListPage = 1;
+      mobileProjectActive = true;
       renderProjectSidebar();
       renderView();
     });
@@ -1667,6 +1693,19 @@ const renderView = async (forceRefresh = false) => {
   const container = document.getElementById("todo-view-container");
   if (!container) return;
 
+  if (window.innerWidth <= 992) {
+    currentView = "list";
+  }
+
+  const tc = document.querySelector(".tasks-container");
+  if (tc) {
+    if (mobileProjectActive) {
+      tc.classList.add("has-active-project");
+    } else {
+      tc.classList.remove("has-active-project");
+    }
+  }
+
   const cu = getCurrent();
   if (viewMode === "overview") {
     const overviewBtn = $("project-overview-btn");
@@ -1691,6 +1730,7 @@ const renderView = async (forceRefresh = false) => {
   const noProj = $("todo-no-projects");
   const settingsBtn = $("project-settings-btn");
   const tasksContent = document.querySelector(".tasks-content");
+  const viewContainer = $("todo-view-container");
 
   if (projects.length === 0) {
     if (noProj) {
@@ -1704,7 +1744,6 @@ const renderView = async (forceRefresh = false) => {
     return;
   }
 
-  const viewContainer = $("todo-view-container");
   if (viewContainer) viewContainer.style.display = "block";
 
   if (noProj) noProj.style.display = "none";
@@ -1951,6 +1990,13 @@ const renderListRow = (task) => {
           ${myDone ? `<svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/></svg>` : ""}
         </button>
         <span class="todo-row-title ${myDone ? "done-text" : ""}">${task.title}</span>
+        
+        <!-- Mobile Chevron Arrow -->
+        <div class="todo-row-mobile-arrow" data-action="toggle-expand" data-tid="${task._id}">
+          <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
       </div>
       <div class="todo-row-center-cell">
         <div class="todo-list-status-custom-select s-${myStatus} ${canChangeStatus ? "" : "disabled"}" data-tid="${task._id}" data-action="change-status-custom" style="${canChangeStatus ? "" : "pointer-events:none;"}">
@@ -1993,6 +2039,68 @@ const renderListRow = (task) => {
         </button>`
             : ""
         }
+      </div>
+
+      <!-- Mobile details dropdown (expanded on mobile only) -->
+      <div class="todo-row-mobile-details">
+        <div class="todo-mobile-detail-row">
+          <span class="detail-label">${t("status") || "Status"}:</span>
+          <div class="todo-list-status-custom-select s-${myStatus} ${canChangeStatus ? "" : "disabled"}" data-tid="${task._id}" data-action="change-status-custom" style="${canChangeStatus ? "" : "pointer-events:none;"}">
+            <div class="status-selected">
+              <span>${myStatus === "todo" ? t("status_todo") : myStatus === "progress" ? t("status_progress") : t("status_done")}</span>
+              <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+            <ul class="status-options">
+              <li data-value="todo" class="${myStatus === "todo" ? "active" : ""}">
+                <span>${t("status_todo")}</span>
+              </li>
+              <li data-value="progress" class="${myStatus === "progress" ? "active" : ""}">
+                <span>${t("status_progress")}</span>
+              </li>
+              <li data-value="done" class="${myStatus === "done" ? "active" : ""}">
+                <span>${t("status_done")}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+        
+        <div class="todo-mobile-detail-row">
+          <span class="detail-label">${t("assignees") || "Assignees"}:</span>
+          <div class="detail-value">${assigneeStackHtml(task, 26)}</div>
+        </div>
+
+        <div class="todo-mobile-detail-row">
+          <span class="detail-label">${t("due_date") || "Due Date"}:</span>
+          <div class="detail-value">${dueDateHtml(task.dueDate)}</div>
+        </div>
+
+        <div class="todo-mobile-detail-row">
+          <span class="detail-label">${t("priority") || "Priority"}:</span>
+          <div class="detail-value">${getPriorityBadge(task.priority || "none")}</div>
+        </div>
+
+        <div class="todo-mobile-actions">
+          ${
+            canEdit
+              ? `
+          <button class="todo-row-edit todo-action-btn edit" data-tid="${task._id}" data-action="edit" title="${t("edit")}">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span>${t("edit") || "Tahrirlash"}</span>
+          </button>`
+              : ""
+          }
+          ${
+            canDel
+              ? `
+          <button class="todo-row-del todo-action-btn del" data-tid="${task._id}" data-action="del" title="${t("delete")}">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span>${t("delete") || "O'chirish"}</span>
+          </button>`
+              : ""
+          }
+        </div>
       </div>
     </div>`;
 };
@@ -2163,8 +2271,18 @@ const attachListEvents = (container, tasks) => {
         if (act === "edit") openTaskModal(tid);
         if (act === "del") deleteTask(tid);
         if (act === "check") toggleDone(tid);
+        if (act === "toggle-expand") {
+          row.classList.toggle("expanded");
+        }
         return;
       }
+
+      // If mobile view, click on row toggles details expansion
+      if (window.innerWidth <= 992) {
+        row.classList.toggle("expanded");
+        return;
+      }
+
       const tid = row.dataset.tid;
       if (tid) openDetailModal(tid);
     });
@@ -2523,8 +2641,8 @@ const openTaskModal = async (taskId, defaultStatus = "todo") => {
   const task = taskId ? tasks.find((t) => t._id === taskId) : null;
 
   $("task-modal-title").textContent = task ? t("modal_edit_task") : t("modal_create_task");
-  $("lbl-task-name").textContent = t("task_label");
-  $("lbl-task-desc").textContent = t("description_label");
+  if ($("lbl-task-name-text")) $("lbl-task-name-text").textContent = t("task_label");
+  if ($("lbl-task-desc-text")) $("lbl-task-desc-text").textContent = t("description_label");
   $("lbl-task-status").textContent = t("status_label");
   $("lbl-task-priority").textContent = t("priority_label");
   $("lbl-task-assignee").textContent = t("assignee_label");
@@ -2548,7 +2666,11 @@ const openTaskModal = async (taskId, defaultStatus = "todo") => {
   renderAssigneePicker();
 
   $("tm-title").value = task?.title || "";
+  const tmc = $("tm-title-counter");
+  if (tmc) tmc.innerText = ($("tm-title").value.length || 0) + "/20";
   $("tm-desc").value = task?.description || "";
+  const tdc = $("tm-desc-counter");
+  if (tdc) tdc.innerText = ($("tm-desc").value.length || 0) + "/350";
   $("tm-status").value = task?.status || defaultStatus;
   $("tm-priority").value = task?.priority || "none";
   $("tm-startdate").value = task?.startDate ? task.startDate.split("T")[0] : "";
@@ -3470,7 +3592,7 @@ const translateUI = () => {
   ph("tm-title", t("task_title_placeholder"));
   ph("tm-desc", t("task_desc_placeholder"));
   ph("pm-name", t("project_name_placeholder"));
-  if ($("lbl-project-name")) $("lbl-project-name").textContent = t("project_label");
+  if ($("lbl-project-name-text")) $("lbl-project-name-text").textContent = t("project_label");
   if ($("project-modal-cancel")) $("project-modal-cancel").textContent = t("cancel");
   if ($("project-modal-save")) $("project-modal-save").textContent = t("create");
   if ($("no-projects-msg")) $("no-projects-msg").textContent = t("no_projects");
@@ -3636,6 +3758,26 @@ const initTaskFilterEvents = () => {
 let isInitialized = false;
 
 export const initTodoLogic = async () => {
+  if (window.innerWidth <= 992) {
+    currentView = "list";
+    mobileProjectActive = false;
+  }
+
+  // Expose state and functions for tasks_responsive.js
+  window.TasksAppState = {
+    getCurrentProjectId: () => currentProjectId,
+    setCurrentProjectId: (id) => { currentProjectId = id; },
+    getViewMode: () => viewMode,
+    setViewMode: (val) => { viewMode = val; },
+    getCurrentView: () => currentView,
+    setCurrentView: (val) => { currentView = val; },
+    getMobileProjectActive: () => mobileProjectActive,
+    setMobileProjectActive: (val) => { mobileProjectActive = val; },
+    renderView: (force) => renderView(force),
+    renderProjectSidebar: () => renderProjectSidebar(),
+    t: (key) => t(key)
+  };
+
   const lang = getCurrentLang();
   translateUI();
 
@@ -3652,6 +3794,7 @@ export const initTodoLogic = async () => {
 
   initProjectSidebarEvents();
   initTaskFilterEvents();
+  initTasksResponsive();
 
   const cu = getCurrent();
   if (cu) applyPermissions(cu.userId || cu._id);

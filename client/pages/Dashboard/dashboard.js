@@ -703,169 +703,171 @@ const renderTestCreator = () => {
 // Sozlamalar ekrani
 const renderSettingsEditor = () => {
     return `
-        <div class="settings-editor-container" style="display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px;">
-            <div class="s-card">
-                <h3 style="display: flex; align-items: center; gap: 10px; color: #334155; font-size: 16px; margin-bottom: 20px;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-text"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
-                    ${t('general_settings')}
-                </h3>
-                <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block;">${t('test_name')} <span style="color: #ef4444;">*</span></label>
-                <input type="text" id="s-title" value="${testDraft.title}" class="s-input" placeholder="${t('test_name')}" />
-                
-                <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block; margin-top: 15px;">${t('test_desc_optional')}</label>
-                <textarea id="s-desc" class="s-input" rows="3" placeholder="${t('test_desc_placeholder')}">${testDraft.description}</textarea>
-            </div>
-            
-            <div class="s-card">
-                <h3 style="display: flex; align-items: center; gap: 10px; color: #334155; font-size: 16px; margin-bottom: 20px;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-timer"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg>
-                    ${t('time_limit_title')}
-                </h3>
-                <label class="s-toggle-box" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer;">
-                    <div>
-                        <div style="font-size: 14px; font-weight: 600; color: #1e293b;">${t('enable_time_limit')}</div>
-                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">${t('time_limit_desc')}</div>
+        <div class="settings-editor-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; margin-bottom: 20px;">
+            <!-- LEFT COLUMN -->
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- General Settings -->
+                <div class="s-card">
+                    <h3 style="display: flex; align-items: center; gap: 10px; color: #334155; font-size: 16px; margin-bottom: 20px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-text"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+                        ${t('general_settings')}
+                    </h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="font-size: 13px; font-weight: 600; color: #64748b;">${t('test_name')} <span style="color: #ef4444;">*</span></label>
+                        <span id="s-title-counter" style="font-size: 12px; color: #94a3b8; font-weight: 500;">${(testDraft.title || '').length}/35</span>
                     </div>
-                    <div class="custom-toggle">
-                        <input type="checkbox" id="s-timelimit" ${testDraft.hasTimeLimit ? 'checked' : ''} />
-                        <span class="toggle-slider"></span>
+                    <input type="text" id="s-title" value="${testDraft.title}" class="s-input" placeholder="${t('test_name')}" maxlength="35" />
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; margin-top: 15px;">
+                        <label style="font-size: 13px; font-weight: 600; color: #64748b;">${t('test_desc_optional')}</label>
+                        <span id="s-desc-counter" style="font-size: 12px; color: #94a3b8; font-weight: 500;">${(testDraft.description || '').length}/250</span>
                     </div>
-                </label>
-                
-                <div class="time-inputs ${testDraft.hasTimeLimit ? 'expanded' : ''}">
-                    <div>
-                        <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block;">${t('hours')}</label>
-                        <div class="score-input-group" style="display: flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fff; width: 100%;">
-                            <button id="s-hours-minus" style="width: 40px; height: 36px; border: none; background: #f8fafc; cursor: pointer; border-right: 1px solid #e2e8f0; color: #64748b; font-weight: bold; font-size: 16px; transition: 0.2s;">-</button>
-                            <input type="number" id="s-hours" class="score-input" value="${testDraft.timeHours || 0}" min="0" style="flex: 1; height: 36px; padding: 0; border: none; text-align: center; outline: none; -moz-appearance: textfield; font-weight: 600; color: #1e293b;" />
-                            <button id="s-hours-plus" style="width: 40px; height: 36px; border: none; background: #f8fafc; cursor: pointer; border-left: 1px solid #e2e8f0; color: #64748b; font-weight: bold; font-size: 16px; transition: 0.2s;">+</button>
+                    <textarea id="s-desc" class="s-input" rows="3" placeholder="${t('test_desc_placeholder')}" maxlength="250" style="resize: none; overflow-y: auto;">${testDraft.description}</textarea>
+                </div>
+
+                <!-- Foydalanuvchilarni biriktirish -->
+                <div class="user-assign-card s-card" id="user-assign-card-container">
+                    <h3 style="display: flex; align-items: center; gap: 10px; color: #334155; font-size: 16px; margin-bottom: 15px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        ${t('assign_users')}
+                    </h3>
+                    <p style="font-size: 12px; color: #64748b; margin-top: -10px; margin-bottom: 15px;">
+                        ${t('assign_users_desc')}
+                    </p>
+                    
+                    <div class="ua-selected-list" id="ua-selected-list" style="display: flex; flex-wrap: wrap; margin-bottom: 15px;">
+                        <!-- Tanlangan userlar shu yerda bo'ladi -->
+                    </div>
+
+                    <input type="text" id="ua-search-input" class="ua-search-input" placeholder="${t('ua_search_placeholder')}" />
+                    
+                    <div class="ua-users-list" id="ua-users-list">
+                        <!-- Userlar ro'yxati -->
+                    </div>
+                    
+                    <div class="ua-pagination">
+                        <button class="ua-page-btn" id="ua-prev-page">${t('prev_page')}</button>
+                        <span class="ua-page-info" id="ua-page-info">1 / 1</span>
+                        <button class="ua-page-btn" id="ua-next-page">${t('next_page')}</button>
+                    </div>
+                </div>
+
+                <!-- Test muddati -->
+                <div class="s-card">
+                    <h3 style="display: flex; align-items: center; gap: 10px; color: #334155; font-size: 16px; margin-bottom: 20px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        ${t('test_duration')} <span style="font-size: 13px; font-weight: 400; color: #94a3b8; margin-left: 6px;">${t('test_duration_subtitle')}</span>
+                    </h3>
+                    <div style="display: flex; gap: 15px;">
+                        <div style="flex: 1;">
+                            <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block;">${t('valid_from_label')}</label>
+                            <input type="date" id="s-valid-from" value="${testDraft.validFrom ? new Date(testDraft.validFrom).toISOString().slice(0, 10) : ''}" class="s-input" />
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block;">${t('valid_until_label')}</label>
+                            <input type="date" id="s-valid-until" value="${testDraft.validUntil ? new Date(testDraft.validUntil).toISOString().slice(0, 10) : ''}" class="s-input" />
                         </div>
                     </div>
-                    <div>
-                        <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block;">${t('minutes')}</label>
-                        <div class="score-input-group" style="display: flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fff; width: 100%;">
-                            <button id="s-minutes-minus" style="width: 40px; height: 36px; border: none; background: #f8fafc; cursor: pointer; border-right: 1px solid #e2e8f0; color: #64748b; font-weight: bold; font-size: 16px; transition: 0.2s;">-</button>
-                            <input type="number" id="s-minutes" class="score-input" value="${testDraft.timeMinutes || 0}" min="0" max="59" style="flex: 1; height: 36px; padding: 0; border: none; text-align: center; outline: none; -moz-appearance: textfield; font-weight: 600; color: #1e293b;" />
-                            <button id="s-minutes-plus" style="width: 40px; height: 36px; border: none; background: #f8fafc; cursor: pointer; border-left: 1px solid #e2e8f0; color: #64748b; font-weight: bold; font-size: 16px; transition: 0.2s;">+</button>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN -->
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Time Limit -->
+                <div class="s-card">
+                    <h3 style="display: flex; align-items: center; gap: 10px; color: #334155; font-size: 16px; margin-bottom: 20px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-timer"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg>
+                        ${t('time_limit_title')}
+                    </h3>
+                    <label class="s-toggle-box" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 600; color: #1e293b;">${t('enable_time_limit')}</div>
+                            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">${t('time_limit_desc')}</div>
+                        </div>
+                        <div class="custom-toggle">
+                            <input type="checkbox" id="s-has-time-limit" ${testDraft.hasTimeLimit ? 'checked' : ''} />
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+                    <div id="time-limit-input-area" style="margin-top: 15px; display: ${testDraft.hasTimeLimit ? 'block' : 'none'};">
+                        <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block;">${t('limit_in_minutes')}</label>
+                        <input type="number" id="s-time-limit" value="${testDraft.timeLimit || 30}" class="s-input" min="1" max="1440" />
+                    </div>
+                </div>
+
+                <!-- Shuffle Settings -->
+                <div class="s-card">
+                    <h3 style="display: flex; align-items: center; gap: 10px; color: #334155; font-size: 16px; margin-bottom: 20px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shuffle"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+                        ${t('shuffle_settings')}
+                    </h3>
+                    
+                    <label class="s-toggle-box" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; margin-bottom: 12px;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 600; color: #1e293b;">${t('shuffle_questions')}</div>
+                            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">${t('shuffle_questions_desc')}</div>
+                        </div>
+                        <div class="custom-toggle">
+                            <input type="checkbox" id="s-shuffle-q" ${testDraft.shuffleQuestions ? 'checked' : ''} />
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+
+                    <label class="s-toggle-box" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 600; color: #1e293b;">${t('shuffle_options')}</div>
+                            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">${t('shuffle_options_desc')}</div>
+                        </div>
+                        <div class="custom-toggle">
+                            <input type="checkbox" id="s-shuffle-o" ${testDraft.shuffleOptions ? 'checked' : ''} />
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+                </div>
+
+
+
+                <!-- Access Rights -->
+                <div class="s-card">
+                    <h3 style="display: flex; align-items: center; gap: 10px; color: #334155; font-size: 16px; margin-bottom: 20px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        ${t('access_rights')}
+                    </h3>
+                    <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 10px; display: block;">${t('access_method')}</label>
+                    
+                    <div class="segmented-control" style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <label class="segment-btn ${testDraft.accessType === 'public' || !testDraft.accessType ? 'active' : ''}">
+                            <input type="radio" name="s-access" value="public" ${testDraft.accessType === 'public' || !testDraft.accessType ? 'checked' : ''} style="display:none;" />
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                            ${t('public_access')}
+                        </label>
+                        <label class="segment-btn ${testDraft.accessType === 'password' ? 'active' : ''}">
+                            <input type="radio" name="s-access" value="password" ${testDraft.accessType === 'password' ? 'checked' : ''} style="display:none;" />
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+                            ${t('password_access')}
+                        </label>
+                        <label class="segment-btn ${testDraft.accessType === 'id' ? 'active' : ''}">
+                            <input type="radio" name="s-access" value="id" ${testDraft.accessType === 'id' ? 'checked' : ''} style="display:none;" />
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+                            ${t('id_access')}
+                        </label>
+                    </div>
+                    
+                    <div id="password-input-area" class="password-area ${testDraft.accessType === 'password' ? 'expanded' : ''}">
+                        <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block;">${t('enter_password')}</label>
+                        <input type="text" id="s-password" value="${testDraft.password || ''}" class="s-input" placeholder="${t('enter_password')}" />
+                    </div>
+
+                    <div id="id-input-area" class="password-area ${testDraft.accessType === 'id' ? 'expanded' : ''}">
+                        <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block;">${t('random_id_for_test')}</label>
+                        <div style="display: flex; gap: 10px; align-items: center; padding-bottom:10px;">
+                            <input type="text" id="s-access-id" value="${testDraft.accessId || ''}" readonly class="s-input" style="width: 200px; text-align: center; background: #f1f5f9; font-family: monospace; font-size: 16px; font-weight: bold; letter-spacing: 2px; height: 42px;" />
+                            <button id="s-copy-id" type="button" class="btn secondary" style="white-space: nowrap; height: 42px; padding: 0 16px; display: flex; align-items: center; gap: 6px; margin: 0;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" width="16" height="16"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                                ${t('copy_btn') || 'Nusxalash'}
+                            </button>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <div class="s-card">
-                <h3 style="display: flex; align-items: center; gap: 10px; color: #334155; font-size: 16px; margin-bottom: 20px;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shuffle"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
-                    ${t('shuffle_settings')}
-                </h3>
-                
-                <label class="s-toggle-box" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; margin-bottom: 10px;">
-                    <div>
-                        <div style="font-size: 14px; font-weight: 600; color: #1e293b;">${t('shuffle_questions')}</div>
-                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">${t('shuffle_questions_desc')}</div>
-                    </div>
-                    <div class="custom-toggle">
-                        <input type="checkbox" id="s-shuffle-questions" ${testDraft.shuffleQuestions ? 'checked' : ''} />
-                        <span class="toggle-slider"></span>
-                    </div>
-                </label>
-
-                <label class="s-toggle-box" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer;">
-                    <div>
-                        <div style="font-size: 14px; font-weight: 600; color: #1e293b;">${t('shuffle_answers')}</div>
-                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">${t('shuffle_answers_desc')}</div>
-                    </div>
-                    <div class="custom-toggle">
-                        <input type="checkbox" id="s-shuffle-answers" ${testDraft.shuffleAnswers ? 'checked' : ''} />
-                        <span class="toggle-slider"></span>
-                    </div>
-                </label>
-            </div>
-
-
-
-            <div class="s-card">
-                <h3 style="display: flex; align-items: center; gap: 10px; color: #334155; font-size: 16px; margin-bottom: 20px;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    ${t('access_rights')}
-                </h3>
-                <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 10px; display: block;">${t('access_method')}</label>
-                
-                <div class="segmented-control" style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <label class="segment-btn ${testDraft.accessType === 'public' || !testDraft.accessType ? 'active' : ''}">
-                        <input type="radio" name="s-access" value="public" ${testDraft.accessType === 'public' || !testDraft.accessType ? 'checked' : ''} style="display:none;" />
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-                        ${t('public_access')}
-                    </label>
-                    <label class="segment-btn ${testDraft.accessType === 'password' ? 'active' : ''}">
-                        <input type="radio" name="s-access" value="password" ${testDraft.accessType === 'password' ? 'checked' : ''} style="display:none;" />
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>
-                        ${t('password_access')}
-                    </label>
-                    <label class="segment-btn ${testDraft.accessType === 'id' ? 'active' : ''}">
-                        <input type="radio" name="s-access" value="id" ${testDraft.accessType === 'id' ? 'checked' : ''} style="display:none;" />
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-                        ${t('id_access')}
-                    </label>
-                </div>
-                
-                <div id="password-input-area" class="password-area ${testDraft.accessType === 'password' ? 'expanded' : ''}">
-                    <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block;">${t('enter_password')}</label>
-                    <input type="text" id="s-password" value="${testDraft.password || ''}" class="s-input" placeholder="${t('enter_password')}" />
-                </div>
-
-                <div id="id-input-area" class="password-area ${testDraft.accessType === 'id' ? 'expanded' : ''}">
-                    <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block;">${t('random_id_for_test')}</label>
-                    <div style="display: flex; gap: 10px; align-items: center; padding-bottom:10px;">
-                        <input type="text" id="s-access-id" value="${testDraft.accessId || ''}" readonly class="s-input" style="width: 200px; text-align: center; background: #f1f5f9; font-family: monospace; font-size: 16px; font-weight: bold; letter-spacing: 2px; height: 42px;" />
-                        <button id="s-copy-id" type="button" class="btn secondary" style="white-space: nowrap; height: 42px; padding: 0 16px; display: flex; align-items: center; gap: 6px; margin: 0;">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" width="16" height="16"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                            ${t('copy_btn') || 'Nusxalash'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Yangi qo'shilgan: Muddat va Foydalanuvchilarni biriktirish -->
-            <div class="s-card">
-                <h3 style="display: flex; align-items: center; gap: 10px; color: #334155; font-size: 16px; margin-bottom: 20px;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    Test muddati (qachondan - qachongacha)
-                </h3>
-                <div style="display: flex; gap: 15px;">
-                    <div style="flex: 1;">
-                        <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block;">Qachondan boshlanadi</label>
-                        <input type="date" id="s-valid-from" value="${testDraft.validFrom ? new Date(testDraft.validFrom).toISOString().slice(0, 10) : ''}" class="s-input" />
-                    </div>
-                    <div style="flex: 1;">
-                        <label style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 8px; display: block;">Qachon tugaydi</label>
-                        <input type="date" id="s-valid-until" value="${testDraft.validUntil ? new Date(testDraft.validUntil).toISOString().slice(0, 10) : ''}" class="s-input" />
-                    </div>
-                </div>
-            </div>
-
-            <div class="user-assign-card" id="user-assign-card-container">
-                <h3 style="display: flex; align-items: center; gap: 10px; color: #334155; font-size: 16px; margin-bottom: 15px;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    Foydalanuvchilarni biriktirish
-                </h3>
-                <p style="font-size: 12px; color: #64748b; margin-top: -10px; margin-bottom: 15px;">
-                    Agar foydalanuvchilar biriktirilsa, "Kirish huquqlari" sozlamasi avtomatik o'chiriladi.
-                </p>
-                
-                <div class="ua-selected-list" id="ua-selected-list" style="display: flex; flex-wrap: wrap; margin-bottom: 15px;">
-                    <!-- Tanlangan userlar shu yerda bo'ladi -->
-                </div>
-
-                <input type="text" id="ua-search-input" class="ua-search-input" placeholder="Foydalanuvchi ismi yoki emailini qidiring..." />
-                
-                <div class="ua-users-list" id="ua-users-list">
-                    <!-- Userlar ro'yxati -->
-                </div>
-                
-                <div class="ua-pagination">
-                    <button class="ua-page-btn" id="ua-prev-page">Oldingi</button>
-                    <span class="ua-page-info" id="ua-page-info">1 / 1</span>
-                    <button class="ua-page-btn" id="ua-next-page">Keyingi</button>
                 </div>
             </div>
         </div>
@@ -2005,8 +2007,44 @@ const attachCreatorEvents = () => {
         // VALID FROM / UNTIL EVENTS
         const validFromInp = document.getElementById("s-valid-from");
         const validUntilInp = document.getElementById("s-valid-until");
-        if (validFromInp) validFromInp.onchange = (e) => testDraft.validFrom = e.target.value;
+        if (validFromInp) {
+            validFromInp.onchange = (e) => {
+                testDraft.validFrom = e.target.value;
+                // validUntil must be >= validFrom
+                if (validUntilInp) {
+                    validUntilInp.min = e.target.value;
+                    if (validUntilInp.value && validUntilInp.value < e.target.value) {
+                        validUntilInp.value = e.target.value;
+                        testDraft.validUntil = e.target.value;
+                    }
+                }
+            };
+            // Set initial min for validUntil if validFrom already set
+            if (testDraft.validFrom && validUntilInp) {
+                validUntilInp.min = new Date(testDraft.validFrom).toISOString().slice(0, 10);
+            }
+        }
         if (validUntilInp) validUntilInp.onchange = (e) => testDraft.validUntil = e.target.value;
+
+        // TITLE & DESC COUNTERS
+        const titleInput = document.getElementById("s-title");
+        const titleCounter = document.getElementById("s-title-counter");
+        if (titleInput && titleCounter) {
+            titleInput.addEventListener("input", () => {
+                const len = titleInput.value.length;
+                titleCounter.textContent = `${len}/35`;
+                titleCounter.style.color = len >= 30 ? (len >= 35 ? '#ef4444' : '#f59e0b') : '#94a3b8';
+            });
+        }
+        const descTA = document.getElementById("s-desc");
+        const descCounter = document.getElementById("s-desc-counter");
+        if (descTA && descCounter) {
+            descTA.addEventListener("input", () => {
+                const len = descTA.value.length;
+                descCounter.textContent = `${len}/250`;
+                descCounter.style.color = len >= 230 ? (len >= 250 ? '#ef4444' : '#f59e0b') : '#94a3b8';
+            });
+        }
 
         // USER ASSIGNMENT LOGIC
         if (!testDraft.assignedUsers) testDraft.assignedUsers = [];

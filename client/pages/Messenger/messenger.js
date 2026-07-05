@@ -242,6 +242,7 @@ export const MassangerPage = `<div class="messenger-wrap" id="messenger-root">
 let currentLang = "uz";
 let currentUser = null;
 let activeContact = null;
+let mobileInfoOpen = false;
 let msgSearchModalOpen = false;
 let msgSearchModalQuery = "";
 let searchQuery = "";
@@ -265,9 +266,60 @@ const renderRoot = () => {
   if (!root) return;
   const currentLang = getCurrentLang();
   const tr = translations[currentLang];
+
+  const mb = root.querySelector(".messenger-body");
+  if (mb) {
+      if (activeContact) mb.classList.add("has-active-chat");
+      else mb.classList.remove("has-active-chat");
+
+      if (mobileInfoOpen) mb.classList.add("show-info-panel");
+      else mb.classList.remove("show-info-panel");
+
+      const sb = mb.querySelector(".msg-sidebar");
+      if (sb) {
+          sb.className = `msg-sidebar ${sidebarCollapsed ? "collapsed" : ""}`;
+          sb.innerHTML = renderSidebar();
+      }
+
+      const ca = mb.querySelector(".msg-chat-area");
+      if (ca) {
+          ca.removeAttribute("style");
+          ca.innerHTML = renderChatArea();
+      }
+
+      let ip = mb.querySelector(".msg-info-panel");
+      if (activeContact) {
+          if (!ip) {
+              ip = document.createElement("div");
+              ip.className = "msg-info-panel";
+              ip.id = "msg-info-panel";
+              mb.appendChild(ip);
+          }
+          ip.innerHTML = renderInfoPanel();
+      } else {
+          if (ip) ip.remove();
+      }
+
+      let sm = root.querySelector(".msg-search-modal-overlay");
+      if (msgSearchModalOpen) {
+          if (!sm) {
+              const temp = document.createElement("div");
+              temp.innerHTML = renderSearchModal();
+              root.appendChild(temp.firstElementChild);
+          } else {
+              sm.outerHTML = renderSearchModal();
+          }
+      } else {
+          if (sm) sm.remove();
+      }
+
+      attachRootEvents();
+      return;
+  }
+
   root.innerHTML = `
         <h1 class="messenger-title">${tr.title}</h1>
-        <div class="messenger-body">
+        <div class="messenger-body ${activeContact ? "has-active-chat" : ""} ${mobileInfoOpen ? "show-info-panel" : ""}">
             <div class="msg-sidebar ${sidebarCollapsed ? "collapsed" : ""}" id="msg-sidebar">
                 ${renderSidebar()}
             </div>
@@ -275,8 +327,9 @@ const renderRoot = () => {
                 ${renderChatArea()}
             </div>
             ${activeContact ? `<div class="msg-info-panel" id="msg-info-panel">${renderInfoPanel()}</div>` : ""}
-            ${msgSearchModalOpen ? renderSearchModal() : ""}
-        </div>`;
+        </div>
+        ${msgSearchModalOpen ? renderSearchModal() : ""}
+    `;
   attachRootEvents();
 };
 
@@ -288,11 +341,6 @@ const renderSidebar = () => {
 
   if (sidebarCollapsed) {
     return `
-            <div class="msg-sidebar-header msg-sidebar-header--collapsed">
-                <button class="msg-icon-btn" id="msg-collapse-btn" title="${tr.expand}">
-                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-                </button>
-            </div>
             <div class="msg-contacts-list msg-contacts-list--collapsed" id="msg-contacts-list">
                 ${activeChats.map((u) => renderContactMini(u)).join("")}
             </div>`;
@@ -301,21 +349,7 @@ const renderSidebar = () => {
   const freshMe = getFreshUser(currentUser?.username) || currentUser;
   const myStatus = getMyStatus();
   return `
-        <div class="msg-sidebar-header" style="position:relative">
-            <div class="msg-current-user-wrap" id="msg-user-card-trigger">
-                <div class="msg-avatar-wrap" style="flex-shrink:0">
-                    ${avatarHtml(freshMe, 36)}
-                    <span class="msg-status-dot ${myStatus}"></span>
-                </div>
-                <span class="msg-current-user-name">${escHtml(freshMe?.username || "")}</span>
-            </div>
-            <div class="msg-sidebar-actions">
-                <button class="msg-icon-btn" id="msg-collapse-btn" title="${tr.collapse}">
-                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-                </button>
-            </div>
-            ${userCardOpen ? renderUserCard() : ""}
-        </div>
+        ${userCardOpen ? renderUserCard() : ""}
         <div class="msg-search-wrap" style="position:relative; cursor:pointer;" id="msg-search-trigger">
             <div class="msg-search-inner" style="pointer-events:none;">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#aaa" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#aaa" stroke-width="2" stroke-linecap="round"/></svg>
@@ -420,7 +454,12 @@ const renderInfoPanel = () => {
   const email = activeContact.email || null;
 
   return `
-        <div class="msg-info-top">
+        <div class="msg-info-top" style="position:relative;">
+            <button class="msg-info-close-btn" id="msg-info-close-btn" title="Back">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
             ${avatarHtml(activeContact, 72)}
             <div class="msg-info-name">${escHtml(activeContact.username)}</div>
             <div class="msg-info-role">${escHtml(activeContact.role || activeContact.position || "")}</div>
@@ -556,6 +595,11 @@ const renderChatArea = () => {
   return `
         <div class="msg-chat-header">
             <div class="msg-chat-header-left">
+                <button class="msg-back-btn" id="msg-back-btn" title="Back">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
                 <div class="msg-avatar-wrap">${avatarHtml(activeContact, 38)}<span class="msg-status-dot ${isUserOnline(activeContact) ? 'online' : 'offline'}"></span></div>
                 <div>
                     <div class="msg-chat-recipient-name">${escHtml(activeContact.username)}</div>
@@ -653,7 +697,7 @@ const renderMessages = () => {
     lastDate = "",
     lastFrom = null;
 
-  msgs.forEach((msg) => {
+  msgs.forEach((msg, index) => {
     const currentLang = getCurrentLang();
     const dateStr = formatDateSep(msg.at, currentLang);
     if (dateStr !== lastDate) {
@@ -666,18 +710,21 @@ const renderMessages = () => {
     const isFirstInGroup = lastFrom !== msg.from;
     lastFrom = msg.from;
 
-    // Avatar (theirs only, group start)
-    const av = !isMine
-      ? isFirstInGroup
-        ? avatarHtmlFromUser(freshContact, 34)
-        : `<div style="width:34px;flex-shrink:0"></div>`
-      : "";
+    const nextMsg = msgs[index + 1];
+    let isLastInGroup = false;
+    if (!nextMsg) {
+      isLastInGroup = true;
+    } else {
+      const nextDateStr = formatDateSep(nextMsg.at, currentLang);
+      if (nextMsg.from !== msg.from || nextDateStr !== dateStr) {
+        isLastInGroup = true;
+      }
+    }
 
-    // sender name label (theirs, group start only)
-    const senderLabel =
-      !isMine && isFirstInGroup
-        ? `<div class="msg-sender-label">${escHtml(freshContact.username)}</div>`
-        : "";
+    // Avatar (theirs only, group end)
+    const av = !isMine && isLastInGroup
+        ? avatarHtmlFromUser(freshContact, 34)
+        : !isMine ? `<div class="msg-avatar-spacer"></div>` : "";
 
     // Action buttons
     // image & emoji-only → NO edit btn (faqat delete)
@@ -702,7 +749,6 @@ const renderMessages = () => {
             <div class="${wrapCls}" data-mid="${msg.id}">
                 ${av}
                 <div class="msg-row-body">
-                    ${senderLabel}
                     <div class="msg-hover-wrap">
                         ${acts}
                         <div class="msg-img-outer">
@@ -725,7 +771,6 @@ const renderMessages = () => {
             <div class="${wrapCls}" data-mid="${msg.id}">
                 ${av}
                 <div class="msg-row-body">
-                    ${senderLabel}
                     <div class="msg-hover-wrap">
                         ${acts}
                         <div class="msg-bubble ${eo ? "emoji-only" : ""}">
@@ -1104,6 +1149,7 @@ const attachContactEvents = () => {
       if (activeContact && currentUser)
         markAsRead(currentUser.username, activeContact.username);
       emojiPickerOpen = false;
+      mobileInfoOpen = false;
       pendingImages = [];
       infoExpanded = false;
       attachExpanded = false;
@@ -1134,6 +1180,15 @@ const attachInfoEvents = () => {
     .forEach((img) =>
       img.addEventListener("click", () => openLightbox(img.dataset.lightbox)),
     );
+
+  const infoCloseBtn = $("msg-info-close-btn");
+  if (infoCloseBtn) {
+    infoCloseBtn.onclick = (e) => {
+      e.stopPropagation();
+      mobileInfoOpen = false;
+      renderRoot();
+    };
+  }
 };
 
 const attachSidebarEvents = () => {
@@ -1392,7 +1447,9 @@ const attachChatEvents = () => {
       sendTypingEvent();
     });
     ti.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+      // On desktop, Enter sends the message. On mobile, Enter adds a new line.
+      const isMobile = window.innerWidth <= 992;
+      if (e.key === "Enter" && !e.shiftKey && !isMobile) {
         e.preventDefault();
         sendMessage();
       }
@@ -1433,6 +1490,27 @@ const attachChatEvents = () => {
       });
       iu.value = "";
     });
+
+  const backBtn = $("msg-back-btn");
+  if (backBtn) {
+    backBtn.onclick = (e) => {
+      e.stopPropagation();
+      activeContact = null;
+      mobileInfoOpen = false;
+      renderRoot();
+    };
+  }
+
+  const chatHeaderLeft = document.querySelector(".msg-chat-header-left");
+  if (chatHeaderLeft) {
+    chatHeaderLeft.onclick = () => {
+      if (window.innerWidth <= 992) {
+        mobileInfoOpen = true;
+        renderRoot();
+      }
+    };
+  }
+
   attachFeedEvents();
   document.addEventListener("click", (e) => {
     const p = $("msg-emoji-picker"),

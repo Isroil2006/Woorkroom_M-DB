@@ -1,0 +1,178 @@
+/* Default: Hide mobile logo on desktop */
+.mobile-logo {
+    display: none;
+}
+
+/* Tablet & Mobile (max-width: 992px) */
+@media (max-width: 992px) {
+    /* Body: kulrang fon, 20px padding */
+    body {
+        padding: 0;
+        background-color: var(--white);
+        min-height: 100dvh;
+        min-height: 100vh;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    /* Oq karta: to'liq balandlik, vertikal markazda forma */
+    .auth-wrapper {
+        flex-direction: column;
+        padding: 0;
+        width: 100%;
+        height: 100dvh;
+        height: 100vh;
+        background-color: var(--white);
+        border-radius: 0;
+        box-shadow: none;
+        overflow-y: auto;
+    }
+
+    /* Skrollbar stili */
+    .auth-wrapper::-webkit-scrollbar {
+        width: 6px;
+    }
+    .auth-wrapper::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .auth-wrapper::-webkit-scrollbar-thumb {
+        background: #dde1f3;
+        border-radius: 10px;
+    }
+    .auth-wrapper::-webkit-scrollbar-thumb:hover {
+        background: #cbd5e1;
+    }
+
+    /* Banner yashiriladi */
+    .auth-banner,
+    .auth-wrapper.signup-mode .auth-banner {
+        display: none !important;
+    }
+
+    /* Form section — to'liq joy, forma vertikal markazda */
+    .auth-form-section,
+    .auth-wrapper.signup-mode .auth-form-section {
+        width: 100% !important;
+        flex: 1;
+        border-radius: 0 !important;
+        padding: 20px 30px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+    }
+
+    #auth-container {
+        max-width: 100% !important;
+        width: 100%;
+        max-width: 420px;
+        margin-top: auto;
+        margin-bottom: auto;
+    }
+
+    /* Mobil logo — tepada ortada */
+    .mobile-logo {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 0;
+    }
+
+    .mobile-logo a {
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--primary-blue);
+        font-weight: 700;
+        font-size: 26px;
+    }
+
+    .mobile-logo a img {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* Sarlavha */
+    .auth-form-container h2 {
+        text-align: center;
+        font-size: 24px;
+        margin-bottom: 8px !important;
+    }
+
+    /* Form */
+    .auth-form-container form {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .auth-form-container .input-group {
+        width: 100%;
+        margin-bottom: 0px; /* Error xabari (height 15px, mt 5px) oraliqni o'zi tashlaydi */
+    }
+
+    .auth-form-container .input-group label {
+        font-size: 14px;
+        font-weight: 700;
+        color: #1a1a1a;
+        margin-bottom: 4px;
+        display: block;
+    }
+
+    .auth-form-container .input-group input {
+        width: 100%;
+        padding: 12px 14px;
+        font-size: 15px;
+        border-radius: 8px;
+        box-sizing: border-box;
+    }
+
+    /* Tugmalar */
+    .auth-form-container button {
+        width: 100%;
+        padding: 12px;
+        font-size: 15px;
+        border-radius: 8px;
+        margin-top: 8px;
+        margin-bottom: 12px;
+    }
+
+    .auth-form-container .links {
+        text-align: center;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+
+    /* Register form columns (force to column layout on mobile) */
+    #register-form {
+        margin-top: 0 !important; /* Register html dagi margin-top:-20px ni ezish uchun (logo bilan yopishib qolmasligi uchun) */
+    }
+
+    #register-form h2 {
+        margin-top: 50px !important;
+    }
+
+    /* Register: column layout (row emas) */
+    #register-form > div {
+        flex-direction: column !important;
+        gap: 0 !important;
+    }
+
+    #register-form > div > div {
+        min-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        gap: 0 !important;
+    }
+
+    #register-form > div > div:last-child {
+        margin-top: 10px !important;
+    }
+
+    #register-form > div:last-child {
+        margin-bottom: 100px !important;
+    }
+}
+

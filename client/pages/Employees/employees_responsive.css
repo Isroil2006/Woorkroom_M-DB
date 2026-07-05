@@ -1,0 +1,374 @@
+/* employees_responsive.css */
+.emp-chevron-wrap {
+    display: none;
+}
+
+@media (max-width: 992px) {
+    /* Page Layout */
+    .employees-page {
+        padding: 16px 12px;
+        height: 100%;
+        overflow: hidden; /* Lock page scroll */
+    }
+
+    .employees-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .employees-header h2 {
+        display: none;
+    }
+
+    .employees-header-right {
+        width: 100%;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    /* Keep dropdown and button neat */
+    .rows-per-page-container {
+        flex-shrink: 0;
+    }
+
+    .add-employee-btn {
+        flex: 1;
+        justify-content: center;
+        text-align: center;
+        padding: 10px 16px;
+        font-size: 13px;
+        height: 38px;
+    }
+
+    .emp-count-badge {
+        height: 38px;
+        padding: 0 12px;
+        font-size: 12px;
+        border-radius: 10px;
+        gap: 6px;
+    }
+
+    /* Cards list styling on mobile */
+    #employees-list {
+        gap: 12px;
+        flex: 1;
+        overflow-y: auto; /* Scroll list only */
+    }
+
+    .employee-card {
+        border-radius: 14px;
+    }
+
+    .employee-card-inner {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 14px 16px;
+        gap: 0; /* Clear flex gap to avoid blank spaces when collapsed */
+    }
+
+    .employee-box {
+        min-width: 0;
+        width: 100%;
+        gap: 12px;
+        display: flex;
+        align-items: center;
+    }
+
+    .emp-avatar-wrap img {
+        width: 44px;
+        height: 44px;
+    }
+
+    .username {
+        font-size: 14px;
+    }
+
+    .useremail {
+        font-size: 11.5px;
+    }
+
+    /* Accordion Arrow */
+    .emp-chevron-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: auto;
+        cursor: pointer;
+        color: #8892a4;
+    }
+
+    .emp-chevron {
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .employee-card.expanded .emp-chevron {
+        transform: rotate(180deg);
+        color: #5b6ef5;
+    }
+
+    /* Stack main info as a 2x2 grid (Collapsible) */
+    .user-main-info {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        width: 100%;
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+        margin-top: 0;
+        transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin-top 0.3s ease;
+    }
+
+    .employee-card.expanded .user-main-info {
+        max-height: 200px; /* High enough to fit grid */
+        opacity: 1;
+        margin-top: 14px;
+    }
+
+    .info-chip {
+        min-width: 0;
+        padding: 6px 10px;
+        border-radius: 8px;
+        align-items: flex-start;
+    }
+
+    .info-chip-label {
+        font-size: 8px;
+    }
+
+    .info-chip-value {
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Employee action buttons on mobile (Collapsible) */
+    .employee-actions {
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
+        border-top: 1px solid transparent;
+        padding-top: 0;
+        margin-top: 0;
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+        transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin-top 0.3s ease, border-color 0.3s ease, padding-top 0.3s ease;
+    }
+
+    .employee-card.expanded .employee-actions {
+        max-height: 80px;
+        opacity: 1;
+        border-color: #f0f2f5;
+        padding-top: 12px;
+        margin-top: 12px;
+    }
+
+    .emp-action-btn {
+        padding: 8px 12px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .emp-perm-btn {
+        padding: 8px 12px;
+        height: 34px;
+        font-size: 11px;
+    }
+
+    /* Footer containing rows per page and pagination side-by-side */
+    .employees-footer {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1.5px solid #eef0f8;
+        gap: 8px;
+        flex-shrink: 0;
+        position: relative;
+        z-index: 10;
+        background-color: #F0F2F8; /* matches page background */
+    }
+
+    .rows-per-page-container {
+        flex-shrink: 0;
+        position: relative;
+    }
+
+    .rows-selector-btn {
+        height: 32px;
+        min-width: 115px; /* compact but readable */
+        padding: 0 8px;
+        font-size: 11.5px;
+        border-radius: 8px;
+    }
+
+    .rows-selector-btn .chevron {
+        width: 12px;
+        height: 12px;
+    }
+
+    .emp-rows-dropdown {
+        bottom: calc(100% + 8px);
+        top: auto;
+        width: 100%;
+        min-width: 80px;
+        border-radius: 8px;
+    }
+
+    .emp-rows-option {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+
+    /* Pagination */
+    .pagination {
+        margin-top: 0;
+        padding: 0;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 4px;
+    }
+
+    .pagination button {
+        padding: 0 6px;
+        height: 32px;
+        min-width: 32px;
+        font-size: 11px;
+        border-radius: 8px;
+    }
+
+    /* Modal dialog overrides */
+    .modal-content {
+        width: 95vw;
+        max-width: 480px;
+        height: 85vh;
+        border-radius: 20px;
+    }
+
+    .modal-layout {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .modal-aside {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #f0f2f5;
+        padding: 20px;
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .avatar-upload-wrapper {
+        margin-bottom: 0;
+    }
+
+    .avatar-preview {
+        width: 70px;
+        height: 70px;
+        margin-bottom: 0;
+    }
+
+    .avatar-preview img {
+        width: 70px;
+        height: 70px;
+    }
+
+    .upload-label {
+        padding: 6px 12px;
+        font-size: 11px;
+    }
+
+    #modal-aside-info {
+        flex: 1;
+        align-items: flex-start;
+        gap: 4px !important;
+    }
+
+    .modal-main {
+        padding: 20px 16px;
+        overflow-y: visible; /* Already scrollable via modal-layout */
+    }
+
+    .modal-form-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .form-group label {
+        font-size: 12px;
+    }
+
+    .modal-actions {
+        padding: 12px 16px;
+    }
+
+    .modal-actions button {
+        flex: 1;
+        padding: 10px;
+        font-size: 13px;
+        justify-content: center;
+    }
+
+    /* Delete modal overrides */
+    .modal-content.delete-modal {
+        width: 90vw;
+        max-width: 360px;
+        height: auto;
+        padding: 24px 16px;
+    }
+
+    .delete-modal-actions {
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+        margin-top: 16px;
+    }
+
+    .delete-modal-actions button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 576px) {
+    /* Permissions Modal */
+    .perm-modal {
+        width: 95vw;
+        max-height: 90vh;
+        border-radius: 16px;
+    }
+
+    .perm-header {
+        padding: 14px 18px;
+    }
+
+    .perm-header-title {
+        font-size: 14px;
+    }
+
+    .perm-body {
+        padding: 16px;
+        gap: 16px;
+    }
+
+    .perm-item {
+        padding: 10px 12px;
+    }
+
+    .perm-item-label {
+        font-size: 12px;
+    }
+}

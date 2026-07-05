@@ -311,10 +311,46 @@
     display: none;
 }
 
+/* --- Mobile Responsive --- */
+@media (max-width: 992px) {
+    .navigation-wrapper {
+        position: fixed;
+        top: 0;
+        right: -100%;
+        width: 250px !important;
+        min-width: 250px !important;
+        height: 100dvh;
+        z-index: 1000;
+        border-radius: 0;
+        transition: right 0.3s ease;
+    }
 
+    .navigation-wrapper.mobile-open {
+        right: 0;
+    }
 
+    .navigation-wrapper.collapsed {
+        width: 250px !important;
+        min-width: 250px !important;
+    }
 
+    .navigation-wrapper.collapsed #nav-language-selector {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+    }
 
+    .navigation-wrapper.collapsed .nav-menu li a span,
+    .navigation-wrapper.collapsed .nav-user-name,
+    .navigation-wrapper.collapsed .sidebar-profile .chevron-icon {
+        opacity: 1;
+        visibility: visible;
+    }
 
+    .navigation-wrapper.collapsed .sidebar-profile {
+        background-color: #f8fafc;
+        border-color: #e2e8f0;
+    }
+}
 
 

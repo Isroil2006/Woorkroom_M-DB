@@ -337,6 +337,7 @@ const collectAllEvents = async () => {
       const vacData = await resVac.json();
       if (vacData && vacData.success && Array.isArray(vacData.data)) {
         vacData.data.forEach((booking) => {
+          if (booking.status === "pending" || booking.status === "rejected") return;
           let startDate, endDate;
           if (booking.selectedDate && booking.selectedDate.start && booking.selectedDate.end) {
               startDate = parseDate(booking.selectedDate.start);
@@ -441,9 +442,12 @@ export const InfoPortalPage = () => `
                 </div>
             </div>
             <div class="cal-view-dropdown" id="cal-filter-dropdown" style="margin-left: 10px;">
-                <button class="cal-view-btn" id="cal-filter-btn" title="${currentFilter.includes('all') || currentFilter.length === 4 ? t('all_events') : currentFilter.map(f => t(f)).join(', ')}">
+                <button class="cal-view-btn" id="cal-filter-btn" style="position:relative;" title="${currentFilter.includes('all') || currentFilter.length === 4 ? t('all_events') : currentFilter.map(f => t(f)).join(', ')}">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sliders-horizontal-icon lucide-sliders-horizontal"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg>
-                  ${(!currentFilter.includes('all') && currentFilter.length > 0 && currentFilter.length < 4) ? currentFilter.map(f => `<span style="background-color:#F0F2F8; color:#1a1d2e; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; white-space:nowrap;">${t(f)}</span>`).join('') : ''}
+                  ${(!currentFilter.includes('all') && currentFilter.length > 0 && currentFilter.length < 4) ? `
+                    <span class="cal-filter-tags" style="display:flex;gap:4px;">${currentFilter.map(f => `<span style="background-color:#F0F2F8; color:#1a1d2e; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; white-space:nowrap;">${t(f)}</span>`).join('')}</span>
+                    <span class="cal-filter-badge"></span>
+                  ` : ''}
                 </button>
                 <div class="cal-view-menu" id="cal-filter-menu">
                     <div class="cal-filter-option ${currentFilter.includes('all') ? 'active' : ''}" data-filter="all">
@@ -1333,9 +1337,12 @@ export const initInfoPortalLogic = async () => {
         filterBtn.setAttribute("title", isAll ? t("all_events") : currentFilter.map(f => t(f)).join(", "));
         filterBtn.innerHTML = `
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sliders-horizontal-icon lucide-sliders-horizontal"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg>
-          ${!isAll ? currentFilter.map(f => `<span style="background-color:#F0F2F8; color:#1a1d2e; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; white-space:nowrap;">${t(f)}</span>`).join('') : ''}
+          ${!isAll ? `
+            <span class="cal-filter-tags" style="display:flex;gap:4px;">${currentFilter.map(f => `<span style="background-color:#F0F2F8; color:#1a1d2e; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; white-space:nowrap;">${t(f)}</span>`).join('')}</span>
+            <span class="cal-filter-badge"></span>
+          ` : ''}
         `;
-        filterBtn.style.position = "";
+        filterBtn.style.position = "relative";
       }
       
       animateAndRenderCalendar();
@@ -1391,7 +1398,16 @@ const attachCalendarEvents = () => {
       if (e.target.closest(".cal-more-btn") || e.target.closest(".cal-day-popover")) return;
       
       const dateStr = el.dataset.date;
-      if (dateStr) showEventDetails(dateStr);
+      if (dateStr) {
+        if (window.innerWidth <= 992) {
+          // On mobile, switch to day view instead of showing modal directly
+          currentView = "day";
+          currentDate = new Date(dateStr);
+          renderCalendar();
+        } else {
+          showEventDetails(dateStr);
+        }
+      }
     });
   });
 

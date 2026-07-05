@@ -293,7 +293,7 @@
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.5fr) 70px;
 }
     .docs-cols {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 0.5fr);
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1.25fr) minmax(0, 1.25fr) minmax(0, 0.5fr);
     }
 
 .mini-table-header {
@@ -1248,6 +1248,26 @@
     background-clip: padding-box;
 }
 
+.ts-options-scroll::-webkit-scrollbar { 
+    width: 14px; 
+}
+.ts-options-scroll::-webkit-scrollbar-track { 
+    background: transparent; 
+    margin-top: 12px; 
+    margin-bottom: 12px; 
+}
+.ts-options-scroll::-webkit-scrollbar-thumb { 
+    background: #d0d6e8; 
+    border-radius: 10px; 
+    border: 4px solid #fff; 
+    background-clip: padding-box;
+}
+.ts-options-scroll::-webkit-scrollbar-thumb:hover { 
+    background: #aab4d3; 
+    border: 4px solid #fff;
+    background-clip: padding-box;
+}
+
 .pmt-method-card {
     display: flex;
     align-items: center;
@@ -1902,4 +1922,53 @@ input:checked + .switch-slider {
 }
 input:checked + .switch-slider:before {
     transform: translateX(20px);
+}
+
+/* ── FREEZE CARD OPTION OVERLAYS ── */
+.blocked-option-card {
+    position: relative !important;
+    overflow: hidden !important;
+}
+.blocked-option-card .card-freeze-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #38bdf8;
+    margin-left: auto;
+    transition: opacity 0.2s ease;
+}
+.blocked-option-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(1px);
+    opacity: 0;
+    transition: opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+    pointer-events: none;
+    border-radius: inherit;
+}
+.blocked-option-card .freeze-hover-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 11;
+    pointer-events: none;
+}
+.blocked-option-card:hover::after {
+    opacity: 1;
+}
+.blocked-option-card:hover .freeze-hover-overlay {
+    opacity: 1;
+}
+.blocked-option-card:hover .card-freeze-indicator {
+    opacity: 0;
 }

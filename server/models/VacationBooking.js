@@ -5,7 +5,9 @@ const vacationBookingSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     vacationId: { type: mongoose.Schema.Types.ObjectId, ref: "Vacation", required: true },
     guests: { type: Number, required: true, default: 1 },
-    totalCost: { type: Number, required: true },
+    totalCost: { type: Number, required: true }, // USD price from vacation
+    paidAmount: { type: Number, default: null }, // Actual amount deducted from card (USD or UZS)
+    paidCurrency: { type: String, enum: ["USD", "UZS"], default: "UZS" }, // Currency of paidAmount
     paymentMethod: {
       type: { type: String, enum: ["card", "bank"], default: "card" },
       number: { type: String }, // e.g. masked card number or account number
