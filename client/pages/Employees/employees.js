@@ -256,8 +256,8 @@ export function initEmployeesPage() {
                     </div>
 
                     <div class="name-email-box">
-                        <span class="username">${u.username || "—"}</span>
-                        <span class="useremail">${u.email || "—"}</span>
+                        <span class="username">${DOMPurify.sanitize(u.username || "—")}</span>
+                        <span class="useremail">${DOMPurify.sanitize(u.email || "—")}</span>
                     </div>
 
                     <div class="emp-chevron-wrap">
@@ -269,19 +269,19 @@ export function initEmployeesPage() {
                 <div class="user-main-info">
                     <div class="info-chip">
                         <span class="info-chip-label">${t("gender")}</span>
-                        <span class="info-chip-value">${u.gender || "—"}</span>
+                        <span class="info-chip-value">${DOMPurify.sanitize(u.gender || "—")}</span>
                     </div>
                     <div class="info-chip">
                         <span class="info-chip-label">${t("age")}</span>
-                        <span class="info-chip-value">${u.age || "—"}</span>
+                        <span class="info-chip-value">${DOMPurify.sanitize(String(u.age || "—"))}</span>
                     </div>
                     <div class="info-chip info-chip">
                         <span class="info-chip-label">${t("position")}</span>
-                        <span class="info-chip-value">${u.position || "—"}</span>
+                        <span class="info-chip-value">${DOMPurify.sanitize(u.position || "—")}</span>
                     </div>
                     <div class="info-chip">
                         <span class="info-chip-label">${t("level_mini") || "Level"}</span>
-                        <span class="info-chip-value">${u.level || "—"}</span>
+                        <span class="info-chip-value">${DOMPurify.sanitize(u.level || "—")}</span>
                     </div>
                 </div>
                 <div class="employee-actions">
@@ -477,10 +477,10 @@ export function initEmployeesPage() {
 
       asideInfo.innerHTML = `
             <div style="text-align: center; color: #8892a4; font-size: 14px; font-weight: 600;">
-                ${u.username || "—"}
+                ${DOMPurify.sanitize(u.username || "—")}
             </div>
             <div style="text-align: center; color: #5b6ef5; font-size: 13px; font-weight: 700;">
-                ${u.position || "—"}
+                ${DOMPurify.sanitize(u.position || "—")}
             </div>
         `;
     }, 400); // Small fake delay for skeleton effect

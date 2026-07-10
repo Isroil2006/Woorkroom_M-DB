@@ -12,6 +12,8 @@ const userSchema = new mongoose.Schema(
     position: { type: String, default: "" }, // ish holati
     level: { type: String, default: "" }, // daraja (junior, middle, senior)
     age: { type: Number, default: null },
+    loginAttempts: { type: Number, required: true, default: 0 },
+    lockUntil: { type: Date }
   },
   { timestamps: true },
 );

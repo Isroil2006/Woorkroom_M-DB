@@ -8,7 +8,12 @@ export const signInForm = `
         </div>
         <div class="input-group">
             <label for="password">Password</label>
-            <input class="input" type="password" id="password"  placeholder="********" required>
+            <div class="password-wrapper">
+                <input class="input" type="password" id="password"  placeholder="********" required>
+                <button type="button" class="password-toggle" id="toggle-signin-password">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-eye-off"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                </button>
+            </div>
             <p class="error-message" id="error-password"></p>
         </div>
         <button type="button" class="signin-btn btn">Sign In
@@ -28,12 +33,12 @@ export const signUpForm = `
             <!-- Left Column -->
             <div style="flex:1; display:flex; flex-direction:column; gap:20px; min-width:300px;">
                 <div class="input-group">
-                    <label for="reg-firstname">Ism</label>
+                    <label for="reg-firstname">First Name</label>
                     <input class="input" type="text" id="reg-firstname" autocomplete="off" placeholder="John" required>
                     <p class="error-message" id="error-reg-firstname"></p>
                 </div>
                 <div class="input-group">
-                    <label for="reg-lastname">Familiya</label>
+                    <label for="reg-lastname">Last Name</label>
                     <input class="input" type="text" id="reg-lastname" autocomplete="off" placeholder="Doe" required>
                     <p class="error-message" id="error-reg-lastname"></p>
                 </div>
@@ -53,7 +58,33 @@ export const signUpForm = `
                 </div>
                 <div class="input-group">
                     <label for="reg-password">Create Password</label>
-                    <input class="input" type="password" id="reg-password" autocomplete="new-password" placeholder="********" required>
+                    <div class="password-wrapper">
+                        <input class="input" type="text" id="reg-password" autocomplete="off" placeholder="********" required>
+                        <button type="button" class="password-gen-btn" id="generate-reg-password" title="Generate Secure Password">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-key"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+                        </button>
+                        <button type="button" class="password-toggle" id="toggle-reg-password">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-eye-off"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                        </button>
+                    </div>
+                    <div id="password-validation-wrapper" class="password-validation-wrapper hidden-validation">
+                        <div class="val-item invalid" id="val-length">
+                            <span class="val-icon">✕</span>
+                            <span class="val-text">At least 8 characters</span>
+                        </div>
+                        <div class="val-item invalid" id="val-uppercase">
+                            <span class="val-icon">✕</span>
+                            <span class="val-text">At least 1 uppercase letter (A-Z)</span>
+                        </div>
+                        <div class="val-item invalid" id="val-number">
+                            <span class="val-icon">✕</span>
+                            <span class="val-text">At least 1 number (0-9)</span>
+                        </div>
+                        <div class="val-item invalid" id="val-special">
+                            <span class="val-icon">✕</span>
+                            <span class="val-text">At least 1 special character (.-_+@#)</span>
+                        </div>
+                    </div>
                     <p class="error-message" id="error-reg-password"></p>
                 </div>
             </div>

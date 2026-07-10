@@ -1,6 +1,17 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <style id="antiClickjack">
+      body { display: none !important; }
+    </style>
+    <script type="text/javascript">
+      if (self === top) {
+        var antiClickjack = document.getElementById("antiClickjack");
+        antiClickjack.parentNode.removeChild(antiClickjack);
+      } else {
+        top.location = self.location;
+      }
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <title>Woorkroom</title>
@@ -107,6 +118,7 @@
         }
       })();
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
   </head>
   <body>
     <!-- GLOBAL LOADER -->

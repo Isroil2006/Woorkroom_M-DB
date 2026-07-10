@@ -1989,7 +1989,7 @@ const renderListRow = (task) => {
         <button class="todo-check-btn ${myDone ? "checked" : ""}" data-tid="${task._id}" data-action="check" style="${canChangeStatus ? "" : "display:none;"}">
           ${myDone ? `<svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/></svg>` : ""}
         </button>
-        <span class="todo-row-title ${myDone ? "done-text" : ""}">${task.title}</span>
+        <span class="todo-row-title ${myDone ? "done-text" : ""}">${DOMPurify.sanitize(task.title)}</span>
         
         <!-- Mobile Chevron Arrow -->
         <div class="todo-row-mobile-arrow" data-action="toggle-expand" data-tid="${task._id}">
@@ -2358,7 +2358,7 @@ const renderBoardCard = (task) => {
         <button class="todo-check-btn ${myDone ? "checked" : ""}" data-tid="${task._id}" data-action="check" style="${canChangeStatus ? "" : "display:none;"}">
           ${myDone ? `<svg width="10" height="10" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/></svg>` : ""}
         </button>
-        <span class="todo-card-title ${myDone ? "done-text" : ""}">${task.title}</span>
+        <span class="todo-card-title ${myDone ? "done-text" : ""}">${DOMPurify.sanitize(task.title)}</span>
         <div class="todo-card-actions">
           ${
             owner
@@ -2373,7 +2373,7 @@ const renderBoardCard = (task) => {
           }
         </div>
       </div>
-      ${task.description ? `<p class="todo-card-desc">${task.description}</p>` : ""}
+      ${task.description ? `<p class="todo-card-desc">${DOMPurify.sanitize(task.description)}</p>` : ""}
       <div class="todo-card-footer">
         <div class="todo-card-footer-left">
           ${getPriorityBadge(task.priority || "none")}
@@ -3117,7 +3117,7 @@ const renderTaskDetailView = async () => {
           <button class="back-to-tasks" id="back-to-tasks-btn">
             <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M19 12H5m0 0l7 7m-7-7l7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0;">${task.title}</h2>
+          <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0;">${DOMPurify.sanitize(task.title)}</h2>
         </div>
         <div class="settings-actions" style="gap: 8px; display: flex;">
            <button class="todo-detail-history-btn" id="task-detail-chat-btn" style="position: relative; align-items: center; display: flex; gap: 6px; padding: 8px 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; color: #5a6279; transition: all 0.2s;">
@@ -3156,7 +3156,7 @@ const renderTaskDetailView = async () => {
           <div class="todo-detail-section">
             <p class="todo-detail-section-label" id="td-lbl-desc">${t("description_label")}</p>
             <p class="todo-detail-desc" id="td-desc">
-              ${task.description || (lang === "uz" ? "Tavsif yo'q" : lang === "ru" ? "Нет описания" : "No description")}
+              ${task.description ? DOMPurify.sanitize(task.description) : (lang === "uz" ? "Tavsif yo'q" : lang === "ru" ? "Нет описания" : "No description")}
             </p>
           </div>
 

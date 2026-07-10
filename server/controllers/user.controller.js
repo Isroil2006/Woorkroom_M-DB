@@ -19,6 +19,18 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "Bu email band!" });
     }
 
+    // Parol xavfsizlik talablarini tekshirish
+    const isLengthValid = password && password.length >= 8;
+    const isUppercaseValid = /[A-Z]/.test(password || "");
+    const isNumberValid = /[0-9]/.test(password || "");
+    const isSpecialValid = /[\.\-\_\+\@\#]/.test(password || "");
+
+    if (!isLengthValid || !isUppercaseValid || !isNumberValid || !isSpecialValid) {
+      return res.status(400).json({
+        message: "Parol xavfsizlik talablariga javob bermaydi (Kamida 8 ta belgi, 1 ta katta harf, 1 ta raqam va 1 ta maxsus belgi qatnashishi shart)."
+      });
+    }
+
     const newUser = new User({
       userId,
       username,
@@ -91,11 +103,32 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(401).json({ message: "Email yoki parol noto'g'ri" });
+      return res.status(401).json({ message: "Incorrect email or password" });
+    }
+
+    // Check if account is locked
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      return res.status(403).json({
+        message: "Account is temporarily locked due to consecutive failed login attempts.",
+        locked: true,
+        lockUntil: user.lockUntil.getTime()
+      });
+    }
+
+    // Reset attempts if lock has expired
+    if (user.lockUntil && user.lockUntil <= Date.now()) {
+      user.loginAttempts = 0;
+      user.lockUntil = undefined;
+      await user.save();
     }
 
     const isMatch = await user.comparePassword(password);
     if (isMatch) {
+      // Reset counter on success
+      user.loginAttempts = 0;
+      user.lockUntil = undefined;
+      await user.save();
+
       // JWT token yaratish
       const token = jwt.sign({ id: user._id, userId: user.userId, email: user.email }, JWT_SECRET, { expiresIn: "24h" });
 
@@ -111,18 +144,37 @@ exports.login = async (req, res) => {
       // User ma'lumotlarini password'siz qaytarish
       const userObj = user.toObject();
       delete userObj.password;
+      delete userObj.loginAttempts;
+      delete userObj.lockUntil;
 
       res.status(200).json({
         user: userObj,
         token: token,
       });
     } else {
-      res.status(401).json({ message: "Email yoki parol noto'g'ri" });
+      // Increment failed attempts count
+      user.loginAttempts = (user.loginAttempts || 0) + 1;
+
+      if (user.loginAttempts >= 5) {
+        user.lockUntil = Date.now() + 10 * 60 * 1000; // 10 minutes lock
+        await user.save();
+        return res.status(403).json({
+          message: "Account is temporarily locked due to consecutive failed login attempts.",
+          locked: true,
+          lockUntil: user.lockUntil.getTime()
+        });
+      } else {
+        await user.save();
+        return res.status(401).json({
+          message: "Incorrect email or password",
+          attemptsRemaining: 5 - user.loginAttempts
+        });
+      }
     }
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({
-      message: "Tizimga kirishda xatolik yuz berdi",
+      message: "An error occurred during sign in. Please try again later.",
       error: error.message,
     });
   }

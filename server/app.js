@@ -116,6 +116,49 @@ app.use(cors({ origin: true, credentials: true })); // CORS ni kuki bilan ishlas
 app.use(cookieParser());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+// Global XSS Sanitization Middleware (HTML Escaping)
+const sanitizeInput = (val, key) => {
+  if (typeof val === "string") {
+    // Skip 'description' (rich text Quill editor) and 'password' (prevent hashing mutation)
+    if (key === "description" || key === "password") {
+      return val;
+    }
+    return val
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;")
+      .replace(/\//g, "&#x2F;");
+  }
+  if (Array.isArray(val)) {
+    return val.map((item) => sanitizeInput(item, key));
+  }
+  if (typeof val === "object" && val !== null) {
+    const clean = {};
+    for (const k in val) {
+      clean[k] = sanitizeInput(val[k], k);
+    }
+    return clean;
+  }
+  return val;
+};
+
+app.use((req, res, next) => {
+  if (req.body) req.body = sanitizeInput(req.body);
+  if (req.query) req.query = sanitizeInput(req.query);
+  if (req.params) req.params = sanitizeInput(req.params);
+  next();
+});
+
+// Clickjacking Himoyasi (HTTP Response Headers)
+app.use((req, res, next) => {
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'self'");
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "../client")));
 
 // Routes
