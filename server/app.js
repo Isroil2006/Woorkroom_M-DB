@@ -120,7 +120,6 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // Global XSS Sanitization Middleware (HTML Escaping)
 const sanitizeInput = (val, key) => {
   if (typeof val === "string") {
-    // Skip 'description' (rich text Quill editor) and 'password' (prevent hashing mutation)
     if (key === "description" || key === "password") {
       return val;
     }

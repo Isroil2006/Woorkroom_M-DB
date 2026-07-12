@@ -190,12 +190,16 @@ const formatDateSep = (iso, lang) => {
 const isEmojiOnly = (t) =>
   /^(\p{Emoji_Presentation}|\p{Extended_Pictographic}|\s)+$/u.test(t.trim()) &&
   t.trim().length <= 8;
+
+
 const escHtml = (s) =>
   String(s)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+
+    
 
 const getMsgCountFrom = (a, b) =>
   getMessages(a, b).filter((m) => m.from === b).length;
@@ -763,7 +767,6 @@ const renderMessages = () => {
       const edited = msg.edited
         ? `<span class="msg-edited">${tr.edited}</span>`
         : "";
-      // emoji-only → only delete; text → edit+delete (mine) or delete (theirs)
       const acts = isMine
         ? `<div class="msg-hover-acts msg-ha-left">${eo ? "" : editBtn}${delBtn}</div>`
         : `<div class="msg-hover-acts msg-ha-right">${delBtn}</div>`;

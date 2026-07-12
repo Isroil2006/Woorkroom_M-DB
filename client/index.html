@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="en">
   <head>
+
     <style id="antiClickjack">
       body { display: none !important; }
     </style>
+
     <script type="text/javascript">
       if (self === top) {
         var antiClickjack = document.getElementById("antiClickjack");
@@ -12,6 +14,7 @@
         top.location = self.location;
       }
     </script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <title>Woorkroom</title>
@@ -20,105 +23,11 @@
     <link rel="stylesheet" href="./components/Notification/notification.css" />
     <link rel="stylesheet" href="./pages/SuperSettings/supersettings.css" />
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-    <style>
-      #mobile-interceptor {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: #f8fafc;
-        z-index: 9999999;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-        text-align: center;
-        font-family: inherit;
-        box-sizing: border-box;
-      }
-      #mobile-interceptor.active {
-        display: flex;
-      }
-      .mobile-receipt-card {
-        background: #fff;
-        border-radius: 16px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-        padding: 24px;
-        width: 100%;
-        max-width: 400px;
-        text-align: left;
-      }
-      .mobile-receipt-card h2 {
-        margin: 0 0 16px;
-        color: #1e293b;
-        font-size: 20px;
-        text-align: center;
-        border-bottom: 2px dashed #e2e8f0;
-        padding-bottom: 16px;
-      }
-      .mobile-receipt-row {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 12px;
-        font-size: 14px;
-      }
-      .mobile-receipt-label { color: #64748b; }
-      .mobile-receipt-val { color: #0f172a; font-weight: 600; text-align: right; word-break: break-all; margin-left: 10px; }
-      .mobile-error-msg {
-        color: #1e293b;
-        font-size: 20px;
-        font-weight: 700;
-        margin-bottom: 10px;
-      }
-      .mobile-error-sub {
-        color: #64748b;
-        font-size: 15px;
-      }
-    </style>
-    <script>
-      (function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const receiptData = urlParams.get('receiptData');
+    <link rel="stylesheet" href="./assets/css/mobile-receipt.css" />
+    <script src="./assets/js/mobile-receipt.js"></script>
 
-        if (receiptData) {
-          document.addEventListener("DOMContentLoaded", () => {
-            const overlay = document.createElement("div");
-            overlay.id = "mobile-interceptor";
-            overlay.className = "active";
-            
-            const decoded = decodeURIComponent(receiptData);
-            const lines = decoded.split('\n');
-            let html = '<div class="mobile-receipt-card">';
-            
-            let title = "Tranzaksiya Cheki";
-            if(lines.length > 0 && !lines[0].includes(':')) {
-               title = lines[0].replace(/-/g, '').trim() || title;
-            }
-            html += '<h2>' + title + '</h2>';
-
-            lines.forEach(line => {
-               if (line.includes(':')) {
-                  const firstColon = line.indexOf(':');
-                  const label = line.substring(0, firstColon).trim();
-                  const val = line.substring(firstColon + 1).trim();
-                  html += '<div class="mobile-receipt-row"><span class="mobile-receipt-label">' + label + '</span><span class="mobile-receipt-val">' + val + '</span></div>';
-               }
-            });
-            html += '</div>';
-            overlay.innerHTML = html;
-
-            document.body.appendChild(overlay);
-            const container = document.querySelector(".container");
-            if (container) container.style.display = "none";
-            const globalLoader = document.getElementById("global-loader");
-            if (globalLoader) globalLoader.style.display = "none";
-          });
-        }
-      })();
-    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
+    
   </head>
   <body>
     <!-- GLOBAL LOADER -->

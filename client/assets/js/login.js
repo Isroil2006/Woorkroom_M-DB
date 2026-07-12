@@ -197,7 +197,6 @@ function attachEvents() {
           valWrapper.classList.remove("hidden-validation");
           validatePassword();
           
-          // Force display password plaintext so they can read/copy it
           regPasswordInput.classList.add("show-password");
           const toggleRegBtn = document.getElementById("toggle-reg-password");
           if (toggleRegBtn) {

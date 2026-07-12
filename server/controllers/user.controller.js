@@ -151,6 +151,7 @@ exports.login = async (req, res) => {
         user: userObj,
         token: token,
       });
+      
     } else {
       // Increment failed attempts count
       user.loginAttempts = (user.loginAttempts || 0) + 1;
