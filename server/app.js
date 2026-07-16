@@ -8,6 +8,9 @@ const dbConnect = require("./db");
 
 const app = express();
 
+// X-Powered-By headerni o'chirish (server ma'lumotini yashirish)
+app.disable("x-powered-by");
+
 app.use(async (req, res, next) => {
   try {
     await dbConnect();
@@ -112,7 +115,14 @@ const swaggerDocs = swaggerJsdoc(swaggerOptions);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // Middleware
-app.use(cors({ origin: true, credentials: true })); // CORS ni kuki bilan ishlashga moslash
+app.use(cors({
+  origin: process.env.NODE_ENV === "production"
+    ? ["https://woorkroom.uz", "https://www.woorkroom.uz"]
+    : ["http://localhost:5173", "http://localhost:5000"],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 app.use(cookieParser());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
@@ -151,10 +161,42 @@ app.use((req, res, next) => {
   next();
 });
 
-// Clickjacking Himoyasi (HTTP Response Headers)
+// Xavfsizlik Headerlari (ZAP tavsiyalari bo'yicha)
 app.use((req, res, next) => {
+  // Clickjacking himoyasi
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
-  res.setHeader("Content-Security-Policy", "frame-ancestors 'self'");
+
+  // Content Security Policy (CSP) — to'liq
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com; connect-src 'self' https://*.pusher.com wss://*.pusher.com; frame-ancestors 'self'"
+  );
+
+  // MIME-type sniffing himoyasi
+  res.setHeader("X-Content-Type-Options", "nosniff");
+
+  // HTTPS majburlash (production uchun)
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+
+  // XSS himoyasi (eski brauzerlar uchun)
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+
+  // Referrer-Policy
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+
+  // Permissions-Policy
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+
+  // Server header ni yashirish
+  res.removeHeader("Server");
+
+  // API javoblar uchun kesh boshqaruvi
+  if (req.path.startsWith("/api/")) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
+
   next();
 });
 
@@ -191,7 +233,10 @@ app.get(["/", "/profile", "/super-settings", "/index.html"], (req, res) => {
     return res.redirect("/login.html");
   }
   try {
-    const secret = process.env.JWT_SECRET || "fallback_secret_for_dev_only";
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      return res.redirect("/login.html");
+    }
     jwt.verify(token, secret);
     res.sendFile(path.join(__dirname, "../client/index.html"));
   } catch (e) {
